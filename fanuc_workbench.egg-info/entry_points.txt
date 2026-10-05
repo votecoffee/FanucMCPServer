@@ -1,0 +1,2 @@
+[console_scripts]
+fanuc-workbench = fanuc_workbench.app:main
