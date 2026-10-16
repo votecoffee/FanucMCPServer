@@ -2,7 +2,11 @@
 
 The GUI, local Python API and MCP adapter share controller, parser and analysis
 services. The server now exposes 48 tools. No physical robot has been contacted;
-native acceptance remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
+physical acceptance remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
+
+Workbench 2.1 / bridge 0.9 adds native data, reviewed R/PR value edits and LS
+deployment through the existing operation catalog. See [native API setup and
+verification limits](ROBOT_NATIVE_API.md). Native access is disabled by default.
 
 ## Setup
 

@@ -20,6 +20,9 @@
       },
       "writable_files": [],
       "creatable_files": [],
+      "native_provider": "disabled",
+      "native_register_targets": [],
+      "native_programs": [],
       "comment_max_bytes": 16,
       "comment_encoding": "ascii"
     }
