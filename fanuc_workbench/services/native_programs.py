@@ -8,7 +8,7 @@ from decimal import Decimal
 from fanuc_workbench.services.native_values import fingerprint, program_name
 
 TOKEN = re.compile(r'''"[^"\r\n]*"|'[^'\r\n]*'|[A-Za-z_$][A-Za-z0-9_$]*|(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?|[^\s]''')
-GENERATED = re.compile(r"^\s*(OWNER|PROGRAM_SIZE|CREATE|MODIFIED|FILE_NAME|LINE_COUNT|MEMORY_SIZE)\s*=", re.I)
+GENERATED = re.compile(r"^\s*(OWNER|PROG_SIZE|PROGRAM_SIZE|CREATE|MODIFIED|FILE_NAME|LINE_COUNT|MEMORY_SIZE)\s*=", re.I)
 
 
 def validate_source(data):

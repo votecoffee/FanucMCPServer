@@ -224,6 +224,8 @@ def test_native_audit_failure_prevents_vendor_write_and_preserves_plan(native_ca
 def test_listing_verification_retains_instruction_and_position_differences():
     altered = SOURCE.replace(b'   1:', b'  99:')
     assert verify_listing(SOURCE, altered)['matches']
+    sized = SOURCE.replace(b'/ATTR', b'/ATTR\r\nPROG_SIZE = 0;')
+    assert verify_listing(sized, sized.replace(b'PROG_SIZE = 0', b'PROG_SIZE = 1234'))['matches']
     assert not verify_listing(SOURCE, SOURCE.replace(b'fixture', b'changed'))['matches']
     assert validate_source(SOURCE)['program'] == 'FWBTEST'
     for bad in [SOURCE.replace(b'/END', b''), SOURCE.replace(b'FWBTEST', b'../X'), SOURCE+b'/END']:

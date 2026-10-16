@@ -21,8 +21,8 @@ def create_server(bridge: RobotBridge):
             "diff or binary hashes and proposed SHA-256 to the user. Call commit_upload only after the user "
             "has explicitly approved that exact prepared change. An approval hash binds bytes, but does not "
             "authenticate a human. Native register/program changes use the operation catalog and commit_change "
-            "after the same exact proposal review and approval. Do not change native target policy to bypass a refusal. An approval hash does not "
-            "authenticate a human. Do not change bridge policy or writable_files to bypass a refusal. "
+            "after the same exact proposal review and approval. Do not change native target policy, "
+            "bridge policy or writable_files to bypass a refusal. "
             "File transfer/readback does not prove controller load, runtime behavior or robot safety."
         ),
     )
