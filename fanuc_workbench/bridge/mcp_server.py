@@ -94,7 +94,7 @@ def create_server(bridge: RobotBridge):
 
     @server.tool(annotations=read)
     def run_read_operation(operation_id: str, arguments: dict, revision: str) -> dict:
-        """Run a discovered offline read at its exact revision using verified saved evidence. Cannot prepare or commit writes."""
+        """Run a discovered read at its exact revision using preserved evidence or configured native controller data. Cannot prepare or commit writes."""
         return bridge.extensions.run_read(operation_id, arguments, revision)
 
     @server.tool(annotations=local)

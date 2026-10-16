@@ -63,6 +63,8 @@ class RobotBridge:
         self.operations = WorkbenchOperations(self)
         from fanuc_workbench.bridge.comments import CommentChanges
         self.comments = CommentChanges(self)
+        from fanuc_workbench.bridge.native import NativeChanges
+        self.native = NativeChanges(self)
         from fanuc_workbench.bridge.extension_host import ExtensionHost
         self.extensions = ExtensionHost(self)
 
@@ -73,6 +75,7 @@ class RobotBridge:
 
     def close(self):
         self.operations.jobs.close()
+        self.native.close()
         self.extensions.close()
 
     def __enter__(self):
@@ -83,6 +86,8 @@ class RobotBridge:
 
     def cancel_change(self, plan_id: str) -> dict:
         with self._lock:
+            if plan_id in self.native.plans:
+                return self.native.cancel(plan_id)
             if plan_id in self.comments.plans:
                 self.comments.plans.pop(plan_id)
                 self._audit("comment_cancelled", plan_id=plan_id)
@@ -91,12 +96,16 @@ class RobotBridge:
 
     def change_review(self, plan_id: str, approved_sha256: str) -> dict:
         with self._lock:
+            if plan_id in self.native.plans:
+                return self.native.review(plan_id, approved_sha256)
             if plan_id in self.comments.plans:
                 return self.comments.review(plan_id, approved_sha256)
             return self.upload_review(plan_id, approved_sha256)
 
     def commit_change(self, plan_id: str, approved_sha256: str, *, client_approved=False) -> dict:
         with self._lock:
+            if plan_id in self.native.plans:
+                return self.native.commit(plan_id, approved_sha256, client_approved=client_approved)
             if plan_id in self.comments.plans:
                 return self.comments.commit(plan_id, approved_sha256, client_approved=client_approved)
             return self.commit_upload(plan_id, approved_sha256, client_approved=client_approved)
@@ -146,6 +155,7 @@ class RobotBridge:
                     return {"status": "unchanged", "changed_robots": [], "invalidated_upload_plans": 0,
                             "invalidated_comment_plans": 0, "controller_contacted": False}
                 uploads, comments = len(self._plans), len(self.comments.plans)
+                native = len(self.native.plans)
                 endpoints = [{"robot_id": key, "before": {"host": self.config.robots[key].profile.host,
                               "port": self.config.robots[key].profile.port,
                               "timeout": self.config.robots[key].profile.timeout,
@@ -158,13 +168,18 @@ class RobotBridge:
                 # Persist the event before applying the in-memory switch. Preserve all evidence.
                 self._audit("connections_reloaded", robot_ids=changed,
                             invalidated_upload_plans=uploads, invalidated_comment_plans=comments,
+                            invalidated_native_plans=native,
                             connections=endpoints)
                 self._plans.clear()
                 self.comments.plans.clear()
+                self.native.plans.clear()
+                self.native.receipts.clear()
+                self.native.close()
                 self.config = candidate
                 self.operations._last_sample.clear()
                 return {"status": "reloaded", "changed_robots": changed,
                         "invalidated_upload_plans": uploads, "invalidated_comment_plans": comments,
+                        "invalidated_native_plans": native,
                         "controller_contacted": False, "requires_fresh_reads": True,
                         "connections": [{"robot_id": key, "host": candidate.robots[key].profile.host,
                                          "port": candidate.robots[key].profile.port,
@@ -236,6 +251,8 @@ class RobotBridge:
              "transport": access.profile.transport, "roots": access.profile.roots,
              "writable_files": list(access.writable_files), "comment_targets": list(access.comment_targets),
              "creatable_files": list(access.creatable_files),
+             "native_provider": access.native_provider, "native_register_targets": list(access.native_register_targets),
+             "native_programs": list(access.native_programs),
              "comment_service_url": access.comment_service_url, "comment_max_bytes": access.comment_max_bytes,
              "comment_encoding": access.comment_encoding}
             for key, access in self.config.robots.items()

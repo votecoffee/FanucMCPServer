@@ -44,6 +44,9 @@ class RobotAccess:
     creatable_files: tuple[str, ...] = ()
     comment_max_bytes: int = 16
     comment_encoding: str = "ascii"
+    native_provider: str = "disabled"
+    native_register_targets: tuple[str, ...] = ()
+    native_programs: tuple[str, ...] = ()
 
     def connection_profile(self) -> RobotProfile:
         # Resolve secrets only at connection time; never return them through tools.
@@ -118,8 +121,20 @@ class BridgeConfig:
             if any(not isinstance(target, str) or not re.fullmatch(r"(?:R|PR|DIN|DOUT|GIN|GOUT|AIN|AOUT|RI|RO|FLG)\[[1-9][0-9]{0,5}\]", target)
                    for target in targets):
                 raise ValueError("Comment targets must be explicit supported register or I/O identifiers")
+            from fanuc_workbench.services.native_values import register_target, program_name
+            native_provider = item.get("native_provider", "disabled")
+            if native_provider not in {"disabled", "frrobot"}:
+                raise ValueError("Native provider must be disabled or frrobot")
+            native_targets, native_programs = item.get("native_register_targets", []), item.get("native_programs", [])
+            if (not isinstance(native_targets, list) or len(native_targets) > 256
+                    or not isinstance(native_programs, list) or len(native_programs) > 256):
+                raise ValueError("Native policy requires bounded lists of exact targets")
+            for target in native_targets:
+                register_target(target)
+            for name in native_programs:
+                program_name(name)
             robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable, comment_url, targets,
-                                          creatable, maximum_comment, comment_encoding)
+                creatable, maximum_comment, comment_encoding, native_provider, tuple(native_targets), tuple(native_programs))
 
         def local_dir(key: str) -> Path:
             value = Path(data[key])

@@ -53,6 +53,8 @@ def main():
                 result = {"ok": True, "result": result}
             except Exception as exc:
                 result = {"ok": False, "error_type": type(exc).__name__, "hresult": getattr(exc, "hresult", None)}
+                if type(exc) is ValueError:
+                    result["reason"] = str(exc)[:256]  # Fixed contract messages; vendor exception text is excluded.
             send({"request_id": request["request_id"], "result": result})
     finally:
         robot = None

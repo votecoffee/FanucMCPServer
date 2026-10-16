@@ -39,7 +39,7 @@ def test_builtin_catalog_and_legacy_analysis_share_verified_context(bridge_case)
     bridge, robot, config = bridge_case
     assert not bridge.extensions.status()['loaded']
     rows = bridge.extensions.list()
-    assert rows['total'] == 24 and len(rows['extensions']) == 1
+    assert rows['total'] == 32 and len(rows['extensions']) == 1
     identifier = imported(bridge, robot, config)
     operation = descriptor(bridge, 'workbench.analysis.health')
     assert bridge.extensions.run_read(operation['id'], {'artifact_id': identifier}, operation['revision'])['result'] == bridge.operations.analyze(identifier, 'health')

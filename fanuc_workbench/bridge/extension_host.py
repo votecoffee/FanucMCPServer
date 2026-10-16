@@ -34,9 +34,24 @@ def core_operations():
         ("core.comments.update", "Prepare an exact-allowlisted description change; never a value write",
          ["robot_id", "listing_path", "target", "comment", "expected_sha256"]),
     ]
-    return {name: {"id": name, "description": description, "effect": "prepare", "revision": "core@1",
+    operations = {name: {"id": name, "description": description, "effect": "prepare", "revision": "core@1",
                    "input_schema": object_schema(fields, fields), "output_schema": {"type": "object"},
                    "extension_id": "core"} for name, description, fields in specs}
+    native = [
+        ("core.controller.status", "Read native current position, task status and alarm evidence", "read", {"robot_id": {"type": "string"}, "group": {"type": "integer", "minimum": 1, "maximum": 8}, "alarm_limit": {"type": "integer", "minimum": 0, "maximum": 100}}, ["robot_id"]),
+        ("core.controller.sample", "Read native R/PR/I/O values through the configured vendor data API", "read", {"robot_id": {"type": "string"}, "expressions": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 100, "uniqueItems": True}}, ["robot_id", "expressions"]),
+        ("core.controller.reconnect", "Explicitly reconnect a native worker after failure; invalidates native plans; no controller writes", "read", {"robot_id": {"type": "string"}}, ["robot_id"]),
+        ("core.controller.programs", "Browse native program names and metadata", "read", {"robot_id": {"type": "string"}, "offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}, ["robot_id"]),
+        ("core.registers.read", "Preserve a typed native R/PR value and exact endpoint-bound SHA-256 before editing", "read", {"robot_id": {"type": "string"}, "target": {"type": "string"}}, ["robot_id", "target"]),
+        ("core.programs.inspect", "Capture native program presence/metadata and exact TP/LS evidence before deployment", "read", {"robot_id": {"type": "string"}, "program": {"type": "string"}}, ["robot_id", "program"]),
+        ("core.registers.update", "Prepare an exact-allowlisted R/PR value change from a preserved native read; no write", "prepare", {"robot_id": {"type": "string"}, "target": {"type": "string"}, "expected_sha256": {"type": "string"}, "change": {"type": "object"}}, ["robot_id", "target", "expected_sha256", "change"]),
+        ("core.programs.deploy", "Prepare native LS loading/compilation with preserved old program, source SHA and readback checks; never executes", "prepare", {"robot_id": {"type": "string"}, "source_file": {"type": "string"}, "expected_sha256": {"type": "string"}}, ["robot_id", "source_file", "expected_sha256"]),
+    ]
+    for name, description, effect, properties, required in native:
+        operations[name] = {"id": name, "description": description, "effect": effect, "revision": "core.native@1",
+            "input_schema": {"type": "object", "properties": properties, "required": required, "additionalProperties": False},
+            "output_schema": {"type": "object"}, "extension_id": "core"}
+    return operations
 
 
 @dataclass(eq=False)
@@ -143,12 +158,14 @@ class ExtensionHost:
                         raise ValueError("Controller operations or read jobs are active; finish them before extension reload")
                     uploads = len(self.bridge._plans) if not initial else 0
                     comments = len(self.bridge.comments.plans) if not initial else 0
+                    native = len(self.bridge.native.plans) if not initial else 0
                     self.bridge._audit("extensions_loaded" if initial else "extensions_reloaded",
                         generation=fingerprint, extensions=[{"id": key, "sha256": w.checksum} for key, w in candidate.workers.items()],
-                        invalidated_upload_plans=uploads, invalidated_comment_plans=comments)
+                        invalidated_upload_plans=uploads, invalidated_comment_plans=comments, invalidated_native_plans=native)
                     if not initial:
                         self.bridge._plans.clear()
                         self.bridge.comments.plans.clear()
+                        self.bridge.native.plans.clear()
                     old, self.current = self.current, candidate
                     candidate = None
                     if old is not None:
@@ -158,6 +175,7 @@ class ExtensionHost:
                 if old is not None and not old.references:
                     old.close()
                 return {"status": "loaded" if initial else "reloaded", "invalidated_upload_plans": uploads,
+                        "invalidated_native_plans": native,
                         "invalidated_comment_plans": comments, "controller_contacted": False,
                         "mcp_tools_changed": False, **self.status()}
             except Exception:
@@ -225,7 +243,17 @@ class ExtensionHost:
 
     def run_read(self, operation_id, arguments, revision):
         if operation_id.startswith("core."):
-            raise ValueError("Core prepared changes cannot be invoked through a read operation")
+            descriptor = core_operations().get(operation_id)
+            if descriptor is None or descriptor["effect"] != "read":
+                raise ValueError("Core prepared changes cannot be invoked through a read operation")
+            if revision != descriptor["revision"]:
+                raise ValueError("Native operation revision changed; describe it again")
+            validate_data(descriptor["input_schema"], arguments)
+            handlers = {"core.controller.status": self.bridge.native.status,
+                "core.controller.sample": self.bridge.native.sample, "core.controller.reconnect": self.bridge.native.reconnect,
+                "core.controller.programs": self.bridge.native.programs, "core.registers.read": self.bridge.native.read_register,
+                "core.programs.inspect": self.bridge.native.read_program}
+            return {"operation_id": operation_id, "revision": revision, "result": handlers[operation_id](**arguments)}
         with self._lease(operation_id, revision) as (_, descriptor, worker):
             if descriptor["effect"] != "read":
                 raise ValueError("This operation prepares a change; use prepare_change")
@@ -245,6 +273,8 @@ class ExtensionHost:
     def prepare(self, operation_id, arguments, revision):
         core = core_operations().get(operation_id)
         if core is not None:
+            if core["effect"] != "prepare":
+                raise ValueError("Read operations cannot prepare a controller change")
             if revision != core["revision"]:
                 raise ValueError("Core operation revision changed")
             validate_data(core["input_schema"], arguments)
@@ -299,6 +329,10 @@ class ExtensionHost:
                 return {**result, "operation_id": operation_id, "operation_revision": revision}
 
     def _prepare_core(self, operation_id, args):
+        if operation_id == "core.registers.update":
+            return self.bridge.native.prepare_register(**args)
+        if operation_id == "core.programs.deploy":
+            return self.bridge.native.prepare_program(**args)
         if operation_id == "core.files.replace":
             return self.bridge.prepare_upload(**args)
         if operation_id == "core.files.create":

@@ -64,6 +64,13 @@ class WorkbenchOperations:
         return {"analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],
                 "live_reads": ["R", "PR", "DI", "DO", "GI", "GO", "AI", "AO", "RI", "RO", "UI", "UO", "F"],
                 "sampling_provider": "controller-generated files; availability must be verified",
+                "native_access": {"operations": ["core.controller.status", "core.controller.sample", "core.controller.programs",
+                    "core.registers.read", "core.registers.update", "core.programs.inspect", "core.programs.deploy", "core.controller.reconnect"],
+                    "provider": self.bridge._access(robot_id).native_provider if robot_id else "per configured robot",
+                    "policy": "disabled by default; exact native_register_targets/native_programs and writes enabled",
+                    "program_source": "ASCII LS; native loader plus TP/LS readback; never selects or runs a program",
+                    "confirmation": "core prepared plans and configured client confirmation",
+                    "pr_verification": "axis absolute tolerance 0.0001 mm/degrees; metadata exact"},
                 "offline_edits": ["comment", "numeric_register", "position_register"],
                 "file_exchange": {"read_captured_file_max_range": 65536,
                                   "stage_file_max_bytes": min(1048576, self.bridge.config.max_file_bytes),
@@ -81,9 +88,11 @@ class WorkbenchOperations:
                                           "atomic_no_clobber": False, "approval": "prepared change and configured client confirmation"},
                 "live_comments": "ComSet with configured service origin, exact comment targets and listing readback; disabled by default",
                 "approval_mode": self.bridge.config.approval_mode,
-                "native_controller_operations": {name: "unsupported" for name in (
-                    "program_file_creation", "load_compile", "program_start_stop", "motion", "register_value_write",
+                "native_controller_operations": {**{name: "unsupported" for name in (
+                    "program_start_stop", "motion",
                     "frame_write", "io_forcing", "controller_mode_interlock", "dcs_write", "mastering_write")},
+                    **{name: "requires configured native provider and exact target policy" for name in (
+                        "program_file_creation", "load_compile", "register_value_write")}},
                 "controller_identity": "configured profile; authenticate physical identity separately",
                 "cross_process_lock_scope": "bridge clients sharing state_dir and the same configured host string",
                 "robot_id": robot_id, "controller_contacted": False}
@@ -308,6 +317,13 @@ class WorkbenchOperations:
                 raise ValueError("Live samples must be at least two seconds apart")
             self._last_sample[robot_id] = time.monotonic()
             atomic_json(self._sample_clock(robot_id), {"monotonic": self._last_sample[robot_id]})
+            if access.native_provider == "frrobot":
+                if checkpoint:
+                    checkpoint()
+                data = self.bridge.native.sample(robot_id, [spec.expression for spec in specs])
+                values = {name: (value.get("values") if value.get("kind") == "PR" else value.get("value"))
+                          for name, value in data["values"].items()}
+                return {**data, "values": values, "unavailable_files": [], "source": "native FRRobot TCP API"}
             folder = self.bridge._folder()
             unavailable = []
             for name in sorted(needed):

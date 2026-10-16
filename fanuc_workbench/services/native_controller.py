@@ -21,7 +21,8 @@ class NativeControllerService:
             kind = result.get("error_type", "Unavailable")
             code = result.get("hresult")
             suffix = f"; HRESULT {code}" if type(code) is int else ""
-            raise RuntimeError(f"Native API operation failed ({kind}{suffix}); inspect controller state before retrying a change")
+            reason = result.get("reason", "") if kind == "ValueError" else ""
+            raise RuntimeError(f"Native API operation failed ({kind}{suffix}). {reason} Inspect controller state before retrying a change")
         return result["result"]
 
     def close(self):
