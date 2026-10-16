@@ -1,12 +1,12 @@
 # Shared-service and MCP coverage
 
 This mapping describes implementation coverage, not physical acceptance. The
-expanded development server exposes 38 tools. Unsupported native operations are
+expanded development server exposes 39 tools. Unsupported native operations are
 reported through `capabilities`.
 
 | Existing area | Chat/API access | Boundary |
 | --- | --- | --- |
-| Controller, FTP/SFTP | Listing, exact retrieval, reviewed application-file replacement | Existing files; no native load/run acceptance |
+| Controller, FTP/SFTP | Listing, exact retrieval, reviewed application-file replacement and TXT/CSV storage creation | Creation outside MD: with separate exact allowlist; no native load/run acceptance |
 | Backup | Full/selected jobs, ASCII companions, retained manifests | Bounded capture; partial/cancelled states explicit |
 | Restore | Manifest-bound per-file recovery through upload plans | System/variable restore outside chat policy |
 | Compare, workspace, parsers | Workspace comparisons, programs, positions, variables, comments, R/PR/frame/I-O evidence | Preserved/hash-checked workspace IDs |
@@ -28,7 +28,7 @@ reported through `capabilities`.
 | Local plugin setup | Offline wheels, stable runtime, launcher, skill, CLI registration and MCP doctor | Windows/Python-version-specific bundle; public distribution unverified |
 | New jobs/artifacts | History, cancellation, interruption after restart, artifact ranges and audit | No blind write retry or automatic recovery |
 
-New-file creation, controller load/compile, program start/stop, motion, live
+New program-file creation, controller load/compile, program start/stop, motion, live
 register-value writes, frame writes, I/O forcing, controller mode/running-state
 interlocks and DCS/mastering writes require a verified controller adapter and
 are unsupported. File service acceptance does not establish them.

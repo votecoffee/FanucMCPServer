@@ -55,6 +55,11 @@ def create_server(bridge: RobotBridge):
         return bridge.prepare_upload(robot_id, path, source_file, expected_sha256)
 
     @server.tool(annotations=local)
+    def prepare_file_create(robot_id: str, path: str, source_file: str) -> dict:
+        """Prepare creation of an exact-allowlisted TXT/CSV storage file outside MD:. No write; commit_upload requires approval."""
+        return bridge.prepare_file_create(robot_id, path, source_file)
+
+    @server.tool(annotations=local)
     def cancel_upload(plan_id: str) -> dict:
         """Discard a pending upload plan, retaining evidence files and audit history."""
         return bridge.cancel_upload(plan_id)
@@ -64,12 +69,12 @@ def create_server(bridge: RobotBridge):
 
     @server.tool(annotations=write)
     async def commit_upload(plan_id: str, approved_sha256: str, ctx: Context) -> dict:
-        """After explicit user approval, replace one allowlisted file with backup and byte readback."""
+        """After explicit approval, commit a prepared file create or replacement with preflight and exact byte readback."""
         import asyncio
         if bridge.config.approval_mode == "elicitation":
             review = bridge.upload_review(plan_id, approved_sha256)
             confirmation = await ctx.elicit(
-                message="Approve this robot file replacement? " + str(review), schema=UploadApproval)
+                message="Approve this robot file change? " + str(review), schema=UploadApproval)
             if confirmation.action != "accept" or confirmation.data is None or not confirmation.data.approve:
                 raise ValueError("Upload was not approved by the MCP client")
             return await asyncio.to_thread(bridge.commit_upload, plan_id, approved_sha256, client_approved=True)

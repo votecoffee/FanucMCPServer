@@ -68,6 +68,14 @@ and a backup. Enable writes only with exact file/description allowlists. Present
 the prepared diff, target and SHA-256 before committing an explicitly approved
 change. A transfer/readback is separate from controller loading and execution.
 
+To create a new TXT/CSV storage file, add its exact path to `creatable_files`
+and include its parent device in read roots. `MD:` and new program files are
+refused. Use `prepare_file_create`, review the absence check/proposal, then
+`commit_upload` with the prepared hash and client confirmation. Creation checks
+absence again at commit; it is not atomic against other controller clients.
+Use `writable_files` separately for subsequent replacements. Both allowlists
+default to empty and writes default to disabled.
+
 Both the installer and plugin launcher can run from paths containing spaces.
 Dependency compatibility is checked against Python major/minor, OS and machine
 architecture. Build a new bundle for another platform or Python version.

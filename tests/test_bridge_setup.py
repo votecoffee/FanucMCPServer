@@ -85,7 +85,7 @@ def test_doctor_uses_real_mcp_without_contacting_a_controller(tmp_path):
     config.write_text(json.dumps({'state_dir': 'state', 'source_dir': 'edits', 'robots': {},
                                   'approval_mode': 'elicitation'}), encoding='utf-8')
     result = asyncio.run(diagnose(config))
-    assert result['status'] == 'ok' and result['tool_count'] == 38
+    assert result['status'] == 'ok' and result['tool_count'] == 39
     assert result['controller_contacted'] is False and result['gui_imported'] is False
     assert 'workspace_project' in result['tools'] and 'probe_robot' in result['tools']
 
@@ -108,7 +108,7 @@ def test_plugin_launcher_handles_paths_with_spaces(tmp_path):
                                       env={**os.environ, 'PYTHONDONTWRITEBYTECODE':'1'})
         async with stdio_client(params) as (reader,writer), ClientSession(reader,writer) as client:
             await client.initialize()
-            assert len((await client.list_tools()).tools) == 38
+            assert len((await client.list_tools()).tools) == 39
     asyncio.run(check())
 
 

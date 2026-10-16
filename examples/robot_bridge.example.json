@@ -18,7 +18,8 @@
         "roots": ["md:"],
         "timeout": 10
       },
-      "writable_files": []
+      "writable_files": [],
+      "creatable_files": []
     }
   }
 }

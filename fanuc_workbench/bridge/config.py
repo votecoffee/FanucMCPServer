@@ -41,6 +41,7 @@ class RobotAccess:
     writable_files: tuple[str, ...] = ()
     comment_service_url: str | None = None
     comment_targets: tuple[str, ...] = ()
+    creatable_files: tuple[str, ...] = ()
 
     def connection_profile(self) -> RobotProfile:
         # Resolve secrets only at connection time; never return them through tools.
@@ -93,6 +94,11 @@ class BridgeConfig:
             writable = tuple(remote_path(p) for p in item.get("writable_files", []))
             if any(not any(under_root(p, r) for r in profile.roots) for p in writable):
                 raise ValueError("Writable files must stay inside configured remote roots")
+            creatable = tuple(remote_path(p) for p in item.get("creatable_files", []))
+            if any(not any(under_root(p, r) for r in profile.roots) for p in creatable):
+                raise ValueError("Creatable files must stay inside configured remote roots")
+            if any(p.startswith("md:") or Path(p).suffix.upper() not in {".TXT", ".CSV"} for p in creatable):
+                raise ValueError("Creation is limited to TXT/CSV storage files outside MD:")
             comment_url = item.get("comment_service_url")
             if comment_url:
                 parsed = urlsplit(comment_url)
@@ -103,7 +109,7 @@ class BridgeConfig:
             if any(not isinstance(target, str) or not re.fullmatch(r"(?:R|PR|DIN|DOUT|GIN|GOUT|AIN|AOUT|RI|RO|FLG)\[[1-9][0-9]{0,5}\]", target)
                    for target in targets):
                 raise ValueError("Comment targets must be explicit supported register or I/O identifiers")
-            robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable, comment_url, targets)
+            robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable, comment_url, targets, creatable)
 
         def local_dir(key: str) -> Path:
             value = Path(data[key])

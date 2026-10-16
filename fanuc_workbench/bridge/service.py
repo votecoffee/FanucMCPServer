@@ -16,7 +16,7 @@ from fanuc_workbench.backends.factory import create_backend
 from fanuc_workbench.bridge.config import BridgeConfig, remote_path, under_root
 from fanuc_workbench.services.controller import ControllerService
 from fanuc_workbench.services.diagnostics import scan_alarm_file
-from fanuc_workbench.bridge.storage import RobotLocks
+from fanuc_workbench.bridge.storage import RobotLocks, atomic_json
 
 
 _TEXT = {".LS", ".KL", ".VA", ".DG", ".TXT", ".CSV", ".LOG", ".INI", ".XML", ".JSON"}
@@ -28,7 +28,7 @@ _HASH = re.compile(r"[a-f0-9]{64}")
 class UploadPlan:
     robot_id: str
     remote: str
-    original_sha256: str
+    original_sha256: str | None
     proposed_sha256: str
     payload: bytes
     expires: float
@@ -85,17 +85,20 @@ class RobotBridge:
     def _controller(self, robot_id: str) -> ControllerService:
         return ControllerService(self._access(robot_id).connection_profile(), self.backend_factory)
 
-    def _path(self, robot_id: str, value: str, *, write: bool = False) -> str:
+    def _path(self, robot_id: str, value: str, *, write: bool = False, create: bool = False) -> str:
         access = self._access(robot_id)
         value = remote_path(value)
         if not any(under_root(value, root) for root in access.profile.roots):
             raise ValueError("Remote path is outside this robot's configured roots")
-        if write:
+        if write or create:
             if not self.config.allow_writes:
                 raise ValueError("Controller writes are disabled by the local bridge configuration")
-            if value not in access.writable_files:
-                raise ValueError("Remote file is not explicitly listed in writable_files")
+            allowed = access.creatable_files if create else access.writable_files
+            if value not in allowed:
+                raise ValueError("Remote file is not explicitly listed in " + ("creatable_files" if create else "writable_files"))
             name = value.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+            if create and (value.startswith("md:") or Path(name).suffix.upper() not in {".TXT", ".CSV"}):
+                raise ValueError("Creation is limited to TXT/CSV storage files outside MD:")
             if Path(name).suffix.upper() not in _UPLOAD or any(
                 word in name.upper() for word in ("DCS", "MASTER", "SYSMAC", "SYSVARS", "SAFETY")
             ):
@@ -136,6 +139,7 @@ class RobotBridge:
             {"id": key, "name": access.profile.name, "host": access.profile.host,
              "transport": access.profile.transport, "roots": access.profile.roots,
              "writable_files": list(access.writable_files), "comment_targets": list(access.comment_targets),
+             "creatable_files": list(access.creatable_files),
              "comment_service_url": access.comment_service_url}
             for key, access in self.config.robots.items()
         ]}
@@ -208,25 +212,68 @@ class RobotBridge:
         return {"files": files, "unavailable": failures, "alarms": alarms,
                 "alarm_limit": 1000, "capture_is_atomic": False}
 
+    def _source_payload(self, remote: str, source_file: str) -> tuple[bytes, Path]:
+        source_arg = Path(source_file)
+        source = (self.config.source_dir / source_arg).resolve()
+        if (source_arg.is_absolute() or source_arg.drive or ".." in source_arg.parts
+                or not source.is_relative_to(self.config.source_dir.resolve())):
+            raise ValueError("source_file must be relative to the configured source_dir and remain inside it")
+        if source.suffix.upper() != Path(remote).suffix.upper():
+            raise ValueError("Source and remote file extensions must match")
+        with source.open("rb") as stream:
+            payload = stream.read(self.config.max_file_bytes + 1)
+        if not payload or len(payload) > self.config.max_file_bytes:
+            raise ValueError("Upload file must be nonempty and within max_file_bytes")
+        return payload, source
+
+    def _trim_plans(self):
+        now = time.monotonic()
+        self._plans = {key: plan for key, plan in self._plans.items() if plan.expires > now}
+        if len(self._plans) >= 64:
+            raise ValueError("Too many pending plans; cancel plans before preparing more")
+
+    def prepare_file_create(self, robot_id: str, path: str, source_file: str) -> dict:
+        with self._lock, self._robot_lock(robot_id):
+            remote = self._path(robot_id, path, create=True)
+            payload, source = self._source_payload(remote, source_file)
+            self._trim_plans()
+            self._audit("create_prepare_requested", robot_id=robot_id, remote_path=remote)
+            try:
+                absent = self._controller(robot_id).inspect_file_absence(remote)
+            except FileExistsError:
+                raise
+            except Exception as exc:
+                self._audit("create_prepare_failed", robot_id=robot_id, error_type=type(exc).__name__)
+                raise RuntimeError("Cannot establish target absence from its parent directory; no create plan prepared") from None
+            folder = self._folder()
+            atomic_json(folder / "original_absent.json", absent)
+            proposed = folder / ("proposed" + source.suffix.lower())
+            proposed.write_bytes(payload)
+            preview = self._display(proposed, remote)
+            proposed_hash = hashlib.sha256(payload).hexdigest()
+            plan_id = uuid.uuid4().hex
+            self._plans[plan_id] = UploadPlan(robot_id, remote, None, proposed_hash, payload,
+                                             time.monotonic() + self.config.plan_ttl_seconds, folder)
+            result = {"plan_id": plan_id, "operation": "create", "robot_id": robot_id, "remote_path": remote,
+                      "original_sha256": None, "proposed_sha256": proposed_hash, "bytes": len(payload),
+                      "absence_evidence_path": str(folder / "original_absent.json"), "proposed_path": str(proposed),
+                      "diff": "\n".join(difflib.unified_diff([], (preview["text"] or "").splitlines(),
+                                 fromfile="absent", tofile="proposed", lineterm=""))[:32768],
+                      "preview_may_be_truncated": True, "atomic_no_clobber": False,
+                      "expires_in_seconds": self.config.plan_ttl_seconds, "status": "prepared_only",
+                      "requires_user_approval": True}
+            atomic_json(folder / "plan.json", result)
+            self._audit("create_prepared", plan_id=plan_id, robot_id=robot_id, remote_path=remote,
+                        proposed_sha256=proposed_hash)
+            return result
+
     def prepare_upload(self, robot_id: str, path: str, source_file: str, expected_sha256: str) -> dict:
         with self._lock:
             remote = self._path(robot_id, path, write=True)
             if not _HASH.fullmatch(expected_sha256):
                 raise ValueError("expected_sha256 must be the SHA-256 returned by read_file")
-            source_arg = Path(source_file)
-            source = (self.config.source_dir / source_arg).resolve()
-            if source_arg.is_absolute() or not source.is_relative_to(self.config.source_dir.resolve()):
-                raise ValueError("source_file must be relative to the configured source_dir and remain inside it")
-            if source.suffix.upper() != Path(remote).suffix.upper():
-                raise ValueError("Source and remote file extensions must match")
-            with source.open("rb") as stream:
-                payload = stream.read(self.config.max_file_bytes + 1)
-            if not payload or len(payload) > self.config.max_file_bytes:
-                raise ValueError("Upload file must be nonempty and within max_file_bytes")
-            now = time.monotonic()
-            self._plans = {key: plan for key, plan in self._plans.items() if plan.expires > now}
-            if len(self._plans) >= 64:
-                raise ValueError("Too many pending plans; cancel plans before preparing more")
+            payload, source = self._source_payload(remote, source_file)
+            self._trim_plans()
             original = self.read_file(robot_id, remote)
             if original["sha256"] != expected_sha256:
                 raise ValueError("Controller file changed; retrieve it and review the change again")
@@ -281,14 +328,15 @@ class RobotBridge:
             if approved_sha256 != plan.proposed_sha256:
                 raise ValueError("Approval SHA-256 does not match the prepared bytes")
             return {"robot_id": plan.robot_id, "host": self._access(plan.robot_id).profile.host,
-                    "remote_path": plan.remote, "sha256": plan.proposed_sha256, "bytes": len(plan.payload)}
+                    "remote_path": plan.remote, "sha256": plan.proposed_sha256, "bytes": len(plan.payload),
+                    "operation": "create" if plan.original_sha256 is None else "replace"}
 
     def _commit_upload_locked(self, plan_id: str, approved_sha256: str) -> dict:
         with self._lock:
             plan = self._plans.get(plan_id)
             if plan is None:
                 raise ValueError("Unknown or already consumed plan; prepare a new plan")
-            self._path(plan.robot_id, plan.remote, write=True)
+            self._path(plan.robot_id, plan.remote, write=True, create=plan.original_sha256 is None)
             if plan.expires <= time.monotonic():
                 self._plans.pop(plan_id)
                 raise ValueError("Plan expired; prepare a new plan")
@@ -306,13 +354,19 @@ class RobotBridge:
             def before_upload():
                 nonlocal started
                 self._audit("upload_started", plan_id=plan_id, robot_id=plan.robot_id,
-                            remote_path=plan.remote, sha256=plan.proposed_sha256)
+                            remote_path=plan.remote, sha256=plan.proposed_sha256,
+                            operation="create" if plan.original_sha256 is None else "replace")
                 started = True
 
             try:
-                result = self._controller(plan.robot_id).replace_file_verified(
-                    upload, plan.remote, plan.original_sha256, plan.folder / "preflight.bin",
-                    plan.folder / "readback.bin", self.config.max_file_bytes, before_upload)
+                controller = self._controller(plan.robot_id)
+                if plan.original_sha256 is None:
+                    result = controller.create_file_verified(upload, plan.remote, plan.folder / "preflight_absent.json",
+                        plan.folder / "readback.bin", self.config.max_file_bytes, before_upload)
+                else:
+                    result = controller.replace_file_verified(
+                        upload, plan.remote, plan.original_sha256, plan.folder / "preflight.bin",
+                        plan.folder / "readback.bin", self.config.max_file_bytes, before_upload)
                 self._audit("upload_verified", plan_id=plan_id, **result)
                 return {**result, "plan_id": plan_id, "program_loaded_or_running": "not_verified"}
             except Exception as exc:

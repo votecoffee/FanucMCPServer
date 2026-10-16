@@ -29,6 +29,10 @@ Commit only after explicit approval of that prepared change and honor the
 configured client-confirmation step. Do not enable writes, broaden targets or
 change approval policy to bypass a refusal. Cancel unused plans.
 
+For requested new TXT/CSV storage files outside MD:, use `prepare_file_create`.
+Creation needs its own exact `creatable_files` policy and a successful absence
+check; program-file creation is unsupported. Another client can race a preflight.
+
 If a write or readback fails, inspect the actual controller bytes/comments before
 preparing another change. Plans are single-use; do not retry blindly or restore
 automatically. Report unsupported native operations using the capability result;

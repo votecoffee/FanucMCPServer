@@ -1,7 +1,7 @@
 # FANUC Workbench robot bridge (expanded development version)
 
 The GUI, local Python API and MCP adapter share controller, parser and analysis
-services. The server now exposes 38 tools. No physical robot has been contacted;
+services. The server now exposes 39 tools. No physical robot has been contacted;
 native acceptance remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 
 ## Setup
@@ -74,7 +74,7 @@ ordinary local files, not a tamper-proof ledger.
 | Local metadata/projects | read_workspace_metadata, write_workspace_metadata, workspace_project |
 | Live data/recordings | sample_robot, start_watch, analyze_recording, compare_recordings |
 | Snapshots/packages | capture_snapshot, compare_snapshots, make_package |
-| Reviewed files | prepare_upload, commit_upload, cancel_upload, prepare_restore_file |
+| Reviewed files | prepare_upload, prepare_file_create, commit_upload, cancel_upload, prepare_restore_file |
 | Reviewed descriptions | prepare_comment_update, commit_comment_update, cancel_change |
 | Audit | read_audit |
 
@@ -186,6 +186,28 @@ Recovery is deliberate and per-file; rollback is not automatic. Plans expire
 after 15 minutes by default, are single-use including failed attempts, and vanish
 on restart. Later edits to source or preview files cannot alter prepared bytes.
 
+New storage files use a separate `creatable_files` exact-path allowlist plus the
+write switch. Only TXT/CSV files outside `MD:` can be created. Add the storage
+device to read roots as well; creating programs, variables or diagnostic files
+is refused. `prepare_file_create` requires a successful parent-directory listing
+showing the target absent, preserves absence evidence and the proposed bytes,
+and returns a normal plan for `commit_upload`. The configured confirmation step
+applies to creation too. Commit lists the parent again and refuses an existing
+target, including FANUC filename case variants, before attempting an upload.
+Transport/permission errors do not prove absence. FTP does not supply atomic
+create-if-absent for an exact filename: another writer can race this preflight.
+The response explicitly reports `atomic_no_clobber: false`. Creation does not
+grant replacement permission; add a path to `writable_files` separately when
+reviewed subsequent replacements are intended. There is no chat delete tool.
+
+ROBOGUIDE validation used `ud1:FWB_TCP.TXT` on two local virtual controllers.
+Create/replace/readback, declined confirmation, duplicate creation, replay and
+stale-plan rejection passed through real MCP and FTP/TCP. Eight fixture writes
+were verified; both fixtures were left with the same 32-byte baseline marker.
+The SDK confirmation callback was automated and restricted to fixture targets
+and hashes. This tests the protocol, not a human confirmation UI or independent
+human authentication. No existing user files/programs were targeted.
+
 Live descriptions additionally require comment_service_url as an HTTP(S) origin
 on that robot host and exact comment_targets, such as ["R[1]", "PR[1]", "DIN[1]"].
 This is disabled by default. Preparation uses a retrieved NUMREG.VA, POSREG.VA or
@@ -228,8 +250,10 @@ needs no OpenAI API key. It supplies no hosted authenticated gateway or model lo
 Run python -m pytest -q with dev and mcp extras. Coverage includes original
 services, all analysis kinds, encoding/bytes, partial captures, cancellation,
 process locks, samples/recordings, packages, file/comment recovery and real SDK
-stdio/elicitation flows. Controllers/transports are simulated; native acceptance
-remains pending.
+stdio/elicitation flows. Automated unit tests use simulated transports; separate
+ROBOGUIDE tests cover TCP reads and storage-file writes. Physical controllers,
+program load/compile/execution and the actual Codex confirmation UI remain
+unverified.
 
 Official documentation checked October 16, 2026:
 

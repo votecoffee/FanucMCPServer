@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import json
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
@@ -121,3 +122,51 @@ class ControllerService:
                 raise RuntimeError("Uploaded file readback differs; inspect the controller before further writes")
         return {"status": "verified", "remote_path": remote, "sha256": actual,
                 "backup_path": str(backup), "readback_path": str(readback)}
+
+    @staticmethod
+    def _assert_file_absent(backend: RobotBackend, remote: str) -> dict:
+        if "/" in remote:
+            parent, name = remote.rsplit("/", 1)
+            parent = parent or "/"
+        elif ":" in remote:
+            prefix, name = remote.rsplit(":", 1)
+            parent = prefix + ":"
+        else:
+            raise ValueError("File creation requires an explicit device or absolute path")
+        if not name:
+            raise ValueError("File creation requires a filename")
+        # file_exists() historically treats transport/permission failures as
+        # false. A successful complete directory listing is required instead.
+        entries = backend.list_dir(parent)
+        key = name.casefold() if ":" in parent else name
+        if any((item.name.casefold() if ":" in parent else item.name) == key for item in entries):
+            raise FileExistsError("The create target already exists; use a reviewed replacement")
+        return {"remote_path": remote, "parent": parent, "status": "absent",
+                "listing_entries": len(entries), "atomic_no_clobber": False}
+
+    def inspect_file_absence(self, remote: str) -> dict:
+        with self.session() as backend:
+            return self._assert_file_absent(backend, remote)
+
+    def create_file_verified(self, local: Path, remote: str, preflight: Path,
+                             readback: Path, maximum: int, before_upload: Callable[[], None]) -> dict:
+        """Check absence, preserve that check, upload, and verify exact bytes.
+
+        FTP has no atomic create-if-absent for an exact filename. Other clients
+        can race the preflight; this method does not claim no-clobber semantics.
+        """
+        proposed_sha256 = sha256(local)
+        with self.session() as backend:
+            evidence = self._assert_file_absent(backend, remote)
+            with preflight.open("x", encoding="utf-8") as stream:
+                json.dump(evidence, stream, indent=2)
+                stream.flush()
+                os.fsync(stream.fileno())
+            before_upload()
+            backend.upload(local, remote)
+            download_bounded(backend, remote, readback, maximum)
+            actual = sha256(readback)
+            if actual != proposed_sha256:
+                raise RuntimeError("Created file readback differs; inspect the controller before further writes")
+        return {"status": "verified", "operation": "create", "remote_path": remote, "sha256": actual,
+                "preflight_path": str(preflight), "readback_path": str(readback), "atomic_no_clobber": False}

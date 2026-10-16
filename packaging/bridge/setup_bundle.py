@@ -30,6 +30,44 @@ def verify_bundle(root):
     return manifest
 
 
+def register_plugin(codex, root, environment):
+    """Update our local marketplace without taking over a name owned elsewhere."""
+    name = "fanuc-workbench-local"
+    listed = subprocess.run([codex, "plugin", "marketplace", "list", "--json"], check=True,
+                            env=environment, capture_output=True, text=True)
+    existing = next((row for row in json.loads(listed.stdout)["marketplaces"] if row["name"] == name), None)
+    previous = None
+    if existing and Path(existing["root"]).resolve() != root.resolve():
+        previous = Path(existing["root"]).resolve()
+        descriptor = previous / ".agents" / "plugins" / "marketplace.json"
+        try:
+            data = json.loads(descriptor.read_text(encoding="utf-8"))
+            owned = (data["name"] == name and [item["name"] for item in data["plugins"]] == ["fanuc-workbench"]
+                     and (previous / "BUNDLE_MANIFEST.json").is_file()
+                     and json.loads((previous / "plugin" / "plugin.json").read_text(encoding="utf-8"))["name"] == "fanuc-workbench")
+        except (OSError, ValueError, KeyError, TypeError):
+            owned = False
+        if not owned:
+            raise ValueError("The marketplace name is owned by an unrecognized source; registration was not changed")
+        subprocess.run([codex, "plugin", "marketplace", "remove", name, "--json"], check=True, env=environment)
+    try:
+        subprocess.run([codex, "plugin", "marketplace", "add", str(root), "--json"], check=True, env=environment)
+        installed = subprocess.run([codex, "plugin", "add", "fanuc-workbench@" + name, "--json"],
+                                   check=True, env=environment, capture_output=True, text=True)
+        result = json.loads(installed.stdout)
+        expected = json.loads((root / "plugin" / "plugin.json").read_text(encoding="utf-8"))["version"]
+        if result.get("version") != expected:
+            raise ValueError("Codex reported a plugin version different from this bundle")
+        print(json.dumps(result, indent=2))
+    except BaseException:
+        if previous is not None:
+            # Registration rollback only; never delete either local source tree.
+            subprocess.run([codex, "plugin", "marketplace", "remove", name, "--json"], env=environment)
+            subprocess.run([codex, "plugin", "marketplace", "add", str(previous), "--json"],
+                           check=True, env=environment)
+        raise
+
+
 def main():
     parser = argparse.ArgumentParser(description="Install a local FANUC Workbench plugin runtime from bundled wheels")
     parser.add_argument("--runtime-dir", required=True, type=Path, help="Stable dedicated directory outside the plugin cache")
@@ -85,8 +123,7 @@ def main():
             profile_dir.mkdir(parents=True, exist_ok=True)
             environment["CODEX_HOME"] = str(profile_dir)
         if args.register == "plugin":
-            subprocess.run([codex, "plugin", "marketplace", "add", str(root), "--json"], check=True, env=environment)
-            subprocess.run([codex, "plugin", "add", "fanuc-workbench@fanuc-workbench-local", "--json"], check=True, env=environment)
+            register_plugin(codex, root, environment)
         else:
             subprocess.run([codex, "mcp", "add", "fanuc_workbench", "--", str(python), "-B", "-m",
                             "fanuc_workbench.bridge.mcp_server", "--config", str(config)], check=True, env=environment)
