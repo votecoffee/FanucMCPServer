@@ -1,7 +1,7 @@
 # FANUC Workbench robot bridge (expanded development version)
 
 The GUI, local Python API and MCP adapter share controller, parser and analysis
-services. The server now exposes 39 tools. No physical robot has been contacted;
+services. The server now exposes 41 tools. No physical robot has been contacted;
 native acceptance remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 
 ## Setup
@@ -66,11 +66,11 @@ ordinary local files, not a tamper-proof ledger.
 
 | Area | Tools |
 | --- | --- |
-| Discovery/files | list_robots, capabilities, probe_robot, list_files, read_file, collect_logs |
+| Discovery/files | list_robots, capabilities, probe_robot, list_files, read_file, read_captured_file, collect_logs |
 | Artifacts | import_workspace, list_artifacts, artifact_files, read_artifact |
 | Backups/jobs | start_backup, start_fleet_backup, job_status, list_jobs, cancel_job |
 | Workspace analysis | analyze_workspace, compare_workspaces, inspect_program |
-| Offline editing | edit_workspace_file, transform_pose |
+| Offline editing | stage_file, edit_workspace_file, transform_pose |
 | Local metadata/projects | read_workspace_metadata, write_workspace_metadata, workspace_project |
 | Live data/recordings | sample_robot, start_watch, analyze_recording, compare_recordings |
 | Snapshots/packages | capture_snapshot, compare_snapshots, make_package |
@@ -81,6 +81,22 @@ ordinary local files, not a tamper-proof ledger.
 read_file preserves exact bytes and returns SHA-256 and bounded display text.
 Use directory listings or controller documentation for log names. Missing files
 are unavailable; multi-file capture is not atomic.
+
+Clients without access to the server filesystem can call `read_captured_file`
+with the robot ID, path and SHA-256 from `read_file`. It returns exact retained
+bytes as base64, with offset/length pagination up to 65536 bytes per call and
+`next_offset`. It checks the retained capture's hash and makes no new controller
+connection. Reassemble ranges and verify the complete SHA-256 before editing;
+display text alone may be truncated or use a fallback encoding.
+
+`stage_file(filename, data_base64, expected_sha256)` saves a unique local source
+copy after strict base64 decoding and exact hash verification. The limit is the
+smaller of 1 MiB and `max_file_bytes`; supported filenames end in LS/KL/TP/PC/TXT/CSV.
+Paths and Windows device names are refused. Use the returned `source_file` in
+`prepare_upload` or `prepare_file_create`. Staging works with controller writes
+disabled and never contacts a robot. It grants no target permission. Original
+source copies are preserved; larger files can still use an operator-supplied
+source_dir-relative file within the configured file limit.
 
 list_files supports offset/limit pagination and reports total/next_offset. Older
 FTP controllers with UNIX-style LIST responses use a batch listing; unknown
@@ -173,6 +189,7 @@ recognized safety/mastering filenames. System/variable/diagnostic classes are re
 
 1. Retrieve the existing controller file and original SHA-256.
 2. Edit a separate source copy with deliberate encoding/line-ending handling.
+   API-only clients can retrieve exact ranges and use `stage_file` to save the proposal.
 3. Call prepare_upload with the robot, remote path, source_dir-relative filename
    and original hash. The target must already exist and be readable.
 4. Review the complete proposal, backup and hashes. The returned diff is a

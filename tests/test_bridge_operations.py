@@ -358,7 +358,6 @@ def test_mcp_client_confirmation_cannot_be_replaced_by_tool_arguments(tmp_path, 
 
     edits = tmp_path / "edits"
     edits.mkdir()
-    (edits / "MAIN.LS").write_bytes(PROPOSED)
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"state_dir": "state", "source_dir": "edits", "allow_writes": True,
                                   "approval_mode": "elicitation", "robots": {"r1": {
@@ -399,8 +398,19 @@ finally: bridge.close()
         callbacks = {"elicitation_callback": confirm} if client_supports_confirmation else {}
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer, **callbacks) as session:
             await session.initialize()
+            import base64
+            captured = await session.call_tool("read_file", {"robot_id": "r1", "path": "md:MAIN.LS"})
+            assert not captured.isError
+            capture = json.loads(captured.content[0].text)
+            exact = await session.call_tool("read_captured_file", {"robot_id": "r1", "path": "md:MAIN.LS",
+                                                                  "sha256": capture['sha256']})
+            assert not exact.isError and base64.b64decode(json.loads(exact.content[0].text)['base64']) == ORIGINAL
+            staged = await session.call_tool("stage_file", {"filename": "MAIN.LS",
+                "data_base64": base64.b64encode(PROPOSED).decode('ascii'), "expected_sha256": digest(PROPOSED)})
+            assert not staged.isError
+            source = json.loads(staged.content[0].text)['source_file']
             prepared = await session.call_tool("prepare_upload", {"robot_id": "r1", "path": "md:MAIN.LS",
-                                                                   "source_file": "MAIN.LS", "expected_sha256": digest(ORIGINAL)})
+                                                                   "source_file": source, "expected_sha256": digest(ORIGINAL)})
             assert not prepared.isError
             plan = json.loads(prepared.content[0].text)
             args = {"plan_id": plan["plan_id"], "approved_sha256": plan["proposed_sha256"]}

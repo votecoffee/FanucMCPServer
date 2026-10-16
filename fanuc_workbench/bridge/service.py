@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import difflib
 import hashlib
 import json
@@ -22,6 +24,7 @@ from fanuc_workbench.bridge.storage import RobotLocks, atomic_json
 _TEXT = {".LS", ".KL", ".VA", ".DG", ".TXT", ".CSV", ".LOG", ".INI", ".XML", ".JSON"}
 _UPLOAD = {".LS", ".KL", ".TP", ".PC", ".TXT", ".CSV"}
 _HASH = re.compile(r"[a-f0-9]{64}")
+_STAGE_LIMIT = 1048576
 
 
 @dataclass(frozen=True)
@@ -216,6 +219,66 @@ class RobotBridge:
             return capture
         except (OSError, KeyError, ValueError):
             raise ValueError("No intact preserved read matches this robot, path and SHA-256; retrieve a fresh listing") from None
+
+    def read_captured_file(self, robot_id: str, path: str, sha256: str,
+                           offset: int = 0, length: int = 32768) -> dict:
+        """Return exact retained bytes without another controller connection."""
+        if type(offset) is not int or offset < 0 or type(length) is not int or not 1 <= length <= 65536:
+            raise ValueError("Use byte offset >= 0 and length between 1 and 65536")
+        with self._lock:
+            capture = self.reference_capture(robot_id, path, sha256)
+            # Hash the same bytes returned, including if a trusted local process edits the capture.
+            with Path(capture["local_path"]).open("rb") as stream:
+                data = stream.read(self.config.max_file_bytes + 1)
+            if len(data) > self.config.max_file_bytes or hashlib.sha256(data).hexdigest() != sha256:
+                raise ValueError("Preserved reference bytes changed")
+            part = data[offset:offset + length]
+            return {"robot_id": robot_id, "remote_path": self._path(robot_id, path), "sha256": sha256,
+                    "offset": offset, "bytes": len(part), "size": len(data),
+                    "base64": base64.b64encode(part).decode("ascii"),
+                    "next_offset": offset + len(part) if offset + len(part) < len(data) else None,
+                    "controller_contacted": False}
+
+    def stage_file(self, filename: str, data_base64: str, expected_sha256: str) -> dict:
+        """Create a unique local proposal from bounded, hash-checked exact bytes."""
+        if (not isinstance(filename, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", filename)
+                or filename.endswith(".") or Path(filename).suffix.upper() not in _UPLOAD
+                or filename.split(".", 1)[0].upper() in {
+                    "CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)),
+                    *(f"LPT{i}" for i in range(1, 10))}):
+            raise ValueError("filename must be a simple application filename (LS/KL/TP/PC/TXT/CSV), not a path or device")
+        if not isinstance(expected_sha256, str) or not _HASH.fullmatch(expected_sha256):
+            raise ValueError("expected_sha256 must be the SHA-256 of the proposed bytes")
+        maximum = min(_STAGE_LIMIT, self.config.max_file_bytes)
+        if not isinstance(data_base64, str) or not 1 <= len(data_base64) <= 4 * ((maximum + 2) // 3):
+            raise ValueError("Staged data must be nonempty and within the staging byte limit")
+        try:
+            payload = base64.b64decode(data_base64, validate=True)
+        except (binascii.Error, ValueError):
+            raise ValueError("data_base64 must contain strict ASCII base64") from None
+        if not payload or len(payload) > maximum:
+            raise ValueError("Staged data must be nonempty and within the staging byte limit")
+        digest = hashlib.sha256(payload).hexdigest()
+        if digest != expected_sha256:
+            raise ValueError("Proposed bytes do not match expected_sha256")
+        with self._lock:
+            root = self.config.source_dir.resolve()
+            staging = root / "staged"
+            staging.mkdir(parents=True, exist_ok=True)
+            if staging.is_symlink() or staging.resolve() != staging:
+                raise ValueError("The staging directory must not redirect outside source_dir")
+            folder = staging / uuid.uuid4().hex
+            folder.mkdir()
+            local = folder / filename
+            with local.open("xb") as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            source = local.relative_to(root).as_posix()
+            self._audit("file_staged", source_file=source, sha256=digest, bytes=len(payload))
+            return {"source_file": source, "filename": filename, "sha256": digest, "bytes": len(payload),
+                    "max_staging_bytes": maximum, "controller_written": False, "controller_contacted": False,
+                    "status": "staged_only"}
 
     def collect_logs(self, robot_id: str, paths: list[str]) -> dict:
         if not 1 <= len(paths) <= 10:

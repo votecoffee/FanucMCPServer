@@ -45,6 +45,17 @@ def create_server(bridge: RobotBridge):
         return bridge.read_file(robot_id, path)
 
     @server.tool(annotations=read)
+    def read_captured_file(robot_id: str, path: str, sha256: str,
+                           offset: int = 0, length: int = 32768) -> dict:
+        """Read exact preserved read_file bytes as base64 in ranges up to 65536 bytes. No controller contact."""
+        return bridge.read_captured_file(robot_id, path, sha256, offset, length)
+
+    @server.tool(annotations=local)
+    def stage_file(filename: str, data_base64: str, expected_sha256: str) -> dict:
+        """Stage exact application-file bytes locally (up to 1 MiB) after SHA-256 verification; return source_file for preparation. No controller write."""
+        return bridge.stage_file(filename, data_base64, expected_sha256)
+
+    @server.tool(annotations=read)
     def collect_logs(robot_id: str, paths: list[str]) -> dict:
         """Capture 1-10 explicit log paths and parse alarms; missing files are reported unavailable."""
         return bridge.collect_logs(robot_id, paths)

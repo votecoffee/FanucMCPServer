@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fanuc-workbench-bridge"
-version = "0.5.0.dev0"
+version = "0.6.0.dev0"
 description = "Standalone local FANUC Workbench MCP runtime using the shared services"
 requires-python = ">=3.11"
 dependencies = ["mcp>=1.30,<2", "paramiko>=3.5", "XlsxWriter>=3.2", "reportlab>=4.2"]

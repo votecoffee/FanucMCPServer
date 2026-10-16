@@ -28,6 +28,12 @@ separate profile. Python itself and Codex are prerequisites, not bundled softwar
 The runtime directory must be empty or owned by this installer. Existing user
 configuration is preserved. Setup performs no controller connection or write.
 
+For an existing custom policy, pass `--config C:/RobotTools/MyRobotPolicy.json`.
+The installer records that absolute selection in the runtime ownership marker
+and reuses it on later upgrades when `--config` is omitted. Missing saved
+configuration fails before runtime changes. Older runtimes without a recorded
+selection need `--config` once unless their default configuration exists.
+
 The local plugin contains `plugin.json`, `mcp.json`, a `fanuc-robot` skill and a
 stdlib launcher. The installer records absolute runtime/config paths in its
 local `runtime.json` before CLI installation. The launcher reads those paths;
@@ -67,6 +73,11 @@ Begin with `list_robots`, `capabilities`, `probe_robot`, `list_files`, `read_fil
 and a backup. Enable writes only with exact file/description allowlists. Present
 the prepared diff, target and SHA-256 before committing an explicitly approved
 change. A transfer/readback is separate from controller loading and execution.
+
+API clients can use `read_captured_file` for hash-checked base64 byte ranges and
+`stage_file` for a proposed file up to 1 MiB. Pass its returned `source_file` to
+the normal preparation tool. These tools do not require client filesystem access
+and do not perform robot writes.
 
 To create a new TXT/CSV storage file, add its exact path to `creatable_files`
 and include its parent device in read roots. `MD:` and new program files are

@@ -30,6 +30,24 @@ def verify_bundle(root):
     return manifest
 
 
+def select_config(runtime, explicit, installation):
+    """Preserve an installed selection; fail before changing a runtime if it is lost."""
+    if explicit is not None:
+        config = explicit.resolve()
+        if not config.is_file():
+            raise ValueError("The supplied configuration file does not exist")
+    elif installation.get("config"):
+        config = Path(installation["config"])
+        if not config.is_absolute() or not config.is_file():
+            raise ValueError("The installed configuration is missing; supply --config to select its replacement")
+        config = config.resolve()
+    else:
+        config = runtime / "robot_bridge.local.json"
+        if installation and not config.is_file():
+            raise ValueError("This older runtime has no saved configuration selection; supply --config once to retain it")
+    return config
+
+
 def register_plugin(codex, root, environment):
     """Update our local marketplace without taking over a name owned elsewhere."""
     name = "fanuc-workbench-local"
@@ -71,7 +89,7 @@ def register_plugin(codex, root, environment):
 def main():
     parser = argparse.ArgumentParser(description="Install a local FANUC Workbench plugin runtime from bundled wheels")
     parser.add_argument("--runtime-dir", required=True, type=Path, help="Stable dedicated directory outside the plugin cache")
-    parser.add_argument("--config", type=Path, help="Existing bridge JSON; otherwise create a zero-robot read-only configuration")
+    parser.add_argument("--config", type=Path, help="Existing bridge JSON; otherwise retain the installed selection, or create a zero-robot configuration on first install")
     parser.add_argument("--register", choices=("none", "plugin", "mcp"), default="none")
     parser.add_argument("--codex-home", type=Path, help="Optional separate Codex profile for registration/testing")
     args = parser.parse_args()
@@ -83,10 +101,13 @@ def main():
     marker = runtime / "installation.json"
     if runtime.exists() and any(runtime.iterdir()) and not marker.exists():
         raise ValueError("Runtime directory is not owned by this installer; choose an empty dedicated directory")
-    if marker.exists() and json.loads(marker.read_text(encoding="utf-8")).get("kind") != "fanuc-workbench-runtime":
+    installation = json.loads(marker.read_text(encoding="utf-8")) if marker.exists() else {}
+    if marker.exists() and (not isinstance(installation, dict) or installation.get("kind") != "fanuc-workbench-runtime"):
         raise ValueError("Unexpected runtime ownership marker")
+    config = select_config(runtime, args.config, installation)
     runtime.mkdir(parents=True, exist_ok=True)
-    marker.write_text(json.dumps({"kind": "fanuc-workbench-runtime", "compatibility": compatibility()}, indent=2), encoding="utf-8")
+    marker.write_text(json.dumps({**installation, "kind": "fanuc-workbench-runtime",
+                                 "compatibility": compatibility()}, indent=2), encoding="utf-8")
     environment = {key: value for key, value in os.environ.items() if key not in {"PYTHONPATH", "PYTHONHOME"}}
     environment.update(PYTHONNOUSERSITE="1", PYTHONDONTWRITEBYTECODE="1", PIP_CONFIG_FILE=os.devnull,
                        PIP_DISABLE_PIP_VERSION_CHECK="1")
@@ -100,20 +121,19 @@ def main():
     subprocess.run([str(python), "-m", "pip", "install", "--no-index", "--find-links", str(wheels),
                     "--upgrade", "--force-reinstall", str(packages[0])], check=True, env=environment)
     subprocess.run([str(python), "-m", "pip", "check"], check=True, env=environment)
-    config = args.config.resolve() if args.config else runtime / "robot_bridge.local.json"
-    if args.config and not config.is_file():
-        raise ValueError("The supplied configuration file does not exist")
     if not config.exists():
         with config.open("x", encoding="utf-8") as stream:
             json.dump({"state_dir": "evidence", "source_dir": "edits", "robots": {},
                        "allow_writes": False, "approval_mode": "elicitation", "max_file_bytes": 16777216,
                        "max_backup_files": 5000, "max_backup_bytes": 536870912}, stream, indent=2)
     settings = {"python": str(python), "config": str(config)}
-    (root / "plugin" / "runtime.json").write_text(json.dumps(settings, indent=2), encoding="utf-8")
     checked = subprocess.run([str(python), "-B", "-m", "fanuc_workbench.bridge.doctor", "--config", str(config)],
                              env=environment, capture_output=True, text=True, check=True, timeout=60)
     doctor = json.loads(checked.stdout)
     (runtime / "doctor.json").write_text(json.dumps(doctor, indent=2), encoding="utf-8")
+    (root / "plugin" / "runtime.json").write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    marker.write_text(json.dumps({"kind": "fanuc-workbench-runtime", "compatibility": compatibility(),
+                                 "config": str(config)}, indent=2), encoding="utf-8")
     if args.register != "none":
         codex = shutil.which("codex")
         if not codex:
