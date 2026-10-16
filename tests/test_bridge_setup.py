@@ -90,6 +90,15 @@ def test_doctor_uses_real_mcp_without_contacting_a_controller(tmp_path):
     assert 'workspace_project' in result['tools'] and 'probe_robot' in result['tools']
 
 
+def test_doctor_measures_server_imports_when_the_caller_has_gui_modules(tmp_path):
+    import PySide6
+    config = tmp_path / 'bridge.json'
+    config.write_text(json.dumps({'state_dir': 'state', 'source_dir': 'edits', 'robots': {}}))
+    result = asyncio.run(diagnose(config))
+    assert result['caller_gui_imported'] is True
+    assert result['gui_imported'] is False and result['controller_contacted'] is False
+
+
 def test_plugin_launcher_handles_paths_with_spaces(tmp_path):
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client

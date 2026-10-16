@@ -7,6 +7,7 @@ import os
 import shutil
 import time
 import uuid
+import sys
 from pathlib import Path
 
 from fanuc_workbench.backends.base import RobotBackend
@@ -61,7 +62,8 @@ class WorkbenchOperations:
     def capabilities(self, robot_id: str | None = None) -> dict:
         if robot_id is not None:
             self.bridge._access(robot_id)
-        return {"analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],
+        return {"runtime": {"gui_imported": any(name == "PySide6" or name.startswith("PySide6.") for name in sys.modules)},
+                "analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],
                 "live_reads": ["R", "PR", "DI", "DO", "GI", "GO", "AI", "AO", "RI", "RO", "UI", "UO", "F"],
                 "sampling_provider": "controller-generated files or explicitly configured native FRRobot API; verify per-operation availability",
                 "native_access": {"operations": ["core.controller.status", "core.controller.sample", "core.controller.programs",
