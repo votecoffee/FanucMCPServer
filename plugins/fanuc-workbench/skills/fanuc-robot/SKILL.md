@@ -29,6 +29,16 @@ prepare them again. Failed reloads preserve the active features and plans.
 Extensions cannot introduce arbitrary native write classes; `commit_change`
 uses the same exact-proposal approval and core verification as the named tools.
 
+For native data, inspect the `core.controller.*`, `core.registers.*` and
+`core.programs.*` operation descriptors. These require an explicitly configured
+vendor provider. Preserve a native register/program inspection before preparing
+a change. Review robot/endpoint, target, before/proposed values or source hashes
+and the exact proposal SHA-256. Native changes use `commit_change` only after
+explicit approval and client confirmation. R readback is exact; PR axes use the
+stated numerical tolerance with exact metadata. LS deployment never selects or
+runs a program. A failed native commit consumes its plan: inspect actual state
+and evidence before preparing another change. Do not retry or roll back blindly.
+
 For troubleshooting, retrieve relevant files/logs or start a bounded backup.
 Follow job status, inspect capture completeness and unavailable-file errors, and
 use artifact IDs for analysis. Retain source hashes and distinguish captured

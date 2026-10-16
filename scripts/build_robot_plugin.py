@@ -40,7 +40,7 @@ def build(source: Path, output: Path):
                    check=True, env=environment)
     docs = output / "docs"
     docs.mkdir()
-    for name in ("ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md"):
+    for name in ("ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md"):
         shutil.copyfile(source / "docs" / name, docs / name)
     marketplace = output / ".agents" / "plugins"
     marketplace.mkdir(parents=True)

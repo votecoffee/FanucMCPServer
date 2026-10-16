@@ -229,3 +229,40 @@ def test_listing_verification_retains_instruction_and_position_differences():
     for bad in [SOURCE.replace(b'/END', b''), SOURCE.replace(b'FWBTEST', b'../X'), SOURCE+b'/END']:
         with pytest.raises(ValueError):
             validate_source(bad)
+
+
+def test_endpoint_refresh_closes_native_session_and_invalidates_plans_and_reads(native_case, tmp_path):
+    bridge, _, api = native_case
+    plan = reg_plan(bridge)
+    access = bridge.config.robots['r1']
+    document = {'state_dir': str(bridge.config.state_dir), 'source_dir': str(bridge.config.source_dir),
+        'allow_writes': True, 'approval_mode': 'elicitation', 'robots': {'r1': {
+        'profile': access.profile.to_dict(), 'writable_files': list(access.writable_files),
+        'native_provider': 'frrobot', 'native_register_targets': list(access.native_register_targets),
+        'native_programs': list(access.native_programs)}}}
+    path = tmp_path / 'native.json'
+    path.write_text(json.dumps(document))
+    bridge.config_path = path
+    document['robots']['r1']['profile']['host'] = '192.0.2.2'
+    path.write_text(json.dumps(document))
+    result = bridge.reload_connections()
+    assert result['invalidated_native_plans'] == 1 and api.closes == 1
+    assert not bridge.native.clients and not bridge.native.receipts and not bridge.native.plans
+    with pytest.raises(ValueError):
+        bridge.commit_change(plan['plan_id'], plan['proposed_sha256'], client_approved=True)
+
+
+def test_extension_reload_invalidates_native_approval(native_case, tmp_path):
+    from test_extension_runtime import release
+    from fanuc_workbench.bridge.extension_release import install_release
+    bridge, _, api = native_case
+    bridge.extensions.list()
+    plan = reg_plan(bridge)
+    source = tmp_path / 'feature'
+    release(source)
+    install_release(bridge.extensions.root, source)
+    result = bridge.extensions.reload()
+    assert result['invalidated_native_plans'] == 1 and not bridge.native.plans
+    with pytest.raises(ValueError):
+        bridge.commit_change(plan['plan_id'], plan['proposed_sha256'], client_approved=True)
+    assert not api.writes

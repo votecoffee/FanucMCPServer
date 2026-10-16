@@ -1,6 +1,21 @@
-# FANUC Workbench 2.0
+# FANUC Workbench 2.1
 
 A modular Python/PySide6 engineering workbench for FANUC robot backup, offline analysis/editing, live troubleshooting, commissioning, fleet maintenance, integration documentation, and controlled restore.
+
+## New in 2.1 development
+
+- **Native Controller**: TCP/API reads of R/PR/I/O, current position, tasks, alarms
+  and program metadata through the installed FANUC Robot Object data API.
+- **Reviewed live R/PR edits**: preserved values, exact target policy, frozen
+  proposals, explicit confirmation, stale-value checks and readback.
+- **Native LS deployment**: preserve old programs, load/compile and verify TP/LS
+  readback without selecting or executing the program.
+- **Stable MCP host**: 48 permanent tools with a versioned operation catalog
+  and reloadable feature workers, including all 20 workspace analyses.
+
+Native access defaults to disabled and requires a compatible licensed FANUC
+installation. See [native controller setup and limits](docs/ROBOT_NATIVE_API.md)
+and [reloadable features](docs/ROBOT_EXTENSIONS.md).
 
 ## New in 2.0
 
@@ -69,8 +84,8 @@ Dependencies: PySide6, XlsxWriter, ReportLab, and Paramiko.
 
 ## Codex / MCP robot bridge (development)
 
-The GUI and the optional local MCP adapter now share a headless controller
-service. The expanded server exposes 33 tools for backup jobs, workspace
+The GUI and the optional local MCP adapter now share headless controller
+services. The expanded server exposes 48 tools for backup jobs, workspace
 analysis/editing, live samples/recordings, snapshots/packages, audit evidence,
 and reviewed application-file/comment changes. Install the adapter with
 `python -m pip install -e ".[mcp]"` and see
@@ -78,8 +93,8 @@ and reviewed application-file/comment changes. Install the adapter with
 file/log tools, reviewed application-file replacement, and verification limits.
 Writes default to disabled; the example requests client-mediated confirmation.
 See the [service coverage matrix](docs/ROBOT_BRIDGE_COVERAGE.md) for unsupported
-native operations. The development plugin descriptors have not been
-installed into Codex or tested against a physical controller.
+native operations. Development plugins have been installed/tested with MCP
+clients and ROBOGUIDE; physical-controller acceptance remains pending.
 
 For development/testing:
 

@@ -63,7 +63,7 @@ class WorkbenchOperations:
             self.bridge._access(robot_id)
         return {"analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],
                 "live_reads": ["R", "PR", "DI", "DO", "GI", "GO", "AI", "AO", "RI", "RO", "UI", "UO", "F"],
-                "sampling_provider": "controller-generated files; availability must be verified",
+                "sampling_provider": "controller-generated files or explicitly configured native FRRobot API; verify per-operation availability",
                 "native_access": {"operations": ["core.controller.status", "core.controller.sample", "core.controller.programs",
                     "core.registers.read", "core.registers.update", "core.programs.inspect", "core.programs.deploy", "core.controller.reconnect"],
                     "provider": self.bridge._access(robot_id).native_provider if robot_id else "per configured robot",

@@ -6,6 +6,8 @@ reported through `capabilities`.
 
 | Existing area | Chat/API access | Boundary |
 | --- | --- | --- |
+| Native controller data | R/PR/I/O, current position, tasks, alarms and program metadata through FRRobot TCP API | Configured provider; sequential captures; per-section availability errors |
+| Native changes | Reviewed R/PR values and LS loading/compilation through core plans | Exact target policy; native readback; PR tolerance explicit; no program execution |
 | Feature extensions | Stable MCP catalog, exact-revision read/proposal calls and atomic worker reload; all 20 workspace analyses delegated | Trusted local hash-pinned releases, no arbitrary native write classes; failed reload preserves active features and plans |
 | Controller, FTP/SFTP | Listing, exact retrieval, reviewed application-file replacement and TXT/CSV storage creation | Creation outside MD: with separate exact allowlist; no native load/run acceptance |
 | API file exchange | Hash-bound captured-byte ranges and bounded base64 proposal staging | Generated local source paths; no host filesystem access required by the client; existing approval/write policy applies |
@@ -31,8 +33,9 @@ reported through `capabilities`.
 | Local plugin setup | Offline wheels, stable runtime, launcher, skill, CLI registration and MCP doctor | Windows/Python-version-specific bundle; public distribution unverified |
 | New jobs/artifacts | History, cancellation, interruption after restart, artifact ranges and audit | No blind write retry or automatic recovery |
 
-New program-file creation, controller load/compile, program start/stop, motion, live
-register-value writes, frame writes, I/O forcing, controller mode/running-state
+Native LS creation/loading and R/PR value edits are available through the explicit
+provider and target policy described in [native API setup](ROBOT_NATIVE_API.md).
+Program start/stop, motion, frame writes, I/O forcing, controller mode/running-state
 interlocks and DCS/mastering writes require a verified controller adapter and
 are unsupported. File service acceptance does not establish them.
 
