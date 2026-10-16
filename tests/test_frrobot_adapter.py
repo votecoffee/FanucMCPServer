@@ -60,9 +60,11 @@ def test_native_r_write_uses_typed_property_and_rechecks_original():
 
 def test_native_pr_write_stages_only_changed_axes_and_updates_once():
     binding = Binding()
+    # Joint readings can contain converted values with more precision than REAL32.
+    binding.axes['axes'][2] = 9.62761011158101
     api = FrRobot('192.0.2.1', binding=binding, robot=binding.robot)
     before = api.read_register('PR[1,100]')
-    proposed = {**before, 'values': {'J1': 5.0, 'J2': 2.0}}
+    proposed = {**before, 'values': {'J1': 5.0, 'J2': before['values']['J2']}}
     assert api.write_register('PR[1,100]', before, proposed)['status'] == 'verified'
     assert [name for name, *_ in binding.puts] == ['AutomaticUpdate', 'Item']
     assert binding.calls.count('Update') == 1

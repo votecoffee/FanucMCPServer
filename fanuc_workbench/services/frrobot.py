@@ -177,7 +177,8 @@ class FrRobot:
             raise ValueError("Native register changed since review")
         # Validate again inside the vendor worker; no arbitrary property paths.
         from fanuc_workbench.services.native_values import propose_register
-        change = {"type": proposed["type"], "value": proposed["value"]} if before["kind"] == "R" else {"values": proposed["values"]}
+        change = {"type": proposed["type"], "value": proposed["value"]} if before["kind"] == "R" else {
+            "values": {axis: value for axis, value in proposed["values"].items() if value != before["values"].get(axis)}}
         if propose_register(before, change) != proposed:
             raise ValueError("Native proposal no longer matches its contract")
         obj = self._register(target)
