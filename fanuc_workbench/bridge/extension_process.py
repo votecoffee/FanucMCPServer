@@ -69,10 +69,9 @@ class WindowsJob:
             self.handle = None
 
 
-class FeatureWorker:
-    def __init__(self, release: Path, manifest: dict, checksum: str, python: str,
-                 *, startup_timeout=15.0, operation_timeout=30.0):
-        self.manifest, self.checksum = manifest, checksum
+class RpcProcess:
+    """Owned, bounded private JSON IPC used by feature and core vendor workers."""
+    def __init__(self, command, ready_fields, *, cwd=None, startup_timeout=15.0, operation_timeout=30.0):
         self.lock = threading.Lock()
         self.inbox = queue.Queue(maxsize=2)
         self.stopped = threading.Event()
@@ -86,13 +85,11 @@ class FeatureWorker:
                    "APPDATA", "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "COMSPEC", "LANG", "LC_ALL"}
         environment = {key: value for key, value in os.environ.items() if key.upper() in allowed}
         environment.update(PYTHONDONTWRITEBYTECODE="1", PYTHONNOUSERSITE="1", PYTHONUTF8="1")
-        bootstrap = Path(__file__).with_name("extension_worker.py")
         options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
         try:
-            self.process = subprocess.Popen([python, "-B", str(bootstrap), "--release", str(release),
-                "--manifest-sha256", checksum, "--host-root", str(Path(__file__).resolve().parents[2])],
+            self.process = subprocess.Popen(command,
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                env=environment, cwd=release, **options)
+                env=environment, cwd=cwd, **options)
             self.reader = threading.Thread(target=self._read, daemon=True, name="fanuc-feature-ipc")
             self.reader.start()
             boot = self._receive(startup_timeout)
@@ -110,8 +107,7 @@ class FeatureWorker:
             self._send({"command": "activate"})
             ready = self._receive(startup_timeout)
             if (ready.get("protocol") != 1 or ready.get("ready") is not True or ready.get("pid") != self.pid
-                    or ready.get("manifest_sha256") != checksum
-                    or ready.get("operations") != sorted(row["id"] for row in manifest["operations"])):
+                    or any(ready.get(key) != value for key, value in ready_fields.items())):
                 raise ValueError("Worker feature handshake failed")
         except Exception:
             self.close()
@@ -238,3 +234,14 @@ class FeatureWorker:
                     except subprocess.TimeoutExpired:
                         pass
                 self._stop()
+
+
+class FeatureWorker(RpcProcess):
+    def __init__(self, release: Path, manifest: dict, checksum: str, python: str,
+                 *, startup_timeout=15.0, operation_timeout=30.0):
+        self.manifest, self.checksum = manifest, checksum
+        bootstrap = Path(__file__).with_name("extension_worker.py")
+        super().__init__([python, "-B", str(bootstrap), "--release", str(release),
+            "--manifest-sha256", checksum, "--host-root", str(Path(__file__).resolve().parents[2])],
+            {"manifest_sha256": checksum, "operations": sorted(row["id"] for row in manifest["operations"])},
+            cwd=release, startup_timeout=startup_timeout, operation_timeout=operation_timeout)
