@@ -1,7 +1,7 @@
 # Shared-service and MCP coverage
 
 This mapping describes implementation coverage, not physical acceptance. The
-expanded development server exposes 33 tools. Unsupported native operations are
+expanded development server exposes 38 tools. Unsupported native operations are
 reported through `capabilities`.
 
 | Existing area | Chat/API access | Boundary |
@@ -17,14 +17,15 @@ reported through `capabilities`.
 | Option inventory | Matches and unknown status | Does not authenticate installed options |
 | EtherNet/IP | Adapter/scanner evidence | No configuration write |
 | Monitoring | Samples, watch jobs, trend/timeline/cycle exports and profiles | Two-second minimum; source files and availability errors retained |
-| Handshake | Caller-supplied mapping analysis | Timestamp evidence; map authoring stays in GUI/Python service |
+| Handshake | Mapping authoring and recording analysis | New local workspace versions; timestamp evidence |
 | Snapshots | Capture and compare | Offline troubleshooting evidence |
-| Commissioning | Baseline packages and comparisons | Checklist authoring stays in GUI/Python; no acceptance approval |
+| Commissioning | Checklist versions, baseline packages and comparisons | User-authored evidence; no acceptance approval |
 | Transformations | Finite six-axis frame conversion | Calculation only; physical verification pending |
 | Documentation | HTML/XLSX/PDF packages | Offline artifacts |
-| ROBOGUIDE | Preserved handoff package | Native launch/UI automation outside chat tools |
-| Fleet | Configured robots and independent backup jobs | Scheduling stays in Workbench/host; no scheduler installed |
-| Project/cell | Cross-workspace comparison and explicit deployment packages | Project metadata stays in GUI/Python service |
+| ROBOGUIDE | FTP/TCP file access, analysis and preserved handoff package | Explicit virtual-controller endpoints; no Windows automation required |
+| Fleet | Configured robots, reachability probes and grouped independent backup jobs | Scheduling stays in Workbench/host; no scheduler installed |
+| Project/cell | Project metadata versions, backup association, PLC tag maps and deployment packages | New local artifacts; originals preserved |
+| Local plugin setup | Offline wheels, stable runtime, launcher, skill, CLI registration and MCP doctor | Windows/Python-version-specific bundle; public distribution unverified |
 | New jobs/artifacts | History, cancellation, interruption after restart, artifact ranges and audit | No blind write retry or automatic recovery |
 
 New-file creation, controller load/compile, program start/stop, motion, live

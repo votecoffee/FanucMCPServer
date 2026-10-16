@@ -3,7 +3,9 @@
   "mcpServers": {
     "fanuc-workbench": {
       "type": "stdio",
-      "command": "fanuc-workbench-mcp"
+      "command": "py",
+      "args": ["-3", "${PLUGIN_ROOT}/server/launch.py"],
+      "cwd": "${PLUGIN_ROOT}"
     }
   }
 }

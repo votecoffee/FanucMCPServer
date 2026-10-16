@@ -75,6 +75,88 @@ class WorkbenchOperations:
                 "cross_process_lock_scope": "bridge clients sharing state_dir and the same configured host string",
                 "robot_id": robot_id, "controller_contacted": False}
 
+    def probe(self, robot_id: str) -> dict:
+        self.bridge._access(robot_id)
+        start = time.monotonic()
+        with self.bridge._robot_lock(robot_id):
+            self.bridge._audit("probe_started", robot_id=robot_id)
+            try:
+                roots = self.bridge._controller(robot_id).test_connection()
+                result = {"reachable": True, "entries_by_root": roots}
+            except Exception as exc:
+                result = {"reachable": False, "error_type": type(exc).__name__}
+            self.bridge._audit("probe_complete", robot_id=robot_id, **result)
+        return {"robot_id": robot_id, **result, "elapsed_seconds": time.monotonic() - start,
+                "running_state": "unknown", "physical_identity": "not_verified"}
+
+    def start_fleet_backup(self, robot_ids: list[str], attempt_ascii=True) -> dict:
+        if not 1 <= len(robot_ids) <= 8 or len(set(robot_ids)) != len(robot_ids):
+            raise ValueError("Select 1-8 distinct configured robots")
+        for identifier in robot_ids:
+            self.bridge._access(identifier)
+        jobs, unavailable = [], []
+        for identifier in robot_ids:
+            try:
+                jobs.append(self.start_backup(identifier, attempt_ascii=attempt_ascii))
+            except Exception as exc:
+                unavailable.append({"robot_id": identifier, "error_type": type(exc).__name__})
+        return {"jobs": jobs, "not_started": unavailable}
+
+    def read_metadata(self, artifact_id: str, kind: str) -> dict:
+        from fanuc_workbench.services.workspace_metadata import WorkspaceMetadataService
+        return WorkspaceMetadataService.read(self.store.verify(artifact_id), kind)
+
+    def write_metadata(self, artifact_id: str, kind: str, data) -> dict:
+        from fanuc_workbench.services.workspace_metadata import WorkspaceMetadataService
+        source = self.store.verify(artifact_id)
+        destination = self.bridge._folder() / "workspace"
+        shutil.copytree(source, destination)
+        result = WorkspaceMetadataService.write(destination, kind, data)
+        item = self.store.register(destination, "workspace", note=f"{kind} metadata derived from {artifact_id}")
+        self.bridge._audit("metadata_saved", source_artifact=artifact_id, artifact_id=item["artifact_id"], kind=kind)
+        return {**result, "artifact_id": item["artifact_id"], "source_artifact": artifact_id}
+
+    def project(self, action: str, *, project_id: str = "", name: str = "",
+                robot_id: str = "", workspace_id: str = "", metadata: dict | None = None) -> dict:
+        from fanuc_workbench.services.project import RobotProject, ProjectRobot
+        if action == "read":
+            if self.store.get(project_id)["kind"] != "project":
+                raise ValueError("Supply a project artifact ID")
+            project = RobotProject.load(self.store.verify(project_id))
+            return {"project_id": project_id, "name": project.name, "robots": serial(project.robots)}
+        destination = self.bridge._folder() / "project"
+        if action == "create":
+            if not name.strip() or len(name) > 100 or any(ord(c) < 32 for c in name):
+                raise ValueError("Project name requires 1-100 printable characters")
+            project = RobotProject(name, destination)
+            project.save()
+        elif action == "add_workspace":
+            if self.store.get(project_id)["kind"] != "project":
+                raise ValueError("Supply a project artifact ID")
+            access = self.bridge._access(robot_id)
+            source = self.store.verify(workspace_id)
+            shutil.copytree(self.store.verify(project_id), destination)
+            project = RobotProject.load(destination)
+            fields = metadata or {}
+            if set(fields) - {"controller", "model", "software", "notes"} or any(
+                not isinstance(value, str) or len(value) > 1000 or any(ord(c) < 32 for c in value)
+                for value in fields.values()
+            ):
+                raise ValueError("Project metadata supports bounded controller, model, software and notes text")
+            robot = next((item for item in project.robots if item.name.casefold() == robot_id.casefold()), None)
+            if robot is None:
+                robot = ProjectRobot(robot_id, host=access.profile.host)
+            for field, value in fields.items():
+                setattr(robot, field, value)
+            project.upsert_robot(robot)
+            project.add_backup(robot_id, source, backup_name=workspace_id)
+        else:
+            raise ValueError("Project action must be create, read or add_workspace")
+        item = self.store.register(destination, "project", note="Local project metadata and backup copies")
+        self.bridge._audit("project_saved", artifact_id=item["artifact_id"], project_action=action)
+        return {"project_id": item["artifact_id"], "name": project.name, "robots": serial(project.robots),
+                "controller_written": False}
+
     def import_workspace(self, source_folder: str, note: str = "") -> dict:
         config = self.bridge.config
         source = confined(config.source_dir, source_folder)

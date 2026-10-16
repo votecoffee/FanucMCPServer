@@ -17,6 +17,7 @@ mcp = ["mcp>=1.30,<2"]
 [project.scripts]
 fanuc-workbench = "fanuc_workbench.app:main"
 fanuc-workbench-mcp = "fanuc_workbench.bridge.mcp_server:main"
+fanuc-workbench-doctor = "fanuc_workbench.bridge.doctor:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

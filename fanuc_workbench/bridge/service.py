@@ -140,7 +140,9 @@ class RobotBridge:
             for key, access in self.config.robots.items()
         ]}
 
-    def list_files(self, robot_id: str, remote_dir: str) -> dict:
+    def list_files(self, robot_id: str, remote_dir: str, offset: int = 0, limit: int = 1000) -> dict:
+        if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 1000:
+            raise ValueError("Directory pagination requires offset >= 0 and limit between 1 and 1000")
         with self._lock, self._robot_lock(robot_id):
             remote = self._path(robot_id, remote_dir)
             self._audit("list_requested", robot_id=robot_id, remote_path=remote)
@@ -157,10 +159,11 @@ class RobotBridge:
                         continue
                     rows.append({"path": path, "is_dir": entry.is_dir,
                                  "size": entry.size, "modified": entry.modified})
-                    if len(rows) == 1000:
-                        break
-                self._audit("list_complete", robot_id=robot_id, count=len(rows))
-                return {"entries": rows, "limit": 1000, "possibly_truncated": len(rows) == 1000}
+                selected = rows[offset:offset + limit]
+                more = offset + len(selected) < len(rows)
+                self._audit("list_complete", robot_id=robot_id, count=len(selected), total=len(rows), offset=offset)
+                return {"entries": selected, "limit": limit, "offset": offset, "total": len(rows),
+                        "next_offset": offset + len(selected) if more else None, "possibly_truncated": more}
             except Exception as exc:
                 self._audit("list_failed", robot_id=robot_id, error_type=type(exc).__name__)
                 raise RuntimeError("Controller listing failed; check connection and profile") from None

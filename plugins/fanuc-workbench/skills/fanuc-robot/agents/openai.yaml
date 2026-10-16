@@ -1,0 +1,4 @@
+interface:
+  display_name: "FANUC Robot"
+  short_description: "Inspect robot evidence and prepare reviewed changes"
+  default_prompt: "Use $fanuc-robot to inspect the configured robot and collect diagnostic evidence."

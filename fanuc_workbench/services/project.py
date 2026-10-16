@@ -43,8 +43,17 @@ class RobotProject:
             if r.name.lower()==robot.name.lower(): self.robots[i]=robot; self.save(); return
         self.robots.append(robot); self.save()
 
-    def add_backup(self, robot_name: str, backup: Path) -> Path:
-        dest=self.path/'Robots'/robot_name/'Backups'/backup.name
+    def add_backup(self, robot_name: str, backup: Path, *, backup_name: str | None = None) -> Path:
+        label = backup_name or backup.name
+        for component in (robot_name, label):
+            if (component in {'', '.', '..'} or component != component.rstrip(' .')
+                    or any(ord(c) < 32 or c in '/\\:<>"|?*' for c in component)):
+                raise ValueError('Project robot and backup names must be single path components')
+        dest=self.path/'Robots'/robot_name/'Backups'/label
+        if not dest.resolve().is_relative_to(self.path.resolve()):
+            raise ValueError('Project backup destination is outside the project')
+        if backup_name and dest.exists():
+            raise FileExistsError('This backup is already present in the project')
         if backup.resolve()!=dest.resolve():
             if dest.exists(): shutil.rmtree(dest)
             shutil.copytree(backup,dest)

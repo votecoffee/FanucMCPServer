@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from ftplib import FTP, error_perm
 from pathlib import Path, PurePosixPath
+import re
 
 from fanuc_workbench.core.models import RemoteEntry, RobotProfile
 from .base import RobotBackend
@@ -12,6 +13,23 @@ def _join_remote(parent: str, child: str) -> str:
     if parent.endswith(":"):
         return f"{parent}{child}"
     return f"{parent.rstrip('/')}/{child}"
+
+
+def _unix_listing(remote_path: str, lines: list[str]) -> list[RemoteEntry] | None:
+    """Parse recognized LIST records as a batch; unknown formats use NLST fallback."""
+    result = []
+    for line in lines:
+        if re.fullmatch(r"total\s+\d+", line):
+            continue
+        match = re.fullmatch(r"([-d])[rwxstST-]{9}\s+\d+\s+\S+\s+\S+\s+(\d+)\s+"
+                             r"\S+\s+\d{1,2}\s+\S+\s+(.+)", line)
+        if not match:
+            return None
+        kind, size, name = match.groups()
+        if name not in {".", ".."}:
+            result.append(RemoteEntry(name=name, path=_join_remote(remote_path, name),
+                                      is_dir=kind == "d", size=int(size)))
+    return result
 
 
 class FanucFtpBackend(RobotBackend):
@@ -84,7 +102,18 @@ class FanucFtpBackend(RobotBackend):
             except Exception:
                 pass
 
-            # FANUC FTP implementations vary; NLST + a CWD probe is a useful fallback.
+            # Older FANUC virtual controllers reject MLSD. Their UNIX-style LIST
+            # avoids three control round-trips per file in large MD: directories.
+            lines: list[str] = []
+            try:
+                ftp.retrlines("LIST", lines.append)
+                listed = _unix_listing(remote_path, lines)
+                if listed is not None:
+                    return sorted(listed, key=lambda e: (not e.is_dir, e.name.lower()))
+            except error_perm:
+                pass
+
+            # Unknown LIST formats still use the existing NLST + CWD fallback.
             for raw in ftp.nlst():
                 name = PurePosixPath(raw.rstrip("/")).name or raw
                 if name in {".", ".."}:

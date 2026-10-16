@@ -56,14 +56,15 @@ class IOData:
 
 _NUMREG = re.compile(r"^\s*\[(?P<idx>\d+)\]\s*=\s*(?P<value>.*?)\s+'(?P<comment>[^']*)'\s*$")
 _PR_START = re.compile(r"^\s*\[(?P<group>\d+)\s*,\s*(?P<idx>\d+)\]\s*=\s*'(?P<comment>[^']*)'(?P<tail>.*)$")
-_AXIS = re.compile(r"\b(X|Y|Z|W|P|R|J\d+)\s*[:=]\s*([-+]?\d+(?:\.\d+)?)", re.I)
+_REAL = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][-+]?\d+)?"
+_AXIS = re.compile(rf"\b(X|Y|Z|W|P|R|J\d+)\s*[:=]\s*({_REAL})(?![\w.])", re.I)
 _UF = re.compile(r"\b(?:UF|UFRAME)\s*[:=]\s*(-?\d+)", re.I)
 _UT = re.compile(r"\b(?:UT|UTOOL)\s*[:=]\s*(-?\d+)", re.I)
 _CONFIG = re.compile(r"\bCONFIG\s*[:=]\s*'?([^'\r\n,]+(?:,[^'\r\n]+){0,3})'?", re.I)
 _FRAME_HEADER = re.compile(r"^\s*(Tool Frame|Jog Frame|User Frame)\s*$", re.I)
 _FRAME_LINE = re.compile(
-    r"^\s*(?P<x>-?\d+(?:\.\d+)?)\s+(?P<y>-?\d+(?:\.\d+)?)\s+(?P<z>-?\d+(?:\.\d+)?)\s+"
-    r"(?P<w>-?\d+(?:\.\d+)?)\s+(?P<p>-?\d+(?:\.\d+)?)\s+(?P<r>-?\d+(?:\.\d+)?)(?:\s+(?P<comment>.*?))?\s*$"
+    rf"^\s*(?P<x>{_REAL})\s+(?P<y>{_REAL})\s+(?P<z>{_REAL})\s+"
+    rf"(?P<w>{_REAL})\s+(?P<p>{_REAL})\s+(?P<r>{_REAL})(?:\s+(?P<comment>.*?))?\s*$"
 )
 _IO = re.compile(
     r"^\s*(?P<type>AIN|AOUT|DIN|DOUT|GIN|GOUT|SI|SO|FLG|RI|RO|UI|UO)\[\s*(?P<idx>\d+)\]\s+"
@@ -151,7 +152,7 @@ def set_position_register(record: PositionRegister, *, comment: str | None = Non
             if _UT.search(line): text_lines[i] = _UT.sub(lambda m: m.group(0).replace(m.group(1), str(user_tool)), line, count=1)
     for axis, val in replacements.items():
         axis = axis.upper()
-        pat = re.compile(rf"\b{re.escape(axis)}\s*([:=])\s*([-+]?\d+(?:\.\d+)?)", re.I)
+        pat = re.compile(rf"\b{re.escape(axis)}\s*([:=])\s*({_REAL})(?![\w.])", re.I)
         for i, line in enumerate(text_lines):
             if pat.search(line):
                 text_lines[i] = pat.sub(lambda m: f"{axis} {m.group(1)} {float(val):.3f}", line, count=1)

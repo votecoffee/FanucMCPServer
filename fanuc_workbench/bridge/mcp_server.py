@@ -35,9 +35,9 @@ def create_server(bridge: RobotBridge):
         return bridge.list_robots()
 
     @server.tool(annotations=read)
-    def list_files(robot_id: str, remote_dir: str) -> dict:
-        """List one configured controller directory (up to 1000 entries)."""
-        return bridge.list_files(robot_id, remote_dir)
+    def list_files(robot_id: str, remote_dir: str, offset: int = 0, limit: int = 1000) -> dict:
+        """List a configured controller directory in pages of up to 1000 entries."""
+        return bridge.list_files(robot_id, remote_dir, offset, limit)
 
     @server.tool(annotations=read)
     def read_file(robot_id: str, path: str) -> dict:
@@ -79,6 +79,33 @@ def create_server(bridge: RobotBridge):
     def capabilities(robot_id: str | None = None) -> dict:
         """Report available tools, providers, approval policy and unsupported native controller actions."""
         return bridge.operations.capabilities(robot_id)
+
+    @server.tool(annotations=read)
+    def probe_robot(robot_id: str) -> dict:
+        """Test configured file-service reachability; controller identity and running state remain unverified."""
+        return bridge.operations.probe(robot_id)
+
+    @server.tool(annotations=local)
+    def start_fleet_backup(robot_ids: list[str], attempt_ascii: bool = True) -> dict:
+        """Start independent bounded backup jobs for 1-8 configured robots; report jobs that could not start."""
+        return bridge.operations.start_fleet_backup(robot_ids, attempt_ascii)
+
+    @server.tool(annotations=read)
+    def read_workspace_metadata(artifact_id: str, kind: str) -> dict:
+        """Read checklist, plc_map or handshake metadata from a verified saved workspace."""
+        return bridge.operations.read_metadata(artifact_id, kind)
+
+    @server.tool(annotations=local)
+    def write_workspace_metadata(artifact_id: str, kind: str, data: dict | list[dict]) -> dict:
+        """Save checklist, plc_map or handshake metadata in a new workspace copy. No controller write or acceptance claim."""
+        return bridge.operations.write_metadata(artifact_id, kind, data)
+
+    @server.tool(annotations=local)
+    def workspace_project(action: str, project_id: str = "", name: str = "", robot_id: str = "",
+                          workspace_id: str = "", metadata: dict | None = None) -> dict:
+        """Create/read a local project or add a captured robot workspace to a new project version."""
+        return bridge.operations.project(action, project_id=project_id, name=name, robot_id=robot_id,
+                                         workspace_id=workspace_id, metadata=metadata)
 
     @server.tool(annotations=local)
     def import_workspace(source_folder: str, note: str = "") -> dict:

@@ -1,7 +1,7 @@
 # FANUC Workbench robot bridge (expanded development version)
 
 The GUI, local Python API and MCP adapter share controller, parser and analysis
-services. The server now exposes 33 tools. No physical robot has been contacted;
+services. The server now exposes 38 tools. No physical robot has been contacted;
 native acceptance remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 
 ## Setup
@@ -35,11 +35,11 @@ args = ["-m", "fanuc_workbench.bridge.mcp_server", "--config", "C:/absolute/path
 ```
 
 Restart the connection, then call list_robots and capabilities before network
-operations. No Codex configuration, HTTP listener or robot tunnel is installed
-automatically. The descriptors under plugins/fanuc-workbench remain a development
-scaffold requiring fanuc-workbench-mcp on PATH and FANUC_WORKBENCH_CONFIG in the
-environment; they do not bundle Python or dependencies. Plugin-directory
-installation and public submission remain unverified. Use the explicit command first.
+operations. The optional local plugin bundle includes dependency wheels, a skill
+and a launcher for a separate runtime. Its installer can register the plugin or
+the stdio MCP server when explicitly requested by a command-line option. See
+[offline plugin setup](ROBOT_PLUGIN_SETUP.md). No HTTP listener or robot tunnel
+is installed. No OpenAI API key is required by this bridge.
 
 ## Credentials and approval
 
@@ -66,11 +66,12 @@ ordinary local files, not a tamper-proof ledger.
 
 | Area | Tools |
 | --- | --- |
-| Discovery/files | list_robots, capabilities, list_files, read_file, collect_logs |
+| Discovery/files | list_robots, capabilities, probe_robot, list_files, read_file, collect_logs |
 | Artifacts | import_workspace, list_artifacts, artifact_files, read_artifact |
-| Backups/jobs | start_backup, job_status, list_jobs, cancel_job |
+| Backups/jobs | start_backup, start_fleet_backup, job_status, list_jobs, cancel_job |
 | Workspace analysis | analyze_workspace, compare_workspaces, inspect_program |
 | Offline editing | edit_workspace_file, transform_pose |
+| Local metadata/projects | read_workspace_metadata, write_workspace_metadata, workspace_project |
 | Live data/recordings | sample_robot, start_watch, analyze_recording, compare_recordings |
 | Snapshots/packages | capture_snapshot, compare_snapshots, make_package |
 | Reviewed files | prepare_upload, commit_upload, cancel_upload, prepare_restore_file |
@@ -80,6 +81,18 @@ ordinary local files, not a tamper-proof ledger.
 read_file preserves exact bytes and returns SHA-256 and bounded display text.
 Use directory listings or controller documentation for log names. Missing files
 are unavailable; multi-file capture is not atomic.
+
+list_files supports offset/limit pagination and reports total/next_offset. Older
+FTP controllers with UNIX-style LIST responses use a batch listing; unknown
+formats retain the per-file NLST fallback. probe_robot tests file-service access
+and reports elapsed time; it does not establish robot running state or identity.
+
+write_workspace_metadata saves GUI-compatible checklist, PLC tag and handshake
+maps in a new workspace artifact. Checklist status is user-authored evidence,
+not commissioning approval. workspace_project creates or reads a local project,
+or adds a captured workspace to a new project version. Originals are preserved.
+start_fleet_backup starts independent jobs for 1-8 distinct configured robot IDs;
+inspect each result and not_started. It does not install a recurring scheduler.
 
 start_backup returns a job ID immediately. Omit paths for configured roots, or
 supply selected file paths. Poll job_status and inspect result.complete, warnings,

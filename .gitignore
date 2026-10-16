@@ -5,5 +5,7 @@
 /robot_bridge.local.json
 /robot-evidence/
 /robot-edits/
+/.robot-bridge/
+/plugins/fanuc-workbench/runtime.json
 __pycache__/
 *.py[cod]
