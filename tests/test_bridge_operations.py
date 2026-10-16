@@ -278,7 +278,8 @@ def test_live_comment_policy_prepare_and_verified_readback(bridge_case, monkeypa
     guarded = RobotBridge(replace(config, robots={"r1": access}), lambda _: robot)
     calls = []
 
-    def setter(host, record, comment, timeout):
+    def setter(host, record, comment, timeout, **policy):
+        assert policy == {"max_bytes": 16, "encoding": "ascii"}
         calls.append((host, record.identifier, comment))
         robot.files["md:NUMREG.VA"] = b"[1] = 42 'New count'\r\n"
 
@@ -306,7 +307,7 @@ def test_live_comment_stale_or_unconfirmed_changes_fail_closed(bridge_case, monk
     try:
         plan = guarded.comments.prepare("r1", "md:NUMREG.VA", "R[1]", "New count", digest(robot.files["md:NUMREG.VA"]))
         if change_before:
-            robot.files["md:NUMREG.VA"] = b"[1] = 99 'Count'\r\n"
+            robot.files["md:NUMREG.VA"] = b"[1] = 99 'Other engineer'\r\n"
         with pytest.raises(RuntimeError, match="not_attempted" if change_before else "uncertain"):
             guarded.comments.commit(plan["plan_id"], plan["proposed_sha256"])
         assert len(calls) == (0 if change_before else 1)

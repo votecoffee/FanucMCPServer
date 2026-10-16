@@ -140,7 +140,8 @@ class RobotBridge:
              "transport": access.profile.transport, "roots": access.profile.roots,
              "writable_files": list(access.writable_files), "comment_targets": list(access.comment_targets),
              "creatable_files": list(access.creatable_files),
-             "comment_service_url": access.comment_service_url}
+             "comment_service_url": access.comment_service_url, "comment_max_bytes": access.comment_max_bytes,
+             "comment_encoding": access.comment_encoding}
             for key, access in self.config.robots.items()
         ]}
 
@@ -185,10 +186,36 @@ class RobotBridge:
                 result = self._display(local, remote)
                 self._audit("read_complete", robot_id=robot_id, remote_path=remote,
                             sha256=result["sha256"], local_path=str(local))
+                atomic_json(self._read_receipt(robot_id, remote, result["sha256"]),
+                            {"sha256": result["sha256"], "local_path": str(local)})
                 return result
             except Exception as exc:
                 self._audit("read_failed", robot_id=robot_id, remote_path=remote, error_type=type(exc).__name__)
                 raise RuntimeError("Controller read failed; check path, connection and max_file_bytes") from None
+
+    def _read_receipt(self, robot_id: str, remote: str, digest: str) -> Path:
+        if not isinstance(digest, str) or not _HASH.fullmatch(digest):
+            raise ValueError("Reference SHA-256 must identify a preserved controller read")
+        profile = self._access(robot_id).profile
+        key = json.dumps([robot_id, profile.host.casefold(), profile.port, profile.transport,
+                          remote.casefold() if ":" in remote else remote, digest])
+        return self.config.state_dir / "read-receipts" / (hashlib.sha256(key.encode()).hexdigest() + ".json")
+
+    def reference_capture(self, robot_id: str, path: str, digest: str) -> dict:
+        """Resolve only an intact read captured for this configured robot/path."""
+        remote = self._path(robot_id, path)
+        try:
+            receipt = json.loads(self._read_receipt(robot_id, remote, digest).read_text(encoding="utf-8"))
+            local = Path(receipt["local_path"]).resolve()
+            if (not local.is_relative_to(self.config.state_dir.resolve()) or not local.is_file()
+                    or local.stat().st_size > self.config.max_file_bytes):
+                raise ValueError("Reference capture is outside retained evidence or exceeds the file limit")
+            capture = self._display(local, remote)
+            if capture["sha256"] != digest or receipt["sha256"] != digest:
+                raise ValueError("Preserved reference bytes changed")
+            return capture
+        except (OSError, KeyError, ValueError):
+            raise ValueError("No intact preserved read matches this robot, path and SHA-256; retrieve a fresh listing") from None
 
     def collect_logs(self, robot_id: str, paths: list[str]) -> dict:
         if not 1 <= len(paths) <= 10:

@@ -19,7 +19,9 @@
         "timeout": 10
       },
       "writable_files": [],
-      "creatable_files": []
+      "creatable_files": [],
+      "comment_max_bytes": 16,
+      "comment_encoding": "ascii"
     }
   }
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import Request, HTTPRedirectHandler, build_opener
+from urllib.request import Request, HTTPRedirectHandler, ProxyHandler, build_opener
 
 from fanuc_workbench.parsers.comments import CommentRecord
 
@@ -54,7 +54,22 @@ def target_for_record(record: CommentRecord) -> LiveCommentTarget:
     raise ValueError(f"{record.kind} descriptions are local-file edits only in this version.")
 
 
-def build_comset_url(host: str, target: LiveCommentTarget, comment: str) -> str:
+def validate_live_comment(comment: str, *, max_bytes: int = 16, encoding: str = "ascii") -> None:
+    if type(max_bytes) is not int or not 1 <= max_bytes <= 256 or encoding not in {"ascii", "latin-1", "utf-8"}:
+        raise ValueError("Comment policy requires 1-256 bytes and ascii, latin-1 or utf-8 encoding")
+    if not isinstance(comment, str) or any(not char.isprintable() for char in comment):
+        raise ValueError("Comments/descriptions require printable text without control characters")
+    try:
+        encoded = comment.encode(encoding, errors="strict")
+    except UnicodeEncodeError:
+        raise ValueError("Comment cannot be represented in the configured controller encoding") from None
+    if len(encoded) > max_bytes:
+        raise ValueError(f"Comment exceeds the configured {max_bytes}-byte controller limit")
+
+
+def build_comset_url(host: str, target: LiveCommentTarget, comment: str, *,
+                     max_bytes: int = 16, encoding: str = "ascii") -> str:
+    validate_live_comment(comment, max_bytes=max_bytes, encoding=encoding)
     clean_host = host.strip().rstrip("/")
     if clean_host.lower().startswith("http://"):
         base = clean_host
@@ -62,18 +77,19 @@ def build_comset_url(host: str, target: LiveCommentTarget, comment: str) -> str:
         base = clean_host
     else:
         base = f"http://{clean_host}"
-    encoded_comment = quote(comment, safe="")
+    encoded_comment = quote(comment, safe="", encoding=encoding, errors="strict")
     return f"{base}/karel/ComSet?sComment={encoded_comment}&sIndx={target.index}&sFc={target.function_code}"
 
 
-def set_live_comment(host: str, record: CommentRecord, comment: str, timeout: float = 10.0) -> LiveCommentTarget:
-    if "\n" in comment or "\r" in comment:
-        raise ValueError("Comments/descriptions cannot contain line breaks")
+def set_live_comment(host: str, record: CommentRecord, comment: str, timeout: float = 10.0, *,
+                     max_bytes: int = 16, encoding: str = "ascii") -> LiveCommentTarget:
     target = target_for_record(record)
-    url = build_comset_url(host, target, comment)
+    url = build_comset_url(host, target, comment, max_bytes=max_bytes, encoding=encoding)
     request = Request(url, method="GET")
     try:
-        with build_opener(_NoWriteRedirect()).open(request, timeout=timeout) as response:
+        # Controller traffic is direct; do not route robot comments through an
+        # environment/system HTTP proxy or follow a redirect to another target.
+        with build_opener(ProxyHandler({}), _NoWriteRedirect()).open(request, timeout=timeout) as response:
             status = getattr(response, "status", 200)
             if status != 200:
                 raise RuntimeError(f"FANUC ComSet returned HTTP {status}")

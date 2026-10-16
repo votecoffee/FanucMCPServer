@@ -42,6 +42,8 @@ class RobotAccess:
     comment_service_url: str | None = None
     comment_targets: tuple[str, ...] = ()
     creatable_files: tuple[str, ...] = ()
+    comment_max_bytes: int = 16
+    comment_encoding: str = "ascii"
 
     def connection_profile(self) -> RobotProfile:
         # Resolve secrets only at connection time; never return them through tools.
@@ -103,13 +105,21 @@ class BridgeConfig:
             if comment_url:
                 parsed = urlsplit(comment_url)
                 if (parsed.scheme not in {"http", "https"} or parsed.hostname != profile.host.casefold()
+                        or (parsed.port is not None and not 1 <= parsed.port <= 65535)
                         or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"}):
                     raise ValueError("Comment service URL must be an HTTP(S) origin on this configured robot host")
+            maximum_comment = item.get("comment_max_bytes", 16)
+            comment_encoding = item.get("comment_encoding", "ascii")
+            if type(maximum_comment) is not int or not 1 <= maximum_comment <= 256:
+                raise ValueError("comment_max_bytes must be an integer between 1 and 256")
+            if comment_encoding not in {"ascii", "latin-1", "utf-8"}:
+                raise ValueError("comment_encoding must be ascii, latin-1 or utf-8")
             targets = tuple(item.get("comment_targets", []))
             if any(not isinstance(target, str) or not re.fullmatch(r"(?:R|PR|DIN|DOUT|GIN|GOUT|AIN|AOUT|RI|RO|FLG)\[[1-9][0-9]{0,5}\]", target)
                    for target in targets):
                 raise ValueError("Comment targets must be explicit supported register or I/O identifiers")
-            robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable, comment_url, targets, creatable)
+            robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable, comment_url, targets,
+                                          creatable, maximum_comment, comment_encoding)
 
         def local_dir(key: str) -> Path:
             value = Path(data[key])

@@ -11,7 +11,7 @@ reported through `capabilities`.
 | Restore | Manifest-bound per-file recovery through upload plans | System/variable restore outside chat policy |
 | Compare, workspace, parsers | Workspace comparisons, programs, positions, variables, comments, R/PR/frame/I-O evidence | Preserved/hash-checked workspace IDs |
 | Comment/data editing | Separate source copies through existing setters | Generated listings stay offline; no live value/frame writes |
-| Live comments | ComSet preparation/approval/readback | Exact targets and configured origin; disabled by default |
+| Live comments | ComSet preparation/approval/readback with preserved references and target description staleness checks | Exact target/origin, byte/encoding policy; numeric-register descriptions tested on two ROBOGUIDE controllers |
 | Diagnostics | Health, alarms, recurrence, mastering and DCS evidence | Mastering/DCS read-only |
 | Lint and cross references | Lint, dependencies, unused programs, register usage, LS validation and flow | Structural evidence; no compiler |
 | Option inventory | Matches and unknown status | Does not authenticate installed options |

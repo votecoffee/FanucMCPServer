@@ -212,9 +212,30 @@ Live descriptions additionally require comment_service_url as an HTTP(S) origin
 on that robot host and exact comment_targets, such as ["R[1]", "PR[1]", "DIN[1]"].
 This is disabled by default. Preparation uses a retrieved NUMREG.VA, POSREG.VA or
 IOSTATE.DG listing and existing ComSet mapping. Group-1 PR comments are supported.
-Commit rejects stale listings, applies the comment and requires matching fresh
-listing readback. Redirects are refused. HTTP 200 alone is insufficient.
-Controller-specific endpoint/security behavior still needs physical validation.
+`comment_max_bytes` defaults to 16 and `comment_encoding` to ASCII; invalid or
+oversized text is refused before network access. Explicit latin-1/utf-8 policies
+are available when verified for the controller. Shared GUI/API calls use the
+same conservative default. HTTP writes use a direct connection without proxy
+settings and refuse redirects. The prepared hash binds the service origin,
+encoding, byte limit, target identity and reviewed old/new description.
+
+Comment staleness is scoped to the selected target identity and description.
+Unrelated registers and live values may change between reads. If the whole
+listing has changed, preparation resolves the supplied hash to an intact,
+preserved read for that configured robot/path, then compares the selected
+description with a fresh listing. Unknown or tampered references are refused.
+Commit checks the selected description again and requires matching fresh
+readback after ComSet. Full listings, hashes and comment-plan JSON are retained.
+Observed display values before/after are reported; captures are not atomic.
+HTTP 200 alone is insufficient. Whole-file replacements retain their strict
+whole-file hash checks.
+
+Two ROBOGUIDE controllers passed four real HTTP description writes: R[999] was
+changed and restored on each. Its value remained zero and all 999 descriptions
+per controller were restored. A background register changed during the test,
+demonstrating why whole-listing byte equality cannot be assumed. The controller's
+served comment page established the tested numeric-register ComSet contract.
+Other description kinds and physical-controller behavior remain unverified.
 
 Interrupted writes or mismatched readback produce uncertain state and consume
 the plan. Inspect actual bytes/comments before another change. Coordinate other
