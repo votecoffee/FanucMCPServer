@@ -26,6 +26,7 @@ from fanuc_workbench.ui.feature_tabs import (
     DiagnosticsTab, ProjectTab, DocumentationTab,
 )
 from fanuc_workbench.ui.advanced_tabs import LiveMonitorTab, FleetTab, CommissioningTab, IntegrationTab, RoboGuideTab
+from fanuc_workbench.ui.native_tab import NativeControllerTab
 
 
 class MainWindow(QMainWindow):
@@ -42,6 +43,7 @@ class MainWindow(QMainWindow):
         self.diagnostics=DiagnosticsTab(self); self.tabs.addTab(self.diagnostics,'Diagnostics')
         self.project=ProjectTab(self); self.tabs.addTab(self.project,'Project / Cell')
         self.live_tab=LiveMonitorTab(self); self.tabs.addTab(self.live_tab,'Live / Recorder')
+        self.native_tab=NativeControllerTab(self); self.tabs.addTab(self.native_tab,'Native Controller')
         self.fleet=FleetTab(self); self.tabs.addTab(self.fleet,'Fleet / Scheduler')
         self.commissioning=CommissioningTab(self); self.tabs.addTab(self.commissioning,'Commissioning')
         self.integration=IntegrationTab(self); self.tabs.addTab(self.integration,'Integration')
@@ -52,7 +54,8 @@ class MainWindow(QMainWindow):
         self._load_external_plugins(); self._menu(); self._update_profile(); self.statusBar().showMessage('Configure Robot > Connection, then back up or open a workspace.')
 
     def _load_external_plugins(self):
-        services=ServiceRegistry(); services.register('backend_factory',create_backend); services.register('backup_service',BackupService); services.register('controller_service',ControllerService)
+        from fanuc_workbench.services.native_controller import NativeControllerService
+        services=ServiceRegistry(); services.register('backend_factory',create_backend); services.register('backup_service',BackupService); services.register('controller_service',ControllerService); services.register('native_controller_service',NativeControllerService)
         context=PluginContext(get_workspace=lambda:self.workspace,get_profile=lambda:self.current_profile,log=lambda m:self.statusBar().showMessage(m),services=services)
         for plugin in discover_plugins():
             try:self.tabs.addTab(plugin.create_widget(context),plugin.title)
@@ -146,3 +149,11 @@ class MainWindow(QMainWindow):
         def work(*,progress):
             return ControllerService(p).upload_file(local,remote)
         wk=Worker(work); wk.signals.result.connect(lambda x:self.file_log.appendPlainText(f'Uploaded {local.name} -> {x}')); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Upload failed',e)); wk.signals.finished.connect(lambda:self.upload_btn.setEnabled(True)); self.thread_pool.start(wk)
+
+    def closeEvent(self, event):
+        if self.native_tab.busy:
+            self.statusBar().showMessage('Wait for the native controller operation to finish before closing.')
+            event.ignore()
+            return
+        self.native_tab.shutdown()
+        super().closeEvent(event)
