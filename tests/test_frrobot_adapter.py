@@ -9,7 +9,8 @@ class Binding:
     def __init__(self):
         self.puts, self.calls = [], []
         self.axes = {'Count': 2, 'axes': {1: 1.0, 2: 2.0}}
-        self.position = {'IsInitialized': True, 'Type': 9, 'UserFrame': 255, 'UserTool': 255, 'Formats': self.axes}
+        self.position = {'IsInitialized': True, 'Type': 9, 'UserFrame': 255, 'UserTool': 255,
+                         'AutomaticUpdate': False, 'Formats': self.axes}
         self.numeric = {'Type': 16, 'RegLong': 0}
         self.robot = {'IsConnected': True, 'IsOffline': False, 'HostName': '192.0.2.1',
             'RegNumerics': {'Item': {'Value': self.numeric}},
@@ -66,9 +67,19 @@ def test_native_pr_write_stages_only_changed_axes_and_updates_once():
     before = api.read_register('PR[1,100]')
     proposed = {**before, 'values': {'J1': 5.0, 'J2': before['values']['J2']}}
     assert api.write_register('PR[1,100]', before, proposed)['status'] == 'verified'
-    assert [name for name, *_ in binding.puts] == ['AutomaticUpdate', 'Item']
+    assert [name for name, *_ in binding.puts] == ['Item']
     assert binding.calls.count('Update') == 1
     assert binding.position['UserFrame'] == binding.position['UserTool'] == 255
+
+
+def test_native_pr_disables_automatic_mode_before_staging():
+    binding = Binding()
+    binding.position['AutomaticUpdate'] = True
+    api = FrRobot('192.0.2.1', binding=binding, robot=binding.robot)
+    before = api.read_register('PR[1,100]')
+    proposed = {**before, 'values': {'J1': 5.0, 'J2': 2.0}}
+    api.write_register('PR[1,100]', before, proposed)
+    assert [name for name, *_ in binding.puts] == ['AutomaticUpdate', 'Item']
 
 
 def test_native_loader_refuses_active_tp_tasks_without_calling_load():

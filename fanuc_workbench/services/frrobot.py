@@ -207,7 +207,13 @@ class FrRobot:
         else:
             # Disable automatic writes while staging axis fields, then send one
             # explicit Update. Frames, tool, config and external axes are untouched.
-            self.binding.put(obj, "AutomaticUpdate", False)
+            # Some controller register objects reject this setter even when
+            # automatic updating is already disabled. Read the actual mode and
+            # only change it when needed; never stage fields in automatic mode.
+            if self._get(obj, "AutomaticUpdate"):
+                self.binding.put(obj, "AutomaticUpdate", False)
+            if self._get(obj, "AutomaticUpdate"):
+                raise ValueError("Cannot disable automatic native position updates")
             fmt = self._get(obj, "Formats", before["native_type"])
             for axis, value in proposed["values"].items():
                 if value != before["values"][axis]:
