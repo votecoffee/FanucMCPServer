@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "fanuc-workbench",
+  "version": "0.1.0",
+  "description": "Local FANUC robot file and diagnostic tools with staged application-file replacement.",
+  "extensions": {
+    "com.openai": {
+      "requires_local_executor": true
+    }
+  }
+}

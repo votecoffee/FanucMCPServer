@@ -22,19 +22,26 @@ class AlarmRecord:
 _ALARM = re.compile(r"(?:(?P<date>\d{1,4}[/-]\d{1,2}[/-]\d{1,4})[ T]+(?P<time>\d{1,2}:\d{2}(?::\d{2})?)\s+)?(?P<code>[A-Z]{2,10}-\d{3,5})(?:\s*\((?P<sev>[^)]+)\))?\s*[: -]?\s*(?P<msg>.*)",re.I)
 
 
+def scan_alarm_file(path: Path) -> list[AlarmRecord]:
+    """Parse an explicitly selected text log, independent of its local filename."""
+    out = []
+    for number, line in enumerate(read_text(path).splitlines(), 1):
+        match = _ALARM.search(line)
+        if match:
+            stamp = ' '.join(x for x in (match.group('date'), match.group('time')) if x)
+            out.append(AlarmRecord(path, number, stamp, match.group('code').upper(),
+                                   match.group('sev') or '', match.group('msg').strip()))
+    return out
+
+
 def scan_alarms(root: Path) -> list[AlarmRecord]:
     out=[]
     for p in root.rglob('*'):
         if not p.is_file(): continue
         name=p.name.upper()
         if not any(k in name for k in ('ERR','ALM','ALARM','HIST')) or p.suffix.upper() not in {'.LS','.DG','.VA','.TXT','.CSV'}: continue
-        try: lines=read_text(p).splitlines()
+        try: out.extend(scan_alarm_file(p))
         except Exception: continue
-        for n,line in enumerate(lines,1):
-            m=_ALARM.search(line)
-            if m:
-                ts=' '.join(x for x in (m.group('date'),m.group('time')) if x)
-                out.append(AlarmRecord(p,n,ts,m.group('code').upper(),m.group('sev') or '',m.group('msg').strip()))
     return out
 
 

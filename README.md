@@ -67,6 +67,15 @@ python run.py
 
 Dependencies: PySide6, XlsxWriter, ReportLab, and Paramiko.
 
+## Codex / MCP robot bridge (development)
+
+The GUI and the optional local MCP adapter now share a headless controller
+service. Install the adapter with `python -m pip install -e ".[mcp]"` and see
+[Robot bridge setup and API guide](docs/ROBOT_BRIDGE.md) for configuration,
+file/log tools, reviewed application-file replacement, and verification limits.
+Writes default to disabled. The development plugin descriptors have not been
+installed into Codex or tested against a physical controller.
+
 For development/testing:
 
 ```powershell
@@ -88,4 +97,7 @@ python -m pytest -q
 
 ## Validation
 
-The release contains **26 passing automated regression tests** for the original workbench and v2 services. Run `python -m pytest -q` from the project root.
+The original v2 release contains 26 baseline regression tests. The development
+bridge adds shared-service, policy, transfer-failure and MCP protocol coverage.
+Run `python -m pytest -q` from the project root; install the `mcp` extra to include
+the SDK protocol tests.

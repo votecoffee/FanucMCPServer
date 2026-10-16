@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import json
+import os
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from fanuc_workbench.core.models import RobotProfile
+
+
+def remote_path(value: str) -> str:
+    """Accept explicit FANUC device paths or absolute SFTP paths only."""
+    if not isinstance(value, str) or not value or value != value.strip():
+        raise ValueError("An explicit remote path is required")
+    if any(ord(c) < 32 or ord(c) == 127 or c in "\\*?%" for c in value):
+        raise ValueError("Remote paths cannot contain controls, backslashes or wildcards")
+    device = re.match(r"^([A-Za-z][A-Za-z0-9]*:)(.*)$", value)
+    if device:
+        prefix, suffix = device.groups()
+        prefix = prefix.lower()
+        suffix = suffix.removeprefix("/")
+    elif value.startswith("/"):
+        prefix, suffix = "/", value[1:]
+    else:
+        raise ValueError("Use a device path such as md:MAIN.LS or an absolute SFTP path")
+    if suffix and any(p in {"", ".", ".."} or ":" in p for p in suffix.split("/")):
+        raise ValueError("Remote path contains an ambiguous or traversing component")
+    return prefix + suffix
+
+
+def under_root(path: str, root: str) -> bool:
+    return path == root or path.startswith(root if root.endswith((":", "/")) else root + "/")
+
+
+@dataclass(frozen=True)
+class RobotAccess:
+    profile: RobotProfile
+    password_env: str | None = None
+    writable_files: tuple[str, ...] = ()
+
+    def connection_profile(self) -> RobotProfile:
+        # Resolve secrets only at connection time; never return them through tools.
+        data = self.profile.to_dict()
+        if self.password_env:
+            if self.password_env not in os.environ:
+                raise ValueError(f"Required password environment variable is not set: {self.password_env}")
+            data["password"] = os.environ[self.password_env]
+        return RobotProfile.from_dict(data)
+
+
+@dataclass(frozen=True)
+class BridgeConfig:
+    state_dir: Path
+    source_dir: Path
+    robots: dict[str, RobotAccess] = field(default_factory=dict)
+    allow_writes: bool = False
+    max_file_bytes: int = 16 * 1024 * 1024
+    plan_ttl_seconds: int = 900
+
+    @classmethod
+    def load(cls, path: Path) -> "BridgeConfig":
+        path = path.resolve()
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if type(data.get("allow_writes", False)) is not bool:
+            raise ValueError("allow_writes must be a JSON boolean")
+        robots = {}
+        for robot_id, item in data.get("robots", {}).items():
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", robot_id):
+                raise ValueError("Robot IDs must contain only letters, numbers, underscores or hyphens")
+            profile_data = dict(item["profile"])
+            if profile_data.get("password"):
+                raise ValueError("Use password_env instead of storing passwords in bridge JSON")
+            transport = profile_data.get("transport", "ftp")
+            if transport not in {"ftp", "sftp"}:
+                raise ValueError("Transport must be ftp or sftp")
+            profile_data.setdefault("port", 22 if transport == "sftp" else 21)
+            profile = RobotProfile.from_dict(profile_data)
+            if not profile.host.strip() or not 1 <= profile.port <= 65535 or not 0 < profile.timeout <= 120:
+                raise ValueError("Profile requires a host, valid port and timeout in (0, 120]")
+            if profile.sftp_trust_unknown_host:
+                raise ValueError("The bridge requires verified SFTP host keys")
+            roots = profile_data.get("roots", ["md:"])
+            if not isinstance(roots, list) or not roots:
+                raise ValueError("At least one explicit remote root is required")
+            profile.roots = [remote_path(r.rstrip("/") if r != "/" else r) for r in roots]
+            writable = tuple(remote_path(p) for p in item.get("writable_files", []))
+            if any(not any(under_root(p, r) for r in profile.roots) for p in writable):
+                raise ValueError("Writable files must stay inside configured remote roots")
+            robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable)
+
+        def local_dir(key: str) -> Path:
+            value = Path(data[key])
+            return (value if value.is_absolute() else path.parent / value).resolve()
+
+        maximum = data.get("max_file_bytes", 16 * 1024 * 1024)
+        ttl = data.get("plan_ttl_seconds", 900)
+        if type(maximum) is not int or not 1 <= maximum <= 64 * 1024 * 1024:
+            raise ValueError("max_file_bytes must be between 1 and 67108864")
+        if type(ttl) is not int or not 1 <= ttl <= 3600:
+            raise ValueError("plan_ttl_seconds must be between 1 and 3600")
+        return cls(local_dir("state_dir"), local_dir("source_dir"), robots,
+                   data.get("allow_writes", False), maximum, ttl)

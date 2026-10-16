@@ -41,6 +41,12 @@ The loader accepts legacy v0.x plugins with `plugin_id`, `title`, and `create_wi
 - `get_workspace()` — current local backup/workspace or `None`.
 - `get_profile()` — current robot profile or `None`.
 - `log(message)` — send a short status message to the main window.
-- `services` — versioned dependency registry. Core v2 exposes `backend_factory` and `backup_service`.
+- `services` — versioned dependency registry. Core v2 exposes `backend_factory`, `backup_service`, and the shared `controller_service` class.
+
+`controller_service(profile)` provides headless connection tests, transfers,
+backup/restore entry points, restore preview, and live comparison. The Codex MCP
+adapter uses this same class with its own configured access/review policy; see
+[`docs/ROBOT_BRIDGE.md`](docs/ROBOT_BRIDGE.md). GUI tab plugins and MCP plugins are
+different adapters over shared services.
 
 Plugins should use public parsers/services rather than reaching into `MainWindow`. Controller writes must remain explicit and should present their own confirmation UI.

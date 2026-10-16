@@ -1,0 +1,9 @@
+/.venv/
+/.pytest_cache/
+/build/
+/dist/
+/robot_bridge.local.json
+/robot-evidence/
+/robot-edits/
+__pycache__/
+*.py[cod]

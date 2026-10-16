@@ -1,0 +1,21 @@
+{
+  "state_dir": "robot-evidence",
+  "source_dir": "robot-edits",
+  "allow_writes": false,
+  "max_file_bytes": 16777216,
+  "plan_ttl_seconds": 900,
+  "robots": {
+    "robot1": {
+      "profile": {
+        "name": "Example robot - configure before use",
+        "host": "192.0.2.1",
+        "transport": "ftp",
+        "port": 21,
+        "username": "anonymous",
+        "roots": ["md:"],
+        "timeout": 10
+      },
+      "writable_files": []
+    }
+  }
+}

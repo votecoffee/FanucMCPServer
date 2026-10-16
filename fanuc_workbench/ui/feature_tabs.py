@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 import shutil
-import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import Qt
@@ -13,7 +12,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QAbstractItemView,
 )
 
-from fanuc_workbench.backends.factory import create_backend
+from fanuc_workbench.services.controller import ControllerService
 from fanuc_workbench.core.workers import Worker
 from fanuc_workbench.parsers.comments import set_comment
 from fanuc_workbench.parsers.data import (
@@ -27,7 +26,7 @@ from fanuc_workbench.services.documentation import export_all
 from fanuc_workbench.services.io_map import export_io_csv, load_plc_map, save_plc_map
 from fanuc_workbench.services.live_comments import set_live_comment, target_for_record
 from fanuc_workbench.services.project import ProjectRobot, RobotProject
-from fanuc_workbench.services.restore import restore_candidates, restore_selected
+from fanuc_workbench.services.restore import restore_candidates
 from fanuc_workbench.services.workspace import scan_comments, scan_programs
 from fanuc_workbench.services.xref import build_xref, program_dependencies, program_flow, register_usage, unused_programs, validate_ls, CALL_RE
 
@@ -148,20 +147,7 @@ class CompareRestoreTab(QWidget):
         if not selected: QMessageBox.information(self,'Nothing selected','Check one or more files first.'); return
         prof=self.owner.current_profile
         def work(*,progress):
-            td=Path(tempfile.mkdtemp(prefix='fanuc_restore_preview_')); out=[]; backend=create_backend(prof); backend.connect()
-            try:
-                for i,row in enumerate(selected):
-                    live=td/f'{i}_{row.path.name}'
-                    try:
-                        backend.download(row.remote_path,live)
-                        if row.path.suffix.upper() in {'.LS','.VA','.DG','.TXT','.CSV'}:
-                            detail=text_diff(live,row.path,max_lines=80)
-                            out.append(f'=== {row.remote_path} ===\n'+(detail or 'No text/semantic difference.'))
-                        else:
-                            same=live.read_bytes()==row.path.read_bytes(); out.append(f'=== {row.remote_path} ===\n'+('Binary files identical.' if same else f'Binary files differ: live {live.stat().st_size} bytes -> backup {row.path.stat().st_size} bytes.'))
-                    except Exception as exc: out.append(f'=== {row.remote_path} ===\nCould not retrieve live file: {exc}')
-            finally: backend.close()
-            return '\n\n'.join(out)
+            return ControllerService(prof).preview_restore(selected)
         wk=Worker(work); wk.signals.result.connect(self.restore_preview.setPlainText); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Preview failed',e)); self.owner.thread_pool.start(wk)
     def restore(self):
         if not self.owner.current_profile: QMessageBox.warning(self,'No robot','Configure a robot connection first.'); return
@@ -173,7 +159,7 @@ class CompareRestoreTab(QWidget):
         msg+=f'This will upload {len(selected)} file(s) to {self.owner.current_profile.host}. Verify the robot is in a safe state and that the backup is correct. Continue?'
         if QMessageBox.warning(self,'Selective restore',msg,QMessageBox.Yes|QMessageBox.No,QMessageBox.No)!=QMessageBox.Yes: return
         prof=self.owner.current_profile
-        def work(*,progress): return restore_selected(create_backend(prof),selected,progress)
+        def work(*,progress): return ControllerService(prof).restore(selected,progress)
         wk=Worker(work); wk.signals.result.connect(lambda x:QMessageBox.information(self,'Restore complete',f'Uploaded {len(x)} files.')); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Restore failed',e)); self.owner.thread_pool.start(wk)
 
 
@@ -236,9 +222,7 @@ class ProgramEditorTab(QWidget):
         if not self.path or not self.owner.current_profile: QMessageBox.warning(self,'Unavailable','Select a program and configure a robot.'); return
         prof=self.owner.current_profile; local=self.path; remote=(prof.roots[0] if prof.roots else 'md:')+local.name
         def work(*,progress):
-            td=Path(tempfile.mkdtemp(prefix='fanuc_live_')); p=td/local.name; b=create_backend(prof)
-            with b:b.download(remote,p)
-            return text_diff(local,p)
+            return ControllerService(prof).compare_file(local,remote)
         wk=Worker(work); wk.signals.result.connect(lambda d:self.results.setPlainText(d or 'No semantic/text difference.')); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Live compare failed',e)); self.owner.thread_pool.start(wk)
 
     def upload(self):
@@ -246,9 +230,7 @@ class ProgramEditorTab(QWidget):
         self.save(); prof=self.owner.current_profile; remote=(prof.roots[0] if prof.roots else 'md:')+self.path.name
         if QMessageBox.warning(self,'Upload LS',f'Upload {self.path.name} to {prof.host} as {remote}? Loading an LS file requires controller support/options and can change robot behavior.',QMessageBox.Yes|QMessageBox.No,QMessageBox.No)!=QMessageBox.Yes:return
         def work(*,progress):
-            b=create_backend(prof)
-            with b:b.upload(self.path,remote)
-            return remote
+            return ControllerService(prof).upload_file(self.path,remote)
         wk=Worker(work); wk.signals.result.connect(lambda r:self.results.setPlainText(f'Uploaded to {r}')); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Upload failed',e)); self.owner.thread_pool.start(wk)
 
 
@@ -473,8 +455,7 @@ class DiagnosticsTab(QWidget):
         if not self.owner.current_profile:return
         prof=self.owner.current_profile
         def work(*,progress):
-            b=create_backend(prof)
-            with b:return {r:len(b.list_dir(r)) for r in prof.roots}
+            return ControllerService(prof).test_connection()
         wk=Worker(work); wk.signals.result.connect(lambda d:QMessageBox.information(self,'Live health',f'{prof.transport.upper()} reachable.\n'+'\n'.join(f'{k}: {v} entries' for k,v in d.items())+'\n\nMode/running-program data is not claimed unless a backend exposes it.')); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Probe failed',e)); self.owner.thread_pool.start(wk)
     def compare_mastering(self):
         other=Path(self.master_other.text())

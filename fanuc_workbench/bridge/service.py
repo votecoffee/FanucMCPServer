@@ -1,0 +1,273 @@
+from __future__ import annotations
+
+import difflib
+import hashlib
+import json
+import os
+import re
+import threading
+import time
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fanuc_workbench.backends.factory import create_backend
+from fanuc_workbench.bridge.config import BridgeConfig, remote_path, under_root
+from fanuc_workbench.services.controller import ControllerService
+from fanuc_workbench.services.diagnostics import scan_alarm_file
+
+
+_TEXT = {".LS", ".KL", ".VA", ".DG", ".TXT", ".CSV", ".LOG", ".INI", ".XML", ".JSON"}
+_UPLOAD = {".LS", ".KL", ".TP", ".PC", ".TXT", ".CSV"}
+_HASH = re.compile(r"[a-f0-9]{64}")
+
+
+@dataclass(frozen=True)
+class UploadPlan:
+    robot_id: str
+    remote: str
+    original_sha256: str
+    proposed_sha256: str
+    payload: bytes
+    expires: float
+    folder: Path
+
+
+class RobotBridge:
+    """Configured access policy and audit for chat-facing controller tools.
+
+    The local operator owns this configuration and the process environment.
+    Tool arguments cannot select arbitrary hosts, credentials or write targets.
+    This is not a security boundary against a client with local shell access.
+    """
+
+    def __init__(self, config: BridgeConfig, backend_factory=create_backend):
+        self.config = config
+        self.backend_factory = backend_factory
+        self._plans: dict[str, UploadPlan] = {}
+        self._lock = threading.RLock()
+        config.state_dir.mkdir(parents=True, exist_ok=True)
+
+    def _access(self, robot_id: str):
+        try:
+            return self.config.robots[robot_id]
+        except KeyError:
+            raise ValueError("Unknown configured robot ID") from None
+
+    def _controller(self, robot_id: str) -> ControllerService:
+        return ControllerService(self._access(robot_id).connection_profile(), self.backend_factory)
+
+    def _path(self, robot_id: str, value: str, *, write: bool = False) -> str:
+        access = self._access(robot_id)
+        value = remote_path(value)
+        if not any(under_root(value, root) for root in access.profile.roots):
+            raise ValueError("Remote path is outside this robot's configured roots")
+        if write:
+            if not self.config.allow_writes:
+                raise ValueError("Controller writes are disabled by the local bridge configuration")
+            if value not in access.writable_files:
+                raise ValueError("Remote file is not explicitly listed in writable_files")
+            name = value.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+            if Path(name).suffix.upper() not in _UPLOAD or any(
+                word in name.upper() for word in ("DCS", "MASTER", "SYSMAC", "SYSVARS", "SAFETY")
+            ):
+                raise ValueError("This bridge only replaces application program/text files")
+        return value
+
+    def _audit(self, action: str, **fields) -> None:
+        record = {"at": datetime.now(timezone.utc).isoformat(), "action": action, **fields}
+        with (self.config.state_dir / "audit.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+
+    def _folder(self) -> Path:
+        folder = self.config.state_dir / uuid.uuid4().hex
+        folder.mkdir()
+        return folder
+
+    @staticmethod
+    def _display(path: Path, remote: str) -> dict:
+        data = path.read_bytes()
+        result = {"remote_path": remote, "local_path": str(path), "bytes": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest()}
+        if Path(remote).suffix.upper() in _TEXT and b"\x00" not in data:
+            try:
+                text = data.decode("utf-8")
+                encoding = "utf-8"
+            except UnicodeDecodeError:
+                text = data.decode("cp1252", errors="replace")
+                encoding = "cp1252 (display only)"
+            result.update(text=text[:65536], text_truncated=len(text) > 65536, encoding=encoding)
+        else:
+            result["text"] = None
+        return result
+
+    def list_robots(self) -> dict:
+        return {"allow_writes": self.config.allow_writes, "robots": [
+            {"id": key, "name": access.profile.name, "host": access.profile.host,
+             "transport": access.profile.transport, "roots": access.profile.roots,
+             "writable_files": list(access.writable_files)}
+            for key, access in self.config.robots.items()
+        ]}
+
+    def list_files(self, robot_id: str, remote_dir: str) -> dict:
+        with self._lock:
+            remote = self._path(robot_id, remote_dir)
+            self._audit("list_requested", robot_id=robot_id, remote_path=remote)
+            try:
+                entries = self._controller(robot_id).list_files(remote)
+                # Do not trust paths/names supplied by the remote directory listing.
+                rows = []
+                for entry in entries:
+                    try:
+                        path = self._path(robot_id, entry.path)
+                    except ValueError:
+                        continue
+                    if not under_root(path, remote) or path == remote:
+                        continue
+                    rows.append({"path": path, "is_dir": entry.is_dir,
+                                 "size": entry.size, "modified": entry.modified})
+                    if len(rows) == 1000:
+                        break
+                self._audit("list_complete", robot_id=robot_id, count=len(rows))
+                return {"entries": rows, "limit": 1000, "possibly_truncated": len(rows) == 1000}
+            except Exception as exc:
+                self._audit("list_failed", robot_id=robot_id, error_type=type(exc).__name__)
+                raise RuntimeError("Controller listing failed; check connection and profile") from None
+
+    def read_file(self, robot_id: str, path: str) -> dict:
+        with self._lock:
+            remote = self._path(robot_id, path)
+            folder = self._folder()
+            name = remote.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+            # A fixed local filename prevents remote names becoming local paths.
+            local = folder / ("original" + Path(name).suffix.lower())
+            self._audit("read_requested", robot_id=robot_id, remote_path=remote)
+            try:
+                self._controller(robot_id).download_file(remote, local, maximum=self.config.max_file_bytes)
+                result = self._display(local, remote)
+                self._audit("read_complete", robot_id=robot_id, remote_path=remote,
+                            sha256=result["sha256"], local_path=str(local))
+                return result
+            except Exception as exc:
+                self._audit("read_failed", robot_id=robot_id, remote_path=remote, error_type=type(exc).__name__)
+                raise RuntimeError("Controller read failed; check path, connection and max_file_bytes") from None
+
+    def collect_logs(self, robot_id: str, paths: list[str]) -> dict:
+        if not 1 <= len(paths) <= 10:
+            raise ValueError("Supply between one and ten explicit log/diagnostic paths")
+        for path in paths:
+            if Path(path).suffix.upper() not in _TEXT:
+                raise ValueError("Log capture requires text/diagnostic files")
+            self._path(robot_id, path)
+        files, failures, alarms = [], [], []
+        for path in paths:
+            try:
+                item = self.read_file(robot_id, path)
+                files.append(item)
+                for alarm in scan_alarm_file(Path(item["local_path"])):
+                    if len(alarms) >= 1000:
+                        break
+                    alarms.append({"remote_path": item["remote_path"], "line": alarm.line_number,
+                                   "timestamp": alarm.timestamp, "code": alarm.code, "message": alarm.message})
+            except RuntimeError:
+                failures.append({"remote_path": path, "status": "unavailable"})
+        return {"files": files, "unavailable": failures, "alarms": alarms,
+                "alarm_limit": 1000, "capture_is_atomic": False}
+
+    def prepare_upload(self, robot_id: str, path: str, source_file: str, expected_sha256: str) -> dict:
+        with self._lock:
+            remote = self._path(robot_id, path, write=True)
+            if not _HASH.fullmatch(expected_sha256):
+                raise ValueError("expected_sha256 must be the SHA-256 returned by read_file")
+            source_arg = Path(source_file)
+            source = (self.config.source_dir / source_arg).resolve()
+            if source_arg.is_absolute() or not source.is_relative_to(self.config.source_dir.resolve()):
+                raise ValueError("source_file must be relative to the configured source_dir and remain inside it")
+            if source.suffix.upper() != Path(remote).suffix.upper():
+                raise ValueError("Source and remote file extensions must match")
+            with source.open("rb") as stream:
+                payload = stream.read(self.config.max_file_bytes + 1)
+            if not payload or len(payload) > self.config.max_file_bytes:
+                raise ValueError("Upload file must be nonempty and within max_file_bytes")
+            now = time.monotonic()
+            self._plans = {key: plan for key, plan in self._plans.items() if plan.expires > now}
+            if len(self._plans) >= 64:
+                raise ValueError("Too many pending plans; cancel plans before preparing more")
+            original = self.read_file(robot_id, remote)
+            if original["sha256"] != expected_sha256:
+                raise ValueError("Controller file changed; retrieve it and review the change again")
+            proposed_hash = hashlib.sha256(payload).hexdigest()
+            if proposed_hash == expected_sha256:
+                raise ValueError("Proposed bytes are identical to the controller file")
+            folder = Path(original["local_path"]).parent
+            proposed = folder / ("proposed" + source.suffix.lower())
+            proposed.write_bytes(payload)
+            preview = self._display(proposed, remote)
+            diff = None
+            if original["text"] is not None and preview["text"] is not None:
+                diff = "\n".join(difflib.unified_diff(original["text"].splitlines(), preview["text"].splitlines(),
+                                                       fromfile="controller", tofile="proposed", lineterm=""))[:32768]
+            plan_id = uuid.uuid4().hex
+            self._plans[plan_id] = UploadPlan(robot_id, remote, expected_sha256, proposed_hash,
+                                             payload, time.monotonic() + self.config.plan_ttl_seconds, folder)
+            result = {"plan_id": plan_id, "robot_id": robot_id, "remote_path": remote,
+                      "original_sha256": expected_sha256, "proposed_sha256": proposed_hash,
+                      "bytes": len(payload), "backup_path": original["local_path"],
+                      "proposed_path": str(proposed), "diff": diff,
+                      "preview_may_be_truncated": True, "expires_in_seconds": self.config.plan_ttl_seconds,
+                      "status": "prepared_only", "requires_user_approval": True}
+            (folder / "plan.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+            self._audit("upload_prepared", plan_id=plan_id, robot_id=robot_id,
+                        remote_path=remote, original_sha256=expected_sha256, proposed_sha256=proposed_hash)
+            return result
+
+    def cancel_upload(self, plan_id: str) -> dict:
+        with self._lock:
+            if plan_id not in self._plans:
+                raise ValueError("Unknown or already consumed plan")
+            self._plans.pop(plan_id)
+            self._audit("upload_cancelled", plan_id=plan_id)
+            return {"status": "cancelled", "plan_id": plan_id}
+
+    def commit_upload(self, plan_id: str, approved_sha256: str) -> dict:
+        with self._lock:
+            plan = self._plans.get(plan_id)
+            if plan is None:
+                raise ValueError("Unknown or already consumed plan; prepare a new plan")
+            self._path(plan.robot_id, plan.remote, write=True)
+            if plan.expires <= time.monotonic():
+                self._plans.pop(plan_id)
+                raise ValueError("Plan expired; prepare a new plan")
+            if approved_sha256 != plan.proposed_sha256:
+                raise ValueError("Approval SHA-256 does not match the prepared bytes")
+            # One use, including failures. Restart also discards all pending plans.
+            self._plans.pop(plan_id)
+            upload = plan.folder / "upload.bin"
+            with upload.open("xb") as stream:
+                stream.write(plan.payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            started = False
+
+            def before_upload():
+                nonlocal started
+                self._audit("upload_started", plan_id=plan_id, robot_id=plan.robot_id,
+                            remote_path=plan.remote, sha256=plan.proposed_sha256)
+                started = True
+
+            try:
+                result = self._controller(plan.robot_id).replace_file_verified(
+                    upload, plan.remote, plan.original_sha256, plan.folder / "preflight.bin",
+                    plan.folder / "readback.bin", self.config.max_file_bytes, before_upload)
+                self._audit("upload_verified", plan_id=plan_id, **result)
+                return {**result, "plan_id": plan_id, "program_loaded_or_running": "not_verified"}
+            except Exception as exc:
+                state = "uncertain" if started else "not_attempted"
+                self._audit("upload_failed", plan_id=plan_id, controller_state=state,
+                            error_type=type(exc).__name__)
+                raise RuntimeError(f"Upload failed; controller write state: {state}. "
+                                   "Inspect current bytes before preparing another plan. "
+                                   "The plan is consumed; no automatic retry or rollback occurred.") from None

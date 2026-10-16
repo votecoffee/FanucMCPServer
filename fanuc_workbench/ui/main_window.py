@@ -19,6 +19,7 @@ from fanuc_workbench.plugins.base import PluginContext
 from fanuc_workbench.plugins.manager import discover_plugins
 from fanuc_workbench.plugins.sdk import ServiceRegistry
 from fanuc_workbench.services.backup import BackupService
+from fanuc_workbench.services.controller import ControllerService
 from fanuc_workbench.ui.connection_dialog import ConnectionDialog
 from fanuc_workbench.ui.feature_tabs import (
     CompareRestoreTab, ProgramEditorTab, SearchAnalysisTab, DataTab, IOTab,
@@ -51,7 +52,7 @@ class MainWindow(QMainWindow):
         self._load_external_plugins(); self._menu(); self._update_profile(); self.statusBar().showMessage('Configure Robot > Connection, then back up or open a workspace.')
 
     def _load_external_plugins(self):
-        services=ServiceRegistry(); services.register('backend_factory',create_backend); services.register('backup_service',BackupService)
+        services=ServiceRegistry(); services.register('backend_factory',create_backend); services.register('backup_service',BackupService); services.register('controller_service',ControllerService)
         context=PluginContext(get_workspace=lambda:self.workspace,get_profile=lambda:self.current_profile,log=lambda m:self.statusBar().showMessage(m),services=services)
         for plugin in discover_plugins():
             try:self.tabs.addTab(plugin.create_widget(context),plugin.title)
@@ -90,8 +91,7 @@ class MainWindow(QMainWindow):
         if not self.current_profile:return
         p=self.current_profile
         def work(*,progress):
-            b=create_backend(p)
-            with b:return {r:len(b.list_dir(r)) for r in p.roots}
+            return ControllerService(p).test_connection()
         wk=Worker(work); wk.signals.result.connect(lambda x:QMessageBox.information(self,'Connection OK','Connected successfully.\n'+'\n'.join(f'{k}: {v} entries' for k,v in x.items()))); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Connection failed',e)); self.thread_pool.start(wk)
 
     def choose_backup_destination(self):
@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
         if not self.current_profile:self.edit_connection()
         if not self.current_profile:return
         destination=Path(self.dest.text()).expanduser(); destination.mkdir(parents=True,exist_ok=True); p=self.current_profile; self.backup_btn.setEnabled(False); self.backup_log.appendPlainText(f'Starting backup of {p.name} ({p.host})')
-        def work(*,progress):return BackupService(create_backend(p),p).run(destination,attempt_ascii=self.ascii.isChecked(),max_depth=self.depth.value(),progress=progress)
+        def work(*,progress):return ControllerService(p).backup(destination,attempt_ascii=self.ascii.isChecked(),max_depth=self.depth.value(),progress=progress)
         wk=Worker(work); wk.signals.progress.connect(lambda x:self.backup_log.appendPlainText(x.get('message',str(x)) if isinstance(x,dict) else str(x))); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Backup failed',e)); wk.signals.result.connect(self.backup_finished); wk.signals.finished.connect(lambda:self.backup_btn.setEnabled(True)); self.thread_pool.start(wk)
 
     def backup_finished(self,path):
@@ -144,7 +144,5 @@ class MainWindow(QMainWindow):
         if QMessageBox.warning(self,'Write to robot',f'Upload {local}\n\nto {self.current_profile.host}  {remote}?\n\nThis may overwrite controller data or a program. Verify robot safety and backup first.',QMessageBox.Yes|QMessageBox.No,QMessageBox.No)!=QMessageBox.Yes:return
         p=self.current_profile; self.upload_btn.setEnabled(False)
         def work(*,progress):
-            b=create_backend(p)
-            with b:b.upload(local,remote)
-            return remote
+            return ControllerService(p).upload_file(local,remote)
         wk=Worker(work); wk.signals.result.connect(lambda x:self.file_log.appendPlainText(f'Uploaded {local.name} -> {x}')); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Upload failed',e)); wk.signals.finished.connect(lambda:self.upload_btn.setEnabled(True)); self.thread_pool.start(wk)
