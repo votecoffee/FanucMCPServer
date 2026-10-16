@@ -57,6 +57,21 @@ Read-only listing, retrieval, backups and analysis work through the same FTP
 backend used for real controllers. Program loading/execution and motion are
 outside this adapter.
 
+ROBOGUIDE can assign different loopback addresses when its virtual controllers
+restart. An open ROBOGUIDE application alone does not establish a running file
+service. Rediscover FTP/HTTP listeners owned by the current virtual-controller
+processes and verify which virtual controller each endpoint represents before
+updating local profiles. For a configured description service, update both the
+profile host and its matching `comment_service_url`; keep write allowlists and
+approval policy intact. Do not substitute a saved physical-robot address.
+
+The bridge loads its JSON configuration at process startup. Editing that JSON
+does not update an already-running MCP server: reconnect the server/client
+(or restart Codex for its bundled local connection), then check `list_robots`
+and `probe_robot` again. Previous captures remain historical evidence, and
+prepared plans from the old connection must not be reused. Retrieve fresh
+controller bytes before preparing a change on the new connection.
+
 ## Verify
 
 ```powershell
