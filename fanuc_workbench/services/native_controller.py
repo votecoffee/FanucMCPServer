@@ -8,6 +8,13 @@ from pathlib import Path
 from fanuc_workbench.bridge.extension_process import RpcProcess
 
 
+class NativeApiError(RuntimeError):
+    def __init__(self, operation, response):
+        self.details = {"operation": operation, **{key: response[key] for key in
+            ("error_type", "hresult", "reason", "vendor_call") if key in response}}
+        super().__init__(f"Native API operation failed ({self.details}); inspect controller state before retrying a change")
+
+
 class NativeControllerService:
     def __init__(self, profile):
         if sys.platform != "win32":
@@ -21,11 +28,7 @@ class NativeControllerService:
     def call(self, operation, **arguments):
         result = self.worker.call(operation, arguments, {})
         if result.get("ok") is not True:
-            kind = result.get("error_type", "Unavailable")
-            code = result.get("hresult")
-            suffix = f"; HRESULT {code}" if type(code) is int else ""
-            reason = result.get("reason", "") if kind == "ValueError" else ""
-            raise RuntimeError(f"Native API operation failed ({kind}{suffix}). {reason} Inspect controller state before retrying a change")
+            raise NativeApiError(operation, result)
         return result["result"]
 
     def close(self):

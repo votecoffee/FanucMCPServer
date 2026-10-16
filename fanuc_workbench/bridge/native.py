@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fanuc_workbench.bridge.storage import atomic_json, confined
-from fanuc_workbench.services.native_controller import NativeControllerService
+from fanuc_workbench.services.native_controller import NativeApiError, NativeControllerService
 from fanuc_workbench.services.native_programs import validate_source, verify_listing
 from fanuc_workbench.services.native_values import (IO, canonical, fingerprint, program_name,
                                                     propose_register, register_matches, register_target)
@@ -287,7 +287,10 @@ class NativeChanges:
                     return {**result, "plan_id": plan_id, "robot_id": robot_id, "target": target,
                             "proposed_sha256": plan.sha256, "evidence_path": str(folder)}
                 except Exception as exc:
-                    atomic_json(folder / "failure.json", {"error_type": type(exc).__name__, "state": "inspect_before_retry"})
+                    failure = {"error_type": type(exc).__name__, "state": "inspect_before_retry"}
+                    if isinstance(exc, NativeApiError):
+                        failure["native_api"] = exc.details
+                    atomic_json(folder / "failure.json", failure)
                     self.bridge._audit("native_commit_failed", robot_id=robot_id, target=target, plan_id=plan_id,
                                        error_type=type(exc).__name__)
                     raise RuntimeError("Native change failed or verification is incomplete; plan consumed. Inspect preserved evidence and the controller before another change") from None

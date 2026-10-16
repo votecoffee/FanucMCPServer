@@ -9,6 +9,20 @@ IO_CODES = {"DI": 1, "DO": 2, "AI": 3, "AO": 4, "RI": 8, "RO": 9,
             "GI": 18, "GO": 19, "UI": 20, "UO": 21, "F": 35}
 
 
+class VendorCallError(RuntimeError):
+    """Numeric vendor diagnostics without vendor text or controller data."""
+    def __init__(self, operation, member, cause):
+        details = {"operation": operation, "member": member}
+        code = getattr(cause, "hresult", None)
+        if type(code) is int:
+            details["hresult"] = code
+        info = getattr(cause, "excepinfo", None)
+        if isinstance(info, tuple) and len(info) == 6 and type(info[5]) is int:
+            details["vendor_code"] = info[5]
+        self.details = details
+        super().__init__("Vendor API call failed; inspect controller state before retrying")
+
+
 class ComBinding:
     def __init__(self):
         import pythoncom
@@ -16,14 +30,20 @@ class ComBinding:
         self.com, self.dispatch = pythoncom, Dispatch
 
     def get(self, obj, name, *args):
-        value = obj._oleobj_.Invoke(obj._oleobj_.GetIDsOfNames(name), 0, self.com.DISPATCH_PROPERTYGET, True, *args)
+        value = self._invoke(obj, name, "get", self.com.DISPATCH_PROPERTYGET, True, *args)
         return self.dispatch(value) if hasattr(value, "GetTypeInfo") else value
 
     def put(self, obj, name, value, *indexes):
-        obj._oleobj_.Invoke(obj._oleobj_.GetIDsOfNames(name), 0, self.com.DISPATCH_PROPERTYPUT, False, *indexes, value)
+        self._invoke(obj, name, "put", self.com.DISPATCH_PROPERTYPUT, False, *indexes, value)
 
     def call(self, obj, name, *args):
-        return obj._oleobj_.Invoke(obj._oleobj_.GetIDsOfNames(name), 0, self.com.DISPATCH_METHOD, True, *args)
+        return self._invoke(obj, name, "call", self.com.DISPATCH_METHOD, True, *args)
+
+    def _invoke(self, obj, name, operation, flags, result, *args):
+        try:
+            return obj._oleobj_.Invoke(obj._oleobj_.GetIDsOfNames(name), 0, flags, result, *args)
+        except Exception as exc:
+            raise VendorCallError(operation, name, exc) from None
 
     def items(self, obj, maximum):
         count = int(self.get(obj, "Count"))

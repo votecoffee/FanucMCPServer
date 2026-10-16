@@ -31,7 +31,7 @@ def main():
     if receive() != {"command": "activate"}:
         return
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from fanuc_workbench.services.frrobot import FrRobot
+    from fanuc_workbench.services.frrobot import FrRobot, VendorCallError
     import pythoncom
     pythoncom.CoInitialize()
     robot = None
@@ -55,6 +55,8 @@ def main():
                 result = {"ok": False, "error_type": type(exc).__name__, "hresult": getattr(exc, "hresult", None)}
                 if type(exc) is ValueError:
                     result["reason"] = str(exc)[:256]  # Fixed contract messages; vendor exception text is excluded.
+                if type(exc) is VendorCallError:
+                    result["vendor_call"] = exc.details
             send({"request_id": request["request_id"], "result": result})
     finally:
         robot = None

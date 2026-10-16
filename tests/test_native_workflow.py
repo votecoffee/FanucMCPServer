@@ -10,6 +10,7 @@ import pytest
 from test_bridge_operations import bridge_case
 from fanuc_workbench.services.native_programs import validate_source, verify_listing
 from fanuc_workbench.services.native_values import fingerprint
+from fanuc_workbench.services.native_controller import NativeApiError
 
 SOURCE = b'/PROG FWBTEST\r\n/ATTR\r\nCOMMENT = "Workbench fixture";\r\n/MN\r\n   1: ! Native loader fixture ;\r\n/POS\r\n/END\r\n'
 
@@ -142,6 +143,24 @@ def test_uncertain_native_writes_consume_plans_and_are_never_retried(native_case
     with pytest.raises(ValueError):
         bridge.commit_change(plan['plan_id'], plan['proposed_sha256'], client_approved=True)
     assert api.writes == 1
+
+
+def test_native_vendor_failure_keeps_diagnostics_in_preserved_evidence(native_case, monkeypatch):
+    bridge, _, api = native_case
+    plan = reg_plan(bridge)
+    original = api.call
+    response = {'ok': False, 'error_type': 'VendorCallError',
+        'vendor_call': {'operation': 'call', 'member': 'Update', 'vendor_code': -123}}
+    def call(operation, **args):
+        if operation == 'write_register':
+            raise NativeApiError(operation, response)
+        return original(operation, **args)
+    monkeypatch.setattr(api, 'call', call)
+    with pytest.raises(RuntimeError, match='plan consumed'):
+        bridge.commit_change(plan['plan_id'], plan['proposed_sha256'], client_approved=True)
+    evidence = [json.loads(p.read_text()) for p in bridge.config.state_dir.rglob('failure.json')]
+    assert evidence[-1]['native_api']['vendor_call']['member'] == 'Update'
+    assert plan['plan_id'] not in bridge.native.plans
 
 
 def test_pr_edits_preserve_metadata_and_cancel_uses_generic_route(native_case):

@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from fanuc_workbench.services.frrobot import FrRobot
+from fanuc_workbench.services.frrobot import ComBinding, FrRobot, VendorCallError
 
 
 class Binding:
@@ -79,3 +79,22 @@ def test_native_loader_refuses_active_tp_tasks_without_calling_load():
     with pytest.raises(ValueError, match='active or paused'):
         api.load_program('frozen.LS', 'FWBTEST', None)
     assert 'Load' not in binding.calls and not binding.puts
+
+
+def test_vendor_failure_preserves_numeric_call_diagnostics_without_vendor_text():
+    class Cause(Exception):
+        hresult = -2147352567
+        excepinfo = (0, 'vendor', 'sensitive controller text', '', 0, -123)
+    class Ole:
+        def GetIDsOfNames(self, name):
+            return 42
+        def Invoke(self, *args):
+            raise Cause('sensitive controller text')
+    binding = object.__new__(ComBinding)
+    class Obj:
+        _oleobj_ = Ole()
+    with pytest.raises(VendorCallError) as caught:
+        binding._invoke(Obj(), 'Update', 'call', 1, True)
+    assert caught.value.details == {'operation': 'call', 'member': 'Update',
+        'hresult': -2147352567, 'vendor_code': -123}
+    assert 'sensitive' not in str(caught.value) + str(caught.value.details)
