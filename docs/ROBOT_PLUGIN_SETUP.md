@@ -65,12 +65,20 @@ updating local profiles. For a configured description service, update both the
 profile host and its matching `comment_service_url`; keep write allowlists and
 approval policy intact. Do not substitute a saved physical-robot address.
 
-The bridge loads its JSON configuration at process startup. Editing that JSON
-does not update an already-running MCP server: reconnect the server/client
-(or restart Codex for its bundled local connection), then check `list_robots`
-and `probe_robot` again. Previous captures remain historical evidence, and
-prepared plans from the old connection must not be reused. Retrieve fresh
-controller bytes before preparing a change on the new connection.
+The bridge initially loads its JSON configuration at process startup. Starting
+with version 0.7, use `reload_connections` after an operator updates connection
+settings in that same local JSON. The tool accepts no path or endpoint arguments,
+refuses changes to robot IDs, credentials, roots, HTTP scheme, write/approval
+policy, limits or storage, and refuses active work. Finish or cancel read jobs
+first. Successful endpoint changes invalidate pending plans and make no network
+connection; then check `list_robots` and `probe_robot`, and retrieve fresh bytes
+before preparing a controller change. Other bridge processes are unaffected.
+
+Version 0.6 and earlier require reconnecting the MCP server/client (or restarting
+Codex for its bundled local connection) to pick up configuration changes. Loading
+the newer server is a one-time prerequisite for the refresh tool. Policy changes
+still require a new process in all versions. An independent local MCP/API session
+can use the newer service while the existing Codex connection remains running.
 
 ## Verify
 

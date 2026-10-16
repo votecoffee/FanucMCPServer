@@ -2,7 +2,6 @@ import argparse
 import os
 from pathlib import Path
 
-from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.service import RobotBridge
 
 
@@ -33,6 +32,11 @@ def create_server(bridge: RobotBridge):
     def list_robots() -> dict:
         """List configured robot IDs, roots and policy without connecting or exposing credentials."""
         return bridge.list_robots()
+
+    @server.tool(annotations=local)
+    def reload_connections() -> dict:
+        """Apply endpoint-only edits from the existing local config without a restart. Refuses active work or policy changes; invalidates pending plans. No controller contact."""
+        return bridge.reload_connections()
 
     @server.tool(annotations=read)
     def list_files(robot_id: str, remote_dir: str, offset: int = 0, limit: int = 1000) -> dict:
@@ -271,7 +275,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.config is None:
         parser.error("--config or FANUC_WORKBENCH_CONFIG is required")
-    bridge = RobotBridge(BridgeConfig.load(args.config))
+    bridge = RobotBridge.from_config(args.config)
     try:
         create_server(bridge).run(transport="stdio")
     finally:

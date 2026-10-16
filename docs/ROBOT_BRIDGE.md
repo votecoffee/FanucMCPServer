@@ -1,7 +1,7 @@
 # FANUC Workbench robot bridge (expanded development version)
 
 The GUI, local Python API and MCP adapter share controller, parser and analysis
-services. The server now exposes 41 tools. No physical robot has been contacted;
+services. The server now exposes 42 tools. No physical robot has been contacted;
 native acceptance remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 
 ## Setup
@@ -66,7 +66,7 @@ ordinary local files, not a tamper-proof ledger.
 
 | Area | Tools |
 | --- | --- |
-| Discovery/files | list_robots, capabilities, probe_robot, list_files, read_file, read_captured_file, collect_logs |
+| Discovery/files | list_robots, capabilities, reload_connections, probe_robot, list_files, read_file, read_captured_file, collect_logs |
 | Artifacts | import_workspace, list_artifacts, artifact_files, read_artifact |
 | Backups/jobs | start_backup, start_fleet_backup, job_status, list_jobs, cancel_job |
 | Workspace analysis | analyze_workspace, compare_workspaces, inspect_program |
@@ -102,6 +102,22 @@ list_files supports offset/limit pagination and reports total/next_offset. Older
 FTP controllers with UNIX-style LIST responses use a batch listing; unknown
 formats retain the per-file NLST fallback. probe_robot tests file-service access
 and reports elapsed time; it does not establish robot running state or identity.
+
+`reload_connections` applies endpoint-only operator edits from the configuration
+file bound at server startup. It accepts no tool-supplied path, host or password.
+Host, transport port, timeout and the host/port of an already-enabled comment
+origin may change; robot IDs, transport, credentials, roots, write targets,
+approval mode, HTTP scheme, limits and local directories must remain unchanged.
+Finish active controller operations and queued/running jobs first. A successful
+endpoint switch invalidates all pending file/comment plans and requires fresh
+reads; previous evidence stays preserved. Refresh itself makes no controller
+connection. Call `list_robots` and an explicit `probe_robot` afterward. Other
+bridge processes retain their own loaded configuration.
+
+Python clients can bind a configuration file with `RobotBridge.from_config(path)`.
+Constructing a bridge from an in-memory `BridgeConfig` alone leaves refresh
+unavailable. Policy changes still require a new bridge process. Version 0.6 and
+earlier do not have this tool; the new server must first be loaded normally.
 
 write_workspace_metadata saves GUI-compatible checklist, PLC tag and handshake
 maps in a new workspace artifact. Checklist status is user-authored evidence,

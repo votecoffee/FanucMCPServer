@@ -11,6 +11,14 @@ artifacts. Begin a new robot workflow by inspecting `list_robots` and
 robot list needs local configuration before network work. Never guess addresses
 or put passwords into tool arguments or the conversation.
 
+After an operator updates verified connection endpoints in the existing local
+configuration, `reload_connections` can apply those connection edits without
+restarting this server. Finish active operations/jobs first, check `list_robots`
+and `probe_robot` after refresh, and retrieve fresh evidence. Endpoint changes
+discard pending plans. The tool cannot change write/approval policy or credentials.
+Do not edit configuration to bypass a refusal. Older server versions need a
+normal reconnect before the refresh tool becomes available.
+
 For troubleshooting, retrieve relevant files/logs or start a bounded backup.
 Follow job status, inspect capture completeness and unavailable-file errors, and
 use artifact IDs for analysis. Retain source hashes and distinguish captured

@@ -10,9 +10,11 @@ import re
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fanuc_workbench.backends.factory import create_backend
 from fanuc_workbench.bridge.config import BridgeConfig, remote_path, under_root
@@ -46,18 +48,26 @@ class RobotBridge:
     This is not a security boundary against a client with local shell access.
     """
 
-    def __init__(self, config: BridgeConfig, backend_factory=create_backend):
+    def __init__(self, config: BridgeConfig, backend_factory=create_backend, *, config_path: Path | None = None):
         self.config = config
+        self.config_path = config_path.resolve() if config_path is not None else None
         self.backend_factory = backend_factory
         self._plans: dict[str, UploadPlan] = {}
         self._lock = threading.RLock()
         self._audit_lock = threading.RLock()
+        self._connection_lock = threading.RLock()
+        self._active_robot_operations = 0
         config.state_dir.mkdir(parents=True, exist_ok=True)
         self.robot_locks = RobotLocks(config.state_dir / "robot-locks")
         from fanuc_workbench.bridge.operations import WorkbenchOperations
         self.operations = WorkbenchOperations(self)
         from fanuc_workbench.bridge.comments import CommentChanges
         self.comments = CommentChanges(self)
+
+    @classmethod
+    def from_config(cls, path: Path, backend_factory=create_backend):
+        path = path.resolve()
+        return cls(BridgeConfig.load(path), backend_factory, config_path=path)
 
     def close(self):
         self.operations.jobs.close()
@@ -76,8 +86,75 @@ class RobotBridge:
                 return {"plan_id": plan_id, "status": "cancelled"}
             return self.cancel_upload(plan_id)
 
+    @contextmanager
     def _robot_lock(self, robot_id: str):
-        return self.robot_locks.acquire(self._access(robot_id).profile.host.casefold())
+        # Pin this operation's endpoint until its final controller access.
+        with self._connection_lock:
+            host = self._access(robot_id).profile.host.casefold()
+            self._active_robot_operations += 1
+        try:
+            with self.robot_locks.acquire(host):
+                yield
+        finally:
+            with self._connection_lock:
+                self._active_robot_operations -= 1
+
+    @staticmethod
+    def _connection_policy(config: BridgeConfig):
+        policy = asdict(config)
+        for access in policy["robots"].values():
+            for key in ("host", "port", "timeout"):
+                access["profile"].pop(key)
+            # Preserve whether HTTP writes are enabled and prohibit scheme changes.
+            origin = access["comment_service_url"]
+            access["comment_service_url"] = urlsplit(origin).scheme if origin else None
+        return policy
+
+    def reload_connections(self) -> dict:
+        """Apply endpoint-only changes from the bound local file, never tool-supplied hosts."""
+        if self.config_path is None:
+            raise ValueError("No configuration file is bound; start the bridge with from_config or the MCP --config option")
+        with self._lock, self._connection_lock:
+            if self._active_robot_operations:
+                raise ValueError("A controller operation is active; wait for it to finish before reloading connections")
+            with self.operations.jobs.lock:
+                if self.operations.jobs.events:
+                    raise ValueError("Read jobs are active or queued; finish or cancel them before reloading connections")
+                try:
+                    candidate = BridgeConfig.load(self.config_path)
+                except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                    raise ValueError("The bound configuration could not be validated; active connections were not changed") from None
+                if self._connection_policy(candidate) != self._connection_policy(self.config):
+                    raise ValueError("Connection reload cannot change robots, credentials, roots, write policy, approval or storage settings; restart for those operator changes")
+                changed = [key for key in candidate.robots if candidate.robots[key] != self.config.robots[key]]
+                if not changed:
+                    return {"status": "unchanged", "changed_robots": [], "invalidated_upload_plans": 0,
+                            "invalidated_comment_plans": 0, "controller_contacted": False}
+                uploads, comments = len(self._plans), len(self.comments.plans)
+                endpoints = [{"robot_id": key, "before": {"host": self.config.robots[key].profile.host,
+                              "port": self.config.robots[key].profile.port,
+                              "timeout": self.config.robots[key].profile.timeout,
+                              "comment_service_url": self.config.robots[key].comment_service_url},
+                              "after": {"host": candidate.robots[key].profile.host,
+                              "port": candidate.robots[key].profile.port,
+                              "timeout": candidate.robots[key].profile.timeout,
+                              "comment_service_url": candidate.robots[key].comment_service_url}}
+                             for key in changed]
+                # Persist the event before applying the in-memory switch. Preserve all evidence.
+                self._audit("connections_reloaded", robot_ids=changed,
+                            invalidated_upload_plans=uploads, invalidated_comment_plans=comments,
+                            connections=endpoints)
+                self._plans.clear()
+                self.comments.plans.clear()
+                self.config = candidate
+                self.operations._last_sample.clear()
+                return {"status": "reloaded", "changed_robots": changed,
+                        "invalidated_upload_plans": uploads, "invalidated_comment_plans": comments,
+                        "controller_contacted": False, "requires_fresh_reads": True,
+                        "connections": [{"robot_id": key, "host": candidate.robots[key].profile.host,
+                                         "port": candidate.robots[key].profile.port,
+                                         "comment_service_url": candidate.robots[key].comment_service_url}
+                                        for key in changed]}
 
     def _access(self, robot_id: str):
         try:
@@ -140,6 +217,7 @@ class RobotBridge:
     def list_robots(self) -> dict:
         return {"allow_writes": self.config.allow_writes, "robots": [
             {"id": key, "name": access.profile.name, "host": access.profile.host,
+             "port": access.profile.port, "timeout": access.profile.timeout,
              "transport": access.profile.transport, "roots": access.profile.roots,
              "writable_files": list(access.writable_files), "comment_targets": list(access.comment_targets),
              "creatable_files": list(access.creatable_files),

@@ -71,12 +71,12 @@ def test_setup_remembers_custom_configuration_across_upgrade(tmp_path, monkeypat
     root = tmp_path / 'new bundle'
     wheels = root / 'plugin/wheels'
     wheels.mkdir(parents=True)
-    (wheels / 'fanuc_workbench_bridge-0.6.0.dev0-py3-none-any.whl').write_bytes(b'fake wheel')
+    (wheels / 'fanuc_workbench_bridge-0.7.0.dev0-py3-none-any.whl').write_bytes(b'fake wheel')
     module.__file__ = str(root / 'setup.py')
     monkeypatch.setattr(module, 'verify_bundle', lambda _: None)
     monkeypatch.setattr(module.venv, 'EnvBuilder', lambda **_: SimpleNamespace(create=lambda _: None))
     monkeypatch.setattr(module.subprocess, 'run', lambda *a, **k: SimpleNamespace(
-        stdout=json.dumps({'tool_count': 41, 'configured_robots': 2})))
+        stdout=json.dumps({'tool_count': 42, 'configured_robots': 2})))
     runtime = tmp_path / 'stable runtime'
     config = tmp_path / 'custom robot policy.json'
     original = b'{"state_dir":"retained-evidence","source_dir":"retained-edits","robots":{}}\r\n'

@@ -68,6 +68,10 @@ class WorkbenchOperations:
                 "file_exchange": {"read_captured_file_max_range": 65536,
                                   "stage_file_max_bytes": min(1048576, self.bridge.config.max_file_bytes),
                                   "staging": "base64 plus exact SHA-256; generated source_dir-relative path; no controller contact"},
+                "connection_refresh": {"available": self.bridge.config_path is not None,
+                                       "source": "bound local configuration file only",
+                                       "policy_changes": "refused", "pending_plans": "invalidated on endpoint changes",
+                                       "active_operations_and_jobs": "refused; finish first"},
                 "uploads": "existing exact-allowlisted application files; new exact-allowlisted TXT/CSV storage files outside MD:",
                 "storage_file_creation": {"extensions": [".TXT", ".CSV"], "md_device": "refused",
                                           "atomic_no_clobber": False, "approval": "prepared change and configured client confirmation"},
@@ -203,6 +207,11 @@ class WorkbenchOperations:
 
     def start_backup(self, robot_id: str, paths: list[str] | None = None, max_depth: int = 8,
                      attempt_ascii: bool = True) -> dict:
+        with self.bridge._lock:
+            return self._start_backup(robot_id, paths, max_depth, attempt_ascii)
+
+    def _start_backup(self, robot_id: str, paths: list[str] | None, max_depth: int,
+                      attempt_ascii: bool) -> dict:
         access = self.bridge._access(robot_id)
         if not 0 <= max_depth <= 16:
             raise ValueError("max_depth must be between 0 and 16")
@@ -319,6 +328,11 @@ class WorkbenchOperations:
 
     def start_watch(self, robot_id: str, expressions: list[str], samples: int = 10,
                     interval_seconds: float = 2.0, cycle_signal: str = "") -> dict:
+        with self.bridge._lock:
+            return self._start_watch(robot_id, expressions, samples, interval_seconds, cycle_signal)
+
+    def _start_watch(self, robot_id: str, expressions: list[str], samples: int,
+                     interval_seconds: float, cycle_signal: str) -> dict:
         self.bridge._access(robot_id)
         self._watch_specs(expressions)
         if not 1 <= samples <= 300 or not math.isfinite(interval_seconds) or not 2 <= interval_seconds <= 60:

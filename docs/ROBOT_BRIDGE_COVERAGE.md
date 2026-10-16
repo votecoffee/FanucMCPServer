@@ -1,13 +1,14 @@
 # Shared-service and MCP coverage
 
 This mapping describes implementation coverage, not physical acceptance. The
-expanded development server exposes 41 tools. Unsupported native operations are
+expanded development server exposes 42 tools. Unsupported native operations are
 reported through `capabilities`.
 
 | Existing area | Chat/API access | Boundary |
 | --- | --- | --- |
 | Controller, FTP/SFTP | Listing, exact retrieval, reviewed application-file replacement and TXT/CSV storage creation | Creation outside MD: with separate exact allowlist; no native load/run acceptance |
 | API file exchange | Hash-bound captured-byte ranges and bounded base64 proposal staging | Generated local source paths; no host filesystem access required by the client; existing approval/write policy applies |
+| Connection refresh | Apply endpoint-only edits from the bound local configuration without restarting this server | Refuses policy changes and active work; invalidates pending plans; no controller contact during refresh |
 | Backup | Full/selected jobs, ASCII companions, retained manifests | Bounded capture; partial/cancelled states explicit |
 | Restore | Manifest-bound per-file recovery through upload plans | System/variable restore outside chat policy |
 | Compare, workspace, parsers | Workspace comparisons, programs, positions, variables, comments, R/PR/frame/I-O evidence | Preserved/hash-checked workspace IDs |
