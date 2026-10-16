@@ -67,6 +67,22 @@ class ControllerService:
             backend.upload(local, remote)
         return remote
 
+    def upload_ascii_program(self, local: Path, name: str) -> dict:
+        """Transfer frozen LS to the controller ASCII loader, without execution.
+
+        The caller owns exact program policy, confirmation, preflight, originals
+        and TP/LS verification. Transfer acceptance alone does not prove a load.
+        FRRobot.Load expects a controller-device path, not a local PC filename.
+        """
+        from fanuc_workbench.services.native_programs import validate_source
+        if validate_source(local.read_bytes())["program"] != name:
+            raise ValueError("Program source name does not match the reviewed target")
+        remote = "md:" + name + ".LS"
+        with self.session() as backend:
+            backend.upload(local, remote)
+        return {"status": "ascii_transfer_accepted", "remote_path": remote,
+                "source_sha256": sha256(local), "executed": False}
+
     def backup(self, destination: Path, **options) -> Path:
         return BackupService(self.backend_factory(self.profile), self.profile).run(destination, **options)
 

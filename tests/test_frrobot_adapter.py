@@ -88,7 +88,14 @@ def test_native_loader_refuses_active_tp_tasks_without_calling_load():
                                'CurProgram': {'Name': 'MAIN'}}]
     api = FrRobot('192.0.2.1', binding=binding, robot=binding.robot)
     with pytest.raises(ValueError, match='active or paused'):
-        api.load_program('frozen.LS', 'FWBTEST', None)
+        api.program_load_preflight('FWBTEST', None)
+    assert 'Load' not in binding.calls and not binding.puts
+
+
+def test_native_program_preflight_never_calls_device_load_with_a_pc_path():
+    binding = Binding()
+    api = FrRobot('192.0.2.1', binding=binding, robot=binding.robot)
+    assert api.program_load_preflight('FWBTEST', None)['status'] == 'native_preflight_passed'
     assert 'Load' not in binding.calls and not binding.puts
 
 

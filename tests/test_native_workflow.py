@@ -41,14 +41,9 @@ class FakeNative:
             return {'status': 'verified', 'value': copy.deepcopy(self.values[args['target']])}
         if operation == 'programs':
             return copy.deepcopy(list(self.metadata.values()))
-        if operation == 'load_program':
-            self.loads += 1
-            name = args['name']
-            data = Path(args['source']).read_bytes()
-            self.metadata[name] = {'name': name, 'comment': 'Workbench fixture', 'bytes': len(data), 'protection': 0}
-            self.robot.files['md:'+name+'.LS'] = data.replace(b'fixture', b'different') if self.wrong_listing else data
-            self.robot.files['md:'+name+'.TP'] = b'COMPILED:' + data
-            return {'status': 'native_loader_accepted', 'executed': False}
+        if operation == 'program_load_preflight':
+            assert self.metadata.get(args['name']) == args['expected_programs']
+            return {'status': 'native_preflight_passed', 'executed': False}
         if operation == 'sample':
             return {'timestamp': 1, 'provider': 'frrobot', 'values': {key: copy.deepcopy(self.values[key]) for key in args['expressions']}, 'errors': {}}
         if operation == 'status':
@@ -63,6 +58,17 @@ class FakeNative:
 def native_case(bridge_case):
     bridge, robot, config = bridge_case
     api = FakeNative(robot)
+    original_upload = robot.upload
+    def upload(local, remote):
+        original_upload(local, remote)
+        if remote.startswith('md:') and remote.endswith('.LS'):
+            name = validate_source(local.read_bytes())['program']
+            data = local.read_bytes()
+            api.loads += 1
+            api.metadata[name] = {'name': name, 'comment': 'Workbench fixture', 'bytes': len(data), 'protection': 0}
+            robot.files[remote] = data.replace(b'fixture', b'different') if api.wrong_listing else data
+            robot.files['md:'+name+'.TP'] = b'COMPILED:' + data
+    robot.upload = upload
     access = replace(config.robots['r1'], native_provider='frrobot',
         native_register_targets=('R[999]', 'PR[1,100]'), native_programs=('FWBTEST',))
     bridge.config = replace(config, robots={'r1': access}, approval_mode='elicitation')
@@ -182,6 +188,8 @@ def test_program_deployment_freezes_source_and_verifies_tp_and_ls(native_case):
     assert api.loads == 1 and result['status'] == 'verified' and not result['executed']
     assert robot.files['md:FWBTEST.LS'] == SOURCE
     assert result['listing_verification']['matches'] and result['capture']['value']['tp_sha256']
+    assert result['native_loader']['transfer']['remote_path'] == 'md:FWBTEST.LS'
+    assert 'load_program' not in api.calls and api.calls.count('program_load_preflight') == 1
 
 
 def test_program_replacement_preserves_old_bytes_and_refuses_changed_tp(native_case):
@@ -204,6 +212,32 @@ def test_native_load_with_different_listing_is_not_reported_verified(native_case
     with pytest.raises(RuntimeError, match='verification is incomplete'):
         bridge.commit_change(plan['plan_id'], plan['proposed_sha256'], client_approved=True)
     assert api.loads == 1 and plan['plan_id'] not in bridge.native.plans
+
+
+def test_ascii_transfer_without_compilation_is_not_reported_verified(native_case, monkeypatch):
+    bridge, robot, api = native_case
+    plan = program_plan(bridge)
+    def transfer_only(local, remote):
+        robot.files[remote] = local.read_bytes()
+        robot.uploads += 1
+    monkeypatch.setattr(robot, 'upload', transfer_only)
+    with pytest.raises(RuntimeError, match='verification is incomplete'):
+        bridge.commit_change(plan['plan_id'], plan['proposed_sha256'], client_approved=True)
+    assert robot.uploads == 1 and not api.loads and plan['plan_id'] not in bridge.native.plans
+
+
+def test_native_program_preflight_failure_prevents_transfer(native_case, monkeypatch):
+    bridge, robot, api = native_case
+    plan = program_plan(bridge)
+    original = api.call
+    def call(operation, **args):
+        if operation == 'program_load_preflight':
+            raise NativeApiError(operation, {'error_type': 'WorkerFailure'})
+        return original(operation, **args)
+    monkeypatch.setattr(api, 'call', call)
+    with pytest.raises(RuntimeError, match='plan consumed'):
+        bridge.commit_change(plan['plan_id'], plan['proposed_sha256'], client_approved=True)
+    assert not robot.uploads and not api.loads
 
 
 def test_core_catalog_carries_native_operations_without_new_mcp_tools(native_case):

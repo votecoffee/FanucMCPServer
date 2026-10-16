@@ -45,7 +45,8 @@ def main():
                 with contextlib.redirect_stdout(sys.stderr):
                     robot = robot or FrRobot(args.host)
                     operations = {"status": robot.status, "sample": robot.sample, "read_register": robot.read_register,
-                                  "programs": robot.programs, "write_register": robot.write_register, "load_program": robot.load_program}
+                                  "programs": robot.programs, "write_register": robot.write_register,
+                                  "program_load_preflight": robot.program_load_preflight}
                     operation = operations.get(request["operation_id"])
                     if operation is None:
                         raise ValueError("Unsupported core vendor operation")

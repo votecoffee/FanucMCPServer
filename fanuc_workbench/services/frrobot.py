@@ -228,7 +228,7 @@ class FrRobot:
         return {"status": "verified", "value": after, "value_sha256": fingerprint(after),
                 "verification": "exact" if before["kind"] == "R" else "axis absolute tolerance 0.0001 mm/degrees; metadata exact"}
 
-    def load_program(self, source, name, expected_programs):
+    def program_load_preflight(self, name, expected_programs):
         # Refuse changes to a program referenced by any non-idle task. Do not
         # pause, abort, select or run anything to make a load succeed.
         for task in self.tasks():
@@ -239,8 +239,4 @@ class FrRobot:
         current = next((row for row in self.programs() if row["name"].upper() == name), None)
         if current != expected_programs:
             raise ValueError("Native program metadata changed since preflight")
-        self.binding.call(self.robot, "Load", source, 1 if current else 0)
-        loaded = next((row for row in self.programs() if row["name"].upper() == name), None)
-        if loaded is None:
-            raise RuntimeError("Loader returned without a matching native program")
-        return {"status": "native_loader_accepted", "program": loaded, "executed": False}
+        return {"status": "native_preflight_passed", "program": current, "executed": False}

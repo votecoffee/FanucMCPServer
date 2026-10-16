@@ -26,7 +26,11 @@ class NativeControllerService:
             {"provider": "frrobot"}, operation_timeout=min(120, max(10, profile.timeout * 3)))
 
     def call(self, operation, **arguments):
-        result = self.worker.call(operation, arguments, {})
+        try:
+            result = self.worker.call(operation, arguments, {})
+        except RuntimeError:
+            raise NativeApiError(operation, {"error_type": "WorkerFailure",
+                "reason": "Core native worker failed or timed out; no call was retried"}) from None
         if result.get("ok") is not True:
             raise NativeApiError(operation, result)
         return result["result"]

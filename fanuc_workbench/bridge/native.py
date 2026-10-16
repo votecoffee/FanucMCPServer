@@ -270,8 +270,9 @@ class NativeChanges:
                             os.fsync(stream.fileno())
                         if hashlib.sha256(path.read_bytes()).hexdigest() != value["proposed"]["source_sha256"]:
                             raise ValueError("Frozen program source changed")
-                        loaded = self._client(robot_id).call("load_program", source=str(path), name=target,
-                                                            expected_programs=before["program"])
+                        guard = self._client(robot_id).call("program_load_preflight", name=target,
+                                                           expected_programs=before["program"])
+                        transfer = self.bridge._controller(robot_id).upload_ascii_program(path, target)
                         after_folder = self.bridge._folder()
                         after = self._program_state(robot_id, target, after_folder)
                         if not after["exists"]:
@@ -280,6 +281,8 @@ class NativeChanges:
                         if not comparison["matches"]:
                             atomic_json(after_folder / "listing_verification.json", comparison)
                             raise RuntimeError("Program loaded but LS readback differs; inspect before further changes")
+                        loaded = {"status": "controller_ascii_load_verified", "preflight": guard,
+                                  "transfer": transfer, "executed": False}
                         result = {"status": "verified", "native_loader": loaded, "listing_verification": comparison,
                                   "capture": self._capture(robot_id, "program", target, after, folder=after_folder), "executed": False}
                     atomic_json(folder / "readback.json", result)

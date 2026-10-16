@@ -18,9 +18,12 @@ Native access is disabled by default. A local operator explicitly selects the
 provider and exact register/program targets. Register changes preserve type and
 position metadata unless the reviewed proposal explicitly supports a change;
 initial PR edits change existing axis values only. Uninitialized PRs are refused.
-Program loading accepts validated LS source and uses the native loader; uploading
-an LS file alone is not reported as successful compilation. Program deployment
-never selects, starts or executes a program.
+Program loading accepts validated LS source, checks native task/program state,
+and transfers it to `md:NAME.LS` through the configured FTP/SFTP backend for the
+controller's ASCII loader. The controller needs compatible ASCII upload support.
+Transfer acceptance alone is not reported as successful compilation. Deployment
+never selects, starts or executes a program. FANUC's `IRobot.Load` takes a
+controller-device path; Workbench does not pass local PC filenames to that API.
 
 Every change starts from a preserved native read tied to robot, endpoint, target
 and SHA-256. Preparation freezes the proposal. Commit requires exact approval,
@@ -87,7 +90,7 @@ Editing a proposal invalidates its prepared GUI approval.
   bound. Approved axis readback tolerance is **0.0001 mm/degrees**; metadata is exact.
 - Deployment accepts ASCII LS source up to 1 MiB and uppercase application names
   up to eight characters. It refuses protected programs and active/paused TP tasks.
-- Verification requires native loader acceptance, a nonempty TP capture and a
+- Verification requires transfer acceptance, native compiled-program presence, a nonempty TP capture and a
   normalized LS comparison. Instruction/position tokens and rows remain bound;
   line numbering and generated owner/size/date/file/line-count fields are ignored.
   Other differences fail verification. This is not runtime/physical equivalence.
