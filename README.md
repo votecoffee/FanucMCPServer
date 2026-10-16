@@ -70,10 +70,15 @@ Dependencies: PySide6, XlsxWriter, ReportLab, and Paramiko.
 ## Codex / MCP robot bridge (development)
 
 The GUI and the optional local MCP adapter now share a headless controller
-service. Install the adapter with `python -m pip install -e ".[mcp]"` and see
+service. The expanded server exposes 33 tools for backup jobs, workspace
+analysis/editing, live samples/recordings, snapshots/packages, audit evidence,
+and reviewed application-file/comment changes. Install the adapter with
+`python -m pip install -e ".[mcp]"` and see
 [Robot bridge setup and API guide](docs/ROBOT_BRIDGE.md) for configuration,
 file/log tools, reviewed application-file replacement, and verification limits.
-Writes default to disabled. The development plugin descriptors have not been
+Writes default to disabled; the example requests client-mediated confirmation.
+See the [service coverage matrix](docs/ROBOT_BRIDGE_COVERAGE.md) for unsupported
+native operations. The development plugin descriptors have not been
 installed into Codex or tested against a physical controller.
 
 For development/testing:

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Expanded the local MCP server to 33 tools: durable backup/watch jobs,
+  hash-manifested artifacts, 20 analyses, separate offline edits, recordings,
+  snapshots, offline packages, per-file recovery and audit access.
+- Added optional MCP client elicitation, bridge locks and shared sampling limits,
+  and disabled-by-default ComSet changes with fresh listing readback. Native
+  load/run/value/frame/safety writes remain unsupported.
+- Preserved text encodings, corrected multigroup PR/flag decoding, excluded
+  unavailable samples from timelines, closed failed FTP/SFTP connections and
+  refused controller write redirects.
+
 - Extracted remaining GUI connection tests, transfers, live comparisons and
   restore previews into the shared headless `ControllerService`.
 - Added an optional local MCP adapter for configured robot files/logs and

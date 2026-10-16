@@ -8,6 +8,11 @@ from typing import Callable
 
 from fanuc_workbench.backends.base import RobotBackend
 from fanuc_workbench.core.models import BackupManifest, BackupRecord, RobotProfile
+from fanuc_workbench.services.transfer import TransferLimitError, download_bounded
+
+
+class BackupLimitError(RuntimeError):
+    pass
 
 
 _INVALID = re.compile(r"[<>:\\|?*\x00-\x1f]")
@@ -45,10 +50,26 @@ class BackupService:
         attempt_ascii: bool = True,
         max_depth: int = 8,
         progress: Callable[[object], None] | None = None,
+        maximum_file_bytes: int | None = None,
+        maximum_total_bytes: int | None = None,
+        maximum_files: int | None = None,
+        checkpoint: Callable[[], None] | None = None,
+        validate_path: Callable[[str], str] | None = None,
+        redact_errors: bool = False,
+        selected_paths: list[str] | None = None,
     ) -> Path:
         progress = progress or (lambda _: None)
         roots = roots or self.profile.roots
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.maximum_file_bytes = maximum_file_bytes
+        self.remaining_bytes = maximum_total_bytes
+        self.maximum_files = maximum_files
+        self.checkpoint = checkpoint or (lambda: None)
+        self.validate_path = validate_path or (lambda p: p)
+        self.redact_errors = redact_errors
+        self.attempts = 0
+        self.listed_entries = 0
+        self.seen: set[str] = set()
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         backup_dir = destination / f"{safe_component(self.profile.name)}_{stamp}"
         backup_dir.mkdir(parents=True, exist_ok=False)
         manifest = BackupManifest(
@@ -58,13 +79,58 @@ class BackupService:
             roots=roots,
         )
 
-        with self.backend:
-            for root in roots:
-                self._walk(root, root, backup_dir, manifest, 0, max_depth, attempt_ascii, progress)
-
-        manifest_path = backup_dir / "backup_manifest.json"
-        manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
+        try:
+            with self.backend:
+                if selected_paths is not None:
+                    for path in selected_paths:
+                        path = self.validate_path(path)
+                        root = next(r for r in roots if path == r or path.startswith(r if r.endswith(':') else r.rstrip('/') + '/'))
+                        self._file(root, path, backup_dir, manifest, attempt_ascii, progress)
+                else:
+                    for root in roots:
+                        self._walk(root, root, backup_dir, manifest, 0, max_depth, attempt_ascii, progress)
+        except BaseException as exc:
+            manifest.warnings.append(f"Capture interrupted: {type(exc).__name__}")
+            raise
+        finally:
+            manifest_path = backup_dir / "backup_manifest.json"
+            manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
         return backup_dir
+
+    def _download(self, remote: str, local: Path):
+        self.checkpoint()
+        if self.maximum_files is not None and self.attempts >= self.maximum_files:
+            raise BackupLimitError("Backup file-count limit reached")
+        self.attempts += 1
+        if self.maximum_file_bytes is None:
+            self.backend.download(remote, local)
+        else:
+            maximum = min(self.maximum_file_bytes, self.remaining_bytes) if self.remaining_bytes is not None else self.maximum_file_bytes
+            if maximum <= 0:
+                raise BackupLimitError("Backup byte budget exhausted")
+            download_bounded(self.backend, remote, local, maximum)
+        if self.remaining_bytes is not None:
+            self.remaining_bytes -= local.stat().st_size
+
+    def _file(self, root, remote, backup_dir, manifest, attempt_ascii, progress, size=None):
+        self.checkpoint()
+        remote = self.validate_path(remote)
+        if remote in self.seen:
+            return
+        self.seen.add(remote)
+        rel = remote_to_relative(root, remote)
+        local = backup_dir / rel
+        progress({"message": f"Downloading {remote}", "remote": remote})
+        try:
+            self._download(remote, local)
+            manifest.records.append(BackupRecord(remote, str(rel), local.stat().st_size))
+        except (TransferLimitError, BackupLimitError):
+            raise
+        except Exception as exc:
+            manifest.records.append(BackupRecord(remote, str(rel), size, error=type(exc).__name__ if self.redact_errors else str(exc)))
+            return
+        if attempt_ascii:
+            self._try_ascii_companion(root, remote, backup_dir, manifest, progress)
 
     def _walk(
         self,
@@ -77,31 +143,31 @@ class BackupService:
         attempt_ascii: bool,
         progress: Callable[[object], None],
     ) -> None:
+        self.checkpoint()
+        remote_dir = self.validate_path(remote_dir)
         if depth > max_depth:
             manifest.warnings.append(f"Maximum recursion depth reached at {remote_dir}")
             return
         try:
             entries = self.backend.list_dir(remote_dir)
         except Exception as exc:
-            manifest.warnings.append(f"Could not list {remote_dir}: {exc}")
+            manifest.warnings.append(f"Could not list {remote_dir}: {type(exc).__name__ if self.redact_errors else exc}")
             return
 
-        for entry in entries:
-            if entry.is_dir:
-                self._walk(root, entry.path, backup_dir, manifest, depth + 1, max_depth, attempt_ascii, progress)
-                continue
-            rel = remote_to_relative(root, entry.path)
-            local = backup_dir / rel
-            progress({"message": f"Downloading {entry.path}", "remote": entry.path})
-            try:
-                self.backend.download(entry.path, local)
-                manifest.records.append(BackupRecord(entry.path, str(rel), entry.size))
-            except Exception as exc:
-                manifest.records.append(BackupRecord(entry.path, str(rel), entry.size, error=str(exc)))
-                continue
+        self.listed_entries += len(entries)
+        if self.maximum_files is not None and self.listed_entries > self.maximum_files * 2:
+            raise BackupLimitError("Directory listing exceeds capture limit")
 
-            if attempt_ascii:
-                self._try_ascii_companion(root, entry.path, backup_dir, manifest, progress)
+        for entry in entries:
+            self.checkpoint()
+            path = self.validate_path(entry.path)
+            prefix = remote_dir if remote_dir.endswith(":") else remote_dir.rstrip("/") + "/"
+            if path == remote_dir or not path.startswith(prefix):
+                raise ValueError("Directory listing contains a path outside its parent")
+            if entry.is_dir:
+                self._walk(root, path, backup_dir, manifest, depth + 1, max_depth, attempt_ascii, progress)
+                continue
+            self._file(root, path, backup_dir, manifest, attempt_ascii, progress, entry.size)
 
     def _try_ascii_companion(
         self,
@@ -119,13 +185,19 @@ class BackupService:
         # Preserve FANUC device notation when pathlib has normalized it oddly.
         if ":" in remote_path and ":/" in companion and ":/" not in remote_path:
             companion = companion.replace(":/", ":", 1)
+        companion = self.validate_path(companion)
+        if companion in self.seen:
+            return
+        self.seen.add(companion)
         rel = remote_to_relative(root, companion)
         local = backup_dir / rel
         progress({"message": f"Attempting ASCII companion {companion}", "remote": companion})
         try:
-            self.backend.download(companion, local)
+            self._download(companion, local)
             manifest.records.append(
                 BackupRecord(companion, str(rel), local.stat().st_size, kind="ascii", ascii_companion_of=remote_path)
             )
+        except (TransferLimitError, BackupLimitError):
+            raise
         except Exception as exc:
-            manifest.warnings.append(f"ASCII companion unavailable for {remote_path}: {exc}")
+            manifest.warnings.append(f"ASCII companion unavailable for {remote_path}: {type(exc).__name__ if self.redact_errors else exc}")

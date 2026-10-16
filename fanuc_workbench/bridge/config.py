@@ -5,6 +5,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fanuc_workbench.core.models import RobotProfile
 
@@ -38,6 +39,8 @@ class RobotAccess:
     profile: RobotProfile
     password_env: str | None = None
     writable_files: tuple[str, ...] = ()
+    comment_service_url: str | None = None
+    comment_targets: tuple[str, ...] = ()
 
     def connection_profile(self) -> RobotProfile:
         # Resolve secrets only at connection time; never return them through tools.
@@ -57,6 +60,9 @@ class BridgeConfig:
     allow_writes: bool = False
     max_file_bytes: int = 16 * 1024 * 1024
     plan_ttl_seconds: int = 900
+    approval_mode: str = "chat"
+    max_backup_files: int = 5000
+    max_backup_bytes: int = 512 * 1024 * 1024
 
     @classmethod
     def load(cls, path: Path) -> "BridgeConfig":
@@ -87,7 +93,17 @@ class BridgeConfig:
             writable = tuple(remote_path(p) for p in item.get("writable_files", []))
             if any(not any(under_root(p, r) for r in profile.roots) for p in writable):
                 raise ValueError("Writable files must stay inside configured remote roots")
-            robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable)
+            comment_url = item.get("comment_service_url")
+            if comment_url:
+                parsed = urlsplit(comment_url)
+                if (parsed.scheme not in {"http", "https"} or parsed.hostname != profile.host.casefold()
+                        or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"}):
+                    raise ValueError("Comment service URL must be an HTTP(S) origin on this configured robot host")
+            targets = tuple(item.get("comment_targets", []))
+            if any(not isinstance(target, str) or not re.fullmatch(r"(?:R|PR|DIN|DOUT|GIN|GOUT|AIN|AOUT|RI|RO|FLG)\[[1-9][0-9]{0,5}\]", target)
+                   for target in targets):
+                raise ValueError("Comment targets must be explicit supported register or I/O identifiers")
+            robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable, comment_url, targets)
 
         def local_dir(key: str) -> Path:
             value = Path(data[key])
@@ -99,5 +115,14 @@ class BridgeConfig:
             raise ValueError("max_file_bytes must be between 1 and 67108864")
         if type(ttl) is not int or not 1 <= ttl <= 3600:
             raise ValueError("plan_ttl_seconds must be between 1 and 3600")
+        approval = data.get("approval_mode", "chat")
+        if approval not in {"chat", "elicitation"}:
+            raise ValueError("approval_mode must be chat or elicitation")
+        file_limit = data.get("max_backup_files", 5000)
+        byte_limit = data.get("max_backup_bytes", 512 * 1024 * 1024)
+        if type(file_limit) is not int or not 1 <= file_limit <= 20000:
+            raise ValueError("max_backup_files must be between 1 and 20000")
+        if type(byte_limit) is not int or not 1 <= byte_limit <= 2 * 1024 * 1024 * 1024:
+            raise ValueError("max_backup_bytes must be between 1 and 2147483648")
         return cls(local_dir("state_dir"), local_dir("source_dir"), robots,
-                   data.get("allow_writes", False), maximum, ttl)
+                   data.get("allow_writes", False), maximum, ttl, approval, file_limit, byte_limit)

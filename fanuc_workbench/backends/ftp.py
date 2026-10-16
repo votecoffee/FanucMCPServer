@@ -23,9 +23,13 @@ class FanucFtpBackend(RobotBackend):
         if self.ftp is not None:
             return
         ftp = FTP()
-        ftp.connect(self.profile.host, self.profile.port, timeout=self.profile.timeout)
-        ftp.login(self.profile.username, self.profile.password)
-        ftp.set_pasv(True)
+        try:
+            ftp.connect(self.profile.host, self.profile.port, timeout=self.profile.timeout)
+            ftp.login(self.profile.username, self.profile.password)
+            ftp.set_pasv(True)
+        except BaseException:
+            ftp.close()
+            raise
         self.ftp = ftp
 
     def close(self) -> None:

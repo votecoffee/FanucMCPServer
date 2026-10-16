@@ -23,9 +23,14 @@ class FanucSftpBackend(RobotBackend):
         c=paramiko.SSHClient(); c.load_system_host_keys()
         if getattr(self.profile,'sftp_trust_unknown_host',False): c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         else: c.set_missing_host_key_policy(paramiko.RejectPolicy())
-        c.connect(self.profile.host,port=self.profile.port or 22,username=self.profile.username,password=self.profile.password or None,
-                  timeout=self.profile.timeout,look_for_keys=True,allow_agent=True)
-        self.client=c; self.sftp=c.open_sftp()
+        try:
+            c.connect(self.profile.host,port=self.profile.port or 22,username=self.profile.username,password=self.profile.password or None,
+                      timeout=self.profile.timeout,look_for_keys=True,allow_agent=True)
+            sftp=c.open_sftp()
+        except BaseException:
+            c.close()
+            raise
+        self.client=c; self.sftp=sftp
     def close(self):
         try:
             if self.sftp:self.sftp.close()

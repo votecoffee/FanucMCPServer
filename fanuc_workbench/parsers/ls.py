@@ -26,11 +26,19 @@ def read_text(path: Path) -> str:
 
 
 def write_text(path: Path, text: str) -> None:
-    # FANUC listings are commonly ASCII-compatible; cp1252 preserves typical comments.
+    # Retain the original text encoding when editing an existing listing.
+    encoding = "cp1252"
+    if path.exists():
+        original = path.read_bytes()
+        try:
+            original.decode("utf-8")
+            encoding = "utf-8"
+        except UnicodeDecodeError:
+            original.decode("cp1252")
     try:
-        data = text.encode("cp1252")
-    except UnicodeEncodeError:
-        data = text.encode("utf-8")
+        data = text.encode(encoding)
+    except UnicodeEncodeError as exc:
+        raise ValueError("Edited text cannot be represented in the original file encoding") from exc
     path.write_bytes(data)
 
 

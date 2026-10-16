@@ -1,61 +1,12 @@
-# FANUC Workbench robot bridge (local development version)
+# FANUC Workbench robot bridge (expanded development version)
 
-The GUI and chat tools use the same Python controller service. This extends the
-existing project; no separate robot transport implementation is required.
+The GUI, local Python API and MCP adapter share controller, parser and analysis
+services. The server now exposes 33 tools. No physical robot has been contacted;
+native acceptance remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 
-```text
-PySide6 GUI --------> ControllerService -----> existing FTP / SFTP backends
-                            ^
-Codex MCP tools --> RobotBridge
-                    access policy, plans, evidence and audit
+## Setup
 
-Local API application --> either service, using the appropriate access policy
-```
-
-## What moved out of the GUI
-
-`fanuc_workbench.services.controller.ControllerService` now owns connection tests,
-file listing/download/upload, live file comparison, restore preview, and the
-entry points into existing backup/restore services. `main_window.py` and
-`feature_tabs.py` call these methods instead of opening backend connections or
-implementing live comparisons themselves. The temporary comparison directories
-are cleaned up. GUI confirmation dialogs and worker-thread dispatch stay in the
-GUI. Existing GUI raw uploads retain their prior behavior and confirmation; they
-do not silently acquire the chat adapter's new upload policy.
-
-The shared service also implements a verified replacement operation used by
-`RobotBridge`. Bounded FTP/SFTP reads live in `services.transfer`. Diagnostics,
-comment editing, monitoring, parsers, backup, and selective restore were already
-in services and remain there. GUI extension plugins can obtain the new service
-class using `context.services.get("controller_service")`; the older registry
-entries remain supported.
-
-Neither the shared controller service nor the bridge imports PySide6. The
-project's existing normal installation still declares GUI dependencies.
-
-## Available MCP tools
-
-| Tool | Behavior |
-| --- | --- |
-| `list_robots` | Configured robot IDs, connection addresses, roots and write policy; no connection or secrets |
-| `list_files` | One remote directory, with at most 1000 returned entries |
-| `read_file` | Exact local file copy, SHA-256, size, and up to 65536 characters of text |
-| `collect_logs` | Retrieve 1-10 explicit text/diagnostic paths and parse alarm evidence |
-| `prepare_upload` | Snapshot an edited local file, preserve current controller bytes, and return a review plan |
-| `cancel_upload` | Consume a pending plan while retaining its evidence |
-| `commit_upload` | Apply the approved bytes to one configured application-file target and verify readback |
-
-Log filenames must come from a directory listing or known controller
-documentation. Missing files are reported unavailable. This version does not
-invent controller-specific log paths, poll indefinitely, or claim an atomic
-multi-file snapshot. It has no motion, program-start, register-value, DCS,
-mastering, or general system-configuration write tool. Full backup remains
-available through `ControllerService.backup` and the GUI; it is not a chat tool
-in this first version.
-
-## Local installation and Codex setup
-
-Use the Python environment for the checkout containing this change. In its root:
+Use Python 3.11 or newer in the checkout containing these changes:
 
 ```powershell
 py -3.14 -m venv .venv
@@ -63,28 +14,19 @@ py -3.14 -m venv .venv
 Copy-Item .\examples\robot_bridge.example.json .\robot_bridge.local.json
 ```
 
-An existing compatible environment can be used instead. Edit
-`robot_bridge.local.json` before connecting. `192.0.2.1` is an example address,
-not a discovered robot. Keep that file, evidence, edited files, and credentials
-out of source control. Paths in the JSON resolve relative to that JSON file.
+An existing compatible environment can be used instead. Edit the JSON before
+connecting. The example address 192.0.2.1 is not a discovered robot. Paths resolve
+relative to the JSON. Keep local configuration, edits, evidence and credentials
+out of source control.
 
-Configure the robot host, transport, roots and username. Use `password_env` for
-password authentication, for example `"password_env": "FANUC_ROBOT1_PASSWORD"`.
-Set that variable in the server process's environment using your normal secret
-management. Do not put the password into a chat, command-line argument, or JSON.
-SFTP defaults to port 22 when omitted and requires a verified host key in the
-Paramiko/system host-key store. The bridge rejects unknown-host trust overrides.
-Use FTP only on an appropriate robot network; the existing FTP transport does
-not encrypt its connection.
-
-In Codex's MCP settings, add a local stdio server. Set **command** to the
-absolute path of this environment's `Scripts/python.exe`, and **arguments** to:
+Add a local stdio server in Codex MCP settings using this environment's absolute
+Scripts/python.exe path and these arguments:
 
 ```text
 -m fanuc_workbench.bridge.mcp_server --config C:/absolute/path/robot_bridge.local.json
 ```
 
-The equivalent local Codex configuration is:
+Equivalent local configuration:
 
 ```toml
 [mcp_servers.fanuc_workbench]
@@ -92,111 +34,193 @@ command = "C:/absolute/path/.venv/Scripts/python.exe"
 args = ["-m", "fanuc_workbench.bridge.mcp_server", "--config", "C:/absolute/path/robot_bridge.local.json"]
 ```
 
-Restart the MCP connection and check `list_robots` before any network operation.
-This configuration has not been installed into your Codex settings automatically.
-The server uses local stdio and does not expose an HTTP listener or robot port.
+Restart the connection, then call list_robots and capabilities before network
+operations. No Codex configuration, HTTP listener or robot tunnel is installed
+automatically. The descriptors under plugins/fanuc-workbench remain a development
+scaffold requiring fanuc-workbench-mcp on PATH and FANUC_WORKBENCH_CONFIG in the
+environment; they do not bundle Python or dependencies. Plugin-directory
+installation and public submission remain unverified. Use the explicit command first.
 
-`plugins/fanuc-workbench` also contains portable local plugin descriptors. These
-are a **development scaffold**: they assume `fanuc-workbench-mcp` is installed on
-the client's PATH and `FANUC_WORKBENCH_CONFIG` is supplied in its environment.
-They do not bundle Python or dependencies, and installation in the Codex plugin
-directory has not been verified. Use the explicit interpreter configuration above
-for initial testing. Public directory submission is a separate packaging task.
+## Credentials and approval
 
-## Reviewed replacement workflow
+Configure hosts, roots, transports and usernames outside chat. For passwords use
+a password_env entry, for example FANUC_ROBOT1_PASSWORD, supplied through normal
+secret management. Passwords do not belong in JSON, command arguments or chats.
+SFTP defaults to port 22 and requires a verified host key. Unknown-host trust
+overrides are refused. The existing FTP transport is unencrypted.
 
-Writes default to disabled. A local operator must deliberately set
-`"allow_writes": true` and add exact paths such as `"md:MAIN.LS"` to that robot's
-`writable_files` list, then restart the server. Policy cannot be changed by a
-bridge tool. There are no wildcard write targets. The initial file classes are
-LS, KL, TP, PC, TXT and CSV application files; system/variable/diagnostic file
-classes and recognized safety/mastering filenames are refused.
+Writes default to disabled. The example now selects approval_mode equal to
+elicitation. This asks the MCP client to confirm the exact target and reviewed
+change hash. Decline, cancellation or unsupported elicitation prevents the write.
+A model-supplied hash alone is insufficient. The SDK protocol path is tested;
+support in your actual Codex installation still needs checking. Read tools do not
+require elicitation.
 
-1. Read the existing controller file and keep its SHA-256.
-2. Copy the retrieved bytes into the configured `source_dir` and edit them.
-   Preserve encoding and line endings deliberately. No source encoding or
-   newline conversion occurs in the bridge.
-3. Call `prepare_upload` with the robot ID, exact remote path, source filename
-   relative to `source_dir`, and the original SHA-256. The target must already
-   exist and be retrievable; new-file creation is not implemented.
-4. Review the target, complete proposed file, original backup and hashes. The
-   returned text diff is a bounded convenience preview and can be incomplete;
-   binary changes require external review of the staged file.
-5. Obtain the user's explicit approval of that exact change, then call
-   `commit_upload(plan_id, approved_sha256)` using its proposed hash.
-6. The service reconnects, saves and hashes another preflight copy, rejects a
-   changed original, uploads the staged bytes, downloads readback and compares
-   hashes. The response identifies the backup and readback evidence.
+The older chat approval mode remains for compatibility and relies on explicit
+approval in the conversation. Elicitation is client-mediated confirmation,
+**not independent human authentication**: a client can automate its response.
+Local Python, shell access and configuration remain trusted. Audit records are
+ordinary local files, not a tamper-proof ledger.
 
-Plans expire after 15 minutes by default and are single use, including failed
-attempts. Server restarts discard plans. Changes to the source file or proposed
-preview after preparation do not change the in-memory plan bytes. Backups,
-proposed files, preflight/readback evidence and `audit.jsonl` are retained; the
-operator must manage retention and disk capacity. Audit records include UTC
-times and hashes, and the upload-start audit must succeed before a write.
+## Tools
 
-The approval hash binds bytes; it does **not** prove that a human approved them.
-The MCP host/agent must honor the explicit approval workflow. This bridge is an
-access boundary for its tools, not a sandbox against someone who can run local
-shell commands, edit its configuration, or open robot connections independently.
-Remote roots are lexical path restrictions; configure trusted controller roots
-without symlinks to other locations, particularly on SFTP servers.
+| Area | Tools |
+| --- | --- |
+| Discovery/files | list_robots, capabilities, list_files, read_file, collect_logs |
+| Artifacts | import_workspace, list_artifacts, artifact_files, read_artifact |
+| Backups/jobs | start_backup, job_status, list_jobs, cancel_job |
+| Workspace analysis | analyze_workspace, compare_workspaces, inspect_program |
+| Offline editing | edit_workspace_file, transform_pose |
+| Live data/recordings | sample_robot, start_watch, analyze_recording, compare_recordings |
+| Snapshots/packages | capture_snapshot, compare_snapshots, make_package |
+| Reviewed files | prepare_upload, commit_upload, cancel_upload, prepare_restore_file |
+| Reviewed descriptions | prepare_comment_update, commit_comment_update, cancel_change |
+| Audit | read_audit |
 
-FTP/SFTP do not provide atomic compare-and-swap or a controller lock. Another
-writer can race the preflight check. Coordinate access to the robot. Interrupted
-uploads, readback mismatches, or post-write audit failures produce an uncertain
-result and consume the plan. No automatic retry or rollback occurs: inspect the
-actual controller bytes before deciding the next change. Program loaders may
-transform or consume an uploaded LS file; byte readback can therefore fail even
-when a loader acted. Test the controller's behavior before relying on this path.
+read_file preserves exact bytes and returns SHA-256 and bounded display text.
+Use directory listings or controller documentation for log names. Missing files
+are unavailable; multi-file capture is not atomic.
 
-File transfer equality is not compiler acceptance, native program-load
-acceptance, running-program status, safety validation, or commissioning approval.
-This development version has been tested offline, not against a physical robot.
+start_backup returns a job ID immediately. Omit paths for configured roots, or
+supply selected file paths. Poll job_status and inspect result.complete, warnings,
+and backup_manifest.json: a completed job can contain an incomplete capture.
+Cancelled/failed backups retain partial artifacts when a manifest exists.
 
-## Using the shared service from Python or an API application
+Backups reuse BackupService with optional ASCII companions, path validation and
+limits. Defaults are 16 MiB per file, 5000 transfer attempts and 512 MiB per
+capture. Directory entries and recursion are also bounded. Fresh connections
+isolate transfer failures; there is no blind write retry. Cancellation is
+cooperative between transfers, not an interruption of an active network call.
+Two read workers and a bounded queue serve independent robots.
+
+History survives restart; orphaned jobs become interrupted and do not resume.
+Advisory locks coordinate bridge clients sharing state_dir and the same configured
+host string. The existing GUI, other applications and DNS aliases are outside
+that lock scope. FTP/SFTP provide no atomic compare-and-swap.
+
+import_workspace copies a source_dir-relative backup into preserved state,
+rejecting links and enforcing limits. Artifact IDs select manifest-listed files,
+not arbitrary paths. Bytes and file sets are checked before analysis. Reimport
+changed evidence. read_artifact returns bounded byte ranges as base64, including
+binary data. Lists, files, analysis and audit support pagination.
+
+## Analysis, editing and packages
+
+analyze_workspace supports these kinds:
+
+```text
+health options alarms alarm_intelligence mastering dcs ethernetip lint
+programs dependencies unused_programs xref register_usage comments positions
+variables numeric_registers position_registers frames io
+```
+
+These reuse existing services and return evidence-only results. Option matches
+do not authenticate installed options. inspect_program adds structural LS
+validation and flow inspection; it does not invoke a compiler or loader.
+
+edit_workspace_file creates a separate source copy. Kinds are comment,
+numeric_register and position_register. Targets include R[1] and PR[2,7]
+(group 2, index 7). Values are structured, for example {"value": "12.5"} or
+{"values": {"J2": 9.5}}. Unsupported axes, nonfinite values and ambiguous records
+are refused. Existing encoding and line endings are preserved, or an
+unrepresentable edit fails.
+
+Edited VA/DG listings are offline documentation/analysis. They are not uploaded
+as live register or frame changes. Live register-value/frame writes and I/O
+forcing have no verified provider.
+
+capture_snapshot and compare_snapshots reuse troubleshooting snapshots.
+make_package supports documentation (HTML/XLSX/PDF), baseline, roboguide staging,
+and deployment with an explicit file list. These are offline artifacts; they do
+not establish commissioning approval, launch ROBOGUIDE, or load a controller.
+
+## Samples and recordings
+
+sample_robot reads needed NUMREG.VA, POSREG.VA and IOSTATE.DG files for 1-100
+expressions. R, PR, common I/O and flags are supported when readable evidence
+exists. PR[group,index] selects multigroup records. Per-signal errors and source
+files are retained. The two-second minimum is shared by bridge clients using
+the same host and state directory.
+
+start_watch captures 1-300 samples at intervals of 2-60 seconds. It retains
+trend/timeline CSV, cycle JSON, recording JSON and source artifact IDs. Missing
+samples do not invent transitions. cycle_signal must name a watched expression.
+Failed/cancelled jobs preserve partial recordings. This is file-based sampling,
+not deterministic real-time controller I/O.
+
+analyze_recording supports cycle_profile, handshake with explicit mapping, and
+alarm_correlation with a workspace and compatible timestamps. compare_recordings
+compares cycle durations. Correlation does not synchronize clocks or prove causation.
+
+## Reviewed changes and recovery
+
+Enable writes locally and add exact application paths to writable_files, then
+restart the server. Initial classes are LS, KL, TP, PC, TXT and CSV, excluding
+recognized safety/mastering filenames. System/variable/diagnostic classes are refused.
+
+1. Retrieve the existing controller file and original SHA-256.
+2. Edit a separate source copy with deliberate encoding/line-ending handling.
+3. Call prepare_upload with the robot, remote path, source_dir-relative filename
+   and original hash. The target must already exist and be readable.
+4. Review the complete proposal, backup and hashes. The returned diff is a
+   bounded convenience preview; binary proposals need external review.
+5. Commit only the approved plan/hash. Elicitation mode also requires client confirmation.
+6. The service saves and hashes another preflight copy, rejects stale originals,
+   uploads the prepared bytes and compares downloaded readback to the staged hash.
+
+prepare_restore_file uses a manifest-bound backup through this same workflow.
+Recovery is deliberate and per-file; rollback is not automatic. Plans expire
+after 15 minutes by default, are single-use including failed attempts, and vanish
+on restart. Later edits to source or preview files cannot alter prepared bytes.
+
+Live descriptions additionally require comment_service_url as an HTTP(S) origin
+on that robot host and exact comment_targets, such as ["R[1]", "PR[1]", "DIN[1]"].
+This is disabled by default. Preparation uses a retrieved NUMREG.VA, POSREG.VA or
+IOSTATE.DG listing and existing ComSet mapping. Group-1 PR comments are supported.
+Commit rejects stale listings, applies the comment and requires matching fresh
+listing readback. Redirects are refused. HTTP 200 alone is insufficient.
+Controller-specific endpoint/security behavior still needs physical validation.
+
+Interrupted writes or mismatched readback produce uncertain state and consume
+the plan. Inspect actual bytes/comments before another change. Coordinate other
+writers; preflight cannot prevent races. An LS loader may transform/consume a
+file and defeat byte readback even after acting. Transfer equality is not
+load/compile, running-program, safety or commissioning acceptance. Controller
+mode/running-state interlocks remain unsupported.
+
+The operator owns retention and disk capacity for backups, partial jobs, edits,
+readbacks and UTC audit records. Remote roots are lexical restrictions; use
+trusted roots without cross-root symlinks.
+
+## Shared Python API and validation
 
 ```python
 from pathlib import Path
-from fanuc_workbench.core.models import RobotProfile
-from fanuc_workbench.services.controller import ControllerService
-
-robot = ControllerService(RobotProfile("Test cell", "192.0.2.1", roots=["md:"]))
-entries = robot.list_files("md:")
-robot.download_file("md:MAIN.LS", Path("capture.ls"), maximum=16 * 1024 * 1024)
-```
-
-For the same configured policy and review workflow as MCP:
-
-```python
 from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.service import RobotBridge
 
-bridge = RobotBridge(BridgeConfig.load(Path("robot_bridge.local.json")))
-robots = bridge.list_robots()  # no robot connection
+with RobotBridge(BridgeConfig.load(Path("robot_bridge.local.json"))) as bridge:
+    robots = bridge.list_robots()
+    supported = bridge.operations.capabilities()
+    # job = bridge.operations.start_backup("robot1")
+    # status = bridge.operations.jobs.status(job["job_id"])
 ```
 
-An OpenAI API application can execute these operations locally through its own
-function-call dispatcher. This implementation does not call OpenAI, need an
-OpenAI API key, or implement that application's model loop. A hosted remote MCP
-deployment would additionally need an authenticated gateway with robot-network
-reachability; there is no remote server or tunnel in this version.
+Keep the bridge alive while jobs run, then close it to cancel/join workers.
+The MCP entry point closes during orderly shutdown. Trusted applications can
+also use ControllerService directly. API applications can dispatch function calls
+locally to these operations. This package makes no OpenAI API/model calls and
+needs no OpenAI API key. It supplies no hosted authenticated gateway or model loop.
 
-## Validation and documentation
+Run python -m pytest -q with dev and mcp extras. Coverage includes original
+services, all analysis kinds, encoding/bytes, partial captures, cancellation,
+process locks, samples/recordings, packages, file/comment recovery and real SDK
+stdio/elicitation flows. Controllers/transports are simulated; native acceptance
+remains pending.
 
-Run `python -m pytest -q` with the `dev` and `mcp` extras installed. Tests cover
-the existing application services, shared controller operations, path and policy
-denials, exact bytes, bounded FTP/SFTP reads, stale bases, expiry/replay,
-interrupted uploads, corrupt readback, audit failures, GUI-independent imports,
-and a real MCP SDK stdio subprocess handshake. Transport tests use local doubles;
-they do not prove physical-controller compatibility. SDK-only tests skip when
-the optional MCP extra is absent.
-
-Official integration references checked October 16, 2026:
+Official documentation checked October 16, 2026:
 
 - [Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
+- [MCP tools and elicitation](https://developers.openai.com/plugins/build/mcp-server)
 - [Plugin packaging](https://developers.openai.com/plugins/build/plugins)
-- [Desktop-only local MCP plugins](https://developers.openai.com/plugins/deploy/desktop-only)
-- [OpenAI API function calling](https://developers.openai.com/api/docs/guides/function-calling)
-
-The local plugin descriptors are not a public-directory release package.
+- [Local MCP plugins](https://developers.openai.com/plugins/deploy/desktop-only)

@@ -31,13 +31,15 @@ class WorkspaceSampleProvider:
         p=self._find('IOSTATE.DG')
         if p:
             for r in parse_io(p):
-                typ=r.io_type.replace('DIN','DI').replace('DOUT','DO').replace('GIN','GI').replace('GOUT','GO').replace('AIN','AI').replace('AOUT','AO')
+                typ=r.io_type.replace('DIN','DI').replace('DOUT','DO').replace('GIN','GI').replace('GOUT','GO').replace('AIN','AI').replace('AOUT','AO').replace('FLG','F')
                 ios[(typ,r.index)]=r
         vals={};errs={}
         for s in specs:
             k=s.alias or s.expression; m=WATCH_RE.match(s.expression)
             if not m:errs[k]='Unsupported watch expression';continue
             typ=m.group(1).upper();idx=int(m.group(2));group=int(m.group(3) or 1)
+            if typ == 'PR' and m.group(3):group,idx=int(m.group(2)),int(m.group(3))
+            elif m.group(3):errs[k]='Only PR supports a group,index pair';continue
             if typ=='R':
                 r=nr.get(idx); vals[k]=r.value if r else None
                 if not r:errs[k]='R not found'
@@ -91,6 +93,7 @@ class TimelineRecorder:
     def __init__(self):self.events:list[TimelineEvent]=[];self._last={}
     def add(self,sample:Sample):
         for k,v in sample.values.items():
+            if k in sample.errors or v is None:continue
             if k in self._last and self._last[k]!=v:self.events.append(TimelineEvent(sample.timestamp,k,self._last[k],v))
             self._last[k]=v
     def export_csv(self,path:Path):

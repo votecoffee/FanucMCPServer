@@ -16,6 +16,7 @@ from fanuc_workbench.backends.factory import create_backend
 from fanuc_workbench.bridge.config import BridgeConfig, remote_path, under_root
 from fanuc_workbench.services.controller import ControllerService
 from fanuc_workbench.services.diagnostics import scan_alarm_file
+from fanuc_workbench.bridge.storage import RobotLocks
 
 
 _TEXT = {".LS", ".KL", ".VA", ".DG", ".TXT", ".CSV", ".LOG", ".INI", ".XML", ".JSON"}
@@ -47,7 +48,33 @@ class RobotBridge:
         self.backend_factory = backend_factory
         self._plans: dict[str, UploadPlan] = {}
         self._lock = threading.RLock()
+        self._audit_lock = threading.RLock()
         config.state_dir.mkdir(parents=True, exist_ok=True)
+        self.robot_locks = RobotLocks(config.state_dir / "robot-locks")
+        from fanuc_workbench.bridge.operations import WorkbenchOperations
+        self.operations = WorkbenchOperations(self)
+        from fanuc_workbench.bridge.comments import CommentChanges
+        self.comments = CommentChanges(self)
+
+    def close(self):
+        self.operations.jobs.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exception):
+        self.close()
+
+    def cancel_change(self, plan_id: str) -> dict:
+        with self._lock:
+            if plan_id in self.comments.plans:
+                self.comments.plans.pop(plan_id)
+                self._audit("comment_cancelled", plan_id=plan_id)
+                return {"plan_id": plan_id, "status": "cancelled"}
+            return self.cancel_upload(plan_id)
+
+    def _robot_lock(self, robot_id: str):
+        return self.robot_locks.acquire(self._access(robot_id).profile.host.casefold())
 
     def _access(self, robot_id: str):
         try:
@@ -77,7 +104,7 @@ class RobotBridge:
 
     def _audit(self, action: str, **fields) -> None:
         record = {"at": datetime.now(timezone.utc).isoformat(), "action": action, **fields}
-        with (self.config.state_dir / "audit.jsonl").open("a", encoding="utf-8") as stream:
+        with self._audit_lock, (self.config.state_dir / "audit.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
@@ -108,12 +135,13 @@ class RobotBridge:
         return {"allow_writes": self.config.allow_writes, "robots": [
             {"id": key, "name": access.profile.name, "host": access.profile.host,
              "transport": access.profile.transport, "roots": access.profile.roots,
-             "writable_files": list(access.writable_files)}
+             "writable_files": list(access.writable_files), "comment_targets": list(access.comment_targets),
+             "comment_service_url": access.comment_service_url}
             for key, access in self.config.robots.items()
         ]}
 
     def list_files(self, robot_id: str, remote_dir: str) -> dict:
-        with self._lock:
+        with self._lock, self._robot_lock(robot_id):
             remote = self._path(robot_id, remote_dir)
             self._audit("list_requested", robot_id=robot_id, remote_path=remote)
             try:
@@ -138,7 +166,7 @@ class RobotBridge:
                 raise RuntimeError("Controller listing failed; check connection and profile") from None
 
     def read_file(self, robot_id: str, path: str) -> dict:
-        with self._lock:
+        with self._lock, self._robot_lock(robot_id):
             remote = self._path(robot_id, path)
             folder = self._folder()
             name = remote.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
@@ -232,7 +260,27 @@ class RobotBridge:
             self._audit("upload_cancelled", plan_id=plan_id)
             return {"status": "cancelled", "plan_id": plan_id}
 
-    def commit_upload(self, plan_id: str, approved_sha256: str) -> dict:
+    def commit_upload(self, plan_id: str, approved_sha256: str, *, client_approved: bool = False) -> dict:
+        with self._lock:
+            plan = self._plans.get(plan_id)
+            if plan is None:
+                raise ValueError("Unknown or already consumed plan; prepare a new plan")
+            if self.config.approval_mode == "elicitation" and not client_approved:
+                raise ValueError("This bridge requires confirmation through the MCP client's elicitation interface")
+            with self._robot_lock(plan.robot_id):
+                return self._commit_upload_locked(plan_id, approved_sha256)
+
+    def upload_review(self, plan_id: str, approved_sha256: str) -> dict:
+        with self._lock:
+            plan = self._plans.get(plan_id)
+            if plan is None or plan.expires <= time.monotonic():
+                raise ValueError("Unknown or expired plan")
+            if approved_sha256 != plan.proposed_sha256:
+                raise ValueError("Approval SHA-256 does not match the prepared bytes")
+            return {"robot_id": plan.robot_id, "host": self._access(plan.robot_id).profile.host,
+                    "remote_path": plan.remote, "sha256": plan.proposed_sha256, "bytes": len(plan.payload)}
+
+    def _commit_upload_locked(self, plan_id: str, approved_sha256: str) -> dict:
         with self._lock:
             plan = self._plans.get(plan_id)
             if plan is None:

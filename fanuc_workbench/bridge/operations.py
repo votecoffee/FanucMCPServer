@@ -1,0 +1,389 @@
+from __future__ import annotations
+
+import json
+import hashlib
+import math
+import os
+import shutil
+import time
+import uuid
+from pathlib import Path
+
+from fanuc_workbench.backends.base import RobotBackend
+from fanuc_workbench.bridge.jobs import JobManager
+from fanuc_workbench.bridge.storage import ArtifactStore, atomic_json, confined
+from fanuc_workbench.services.workspace_api import WorkspaceService, ANALYSES, page, serial
+from fanuc_workbench.services.monitoring import (WATCH_RE, Sample, WatchSpec, WorkspaceSampleProvider,
+                                               TrendRecorder, TimelineRecorder, CycleRecorder, profile_cycle)
+from fanuc_workbench.services.snapshots import capture_snapshot, compare_snapshots
+from fanuc_workbench.services.backup import BackupService
+
+
+class ScopedReadBackend(RobotBackend):
+    """Let BackupService reuse bridge policy and a fresh connection per transfer."""
+
+    def __init__(self, bridge, robot_id):
+        self.bridge, self.robot_id = bridge, robot_id
+
+    def connect(self): pass
+    def close(self): pass
+
+    def list_dir(self, remote):
+        remote = self.bridge._path(self.robot_id, remote)
+        return self.bridge._controller(self.robot_id).list_files(remote)
+
+    def download(self, remote, local):
+        self.download_bounded(remote, local, self.bridge.config.max_file_bytes)
+
+    def download_bounded(self, remote, local, maximum):
+        remote = self.bridge._path(self.robot_id, remote)
+        temporary = local.with_name(local.name + "." + uuid.uuid4().hex + ".part")
+        try:
+            self.bridge._controller(self.robot_id).download_file(remote, temporary, maximum=maximum)
+            os.replace(temporary, local)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def upload(self, local, remote):
+        raise ValueError("Backup transport is read-only")
+
+    def file_exists(self, remote):
+        raise ValueError("Existence probes are not used by the backup capture service")
+
+
+class WorkbenchOperations:
+    def __init__(self, bridge):
+        self.bridge = bridge
+        self.store = ArtifactStore(bridge.config.state_dir)
+        self.jobs = JobManager(bridge.config.state_dir / "jobs")
+        self._last_sample: dict[str, float] = {}
+
+    def capabilities(self, robot_id: str | None = None) -> dict:
+        if robot_id is not None:
+            self.bridge._access(robot_id)
+        return {"analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],
+                "live_reads": ["R", "PR", "DI", "DO", "GI", "GO", "AI", "AO", "RI", "RO", "UI", "UO", "F"],
+                "sampling_provider": "controller-generated files; availability must be verified",
+                "offline_edits": ["comment", "numeric_register", "position_register"],
+                "uploads": "existing exact-allowlisted application files only",
+                "live_comments": "ComSet with configured service origin, exact comment targets and listing readback; disabled by default",
+                "approval_mode": self.bridge.config.approval_mode,
+                "native_controller_operations": {name: "unsupported" for name in (
+                    "new_file_creation", "load_compile", "program_start_stop", "motion", "register_value_write",
+                    "frame_write", "io_forcing", "controller_mode_interlock", "dcs_write", "mastering_write")},
+                "controller_identity": "configured profile; authenticate physical identity separately",
+                "cross_process_lock_scope": "bridge clients sharing state_dir and the same configured host string",
+                "robot_id": robot_id, "controller_contacted": False}
+
+    def import_workspace(self, source_folder: str, note: str = "") -> dict:
+        config = self.bridge.config
+        source = confined(config.source_dir, source_folder)
+        if not source.is_dir() or source.is_relative_to(config.state_dir.resolve()):
+            raise ValueError("Import a source_dir-relative backup folder outside state_dir")
+        paths, total = [], 0
+        for path in source.rglob("*"):
+            if path.is_symlink() or not path.resolve().is_relative_to(source):
+                raise ValueError("Imported workspaces cannot contain links")
+            if path.resolve().is_relative_to(config.state_dir.resolve()):
+                raise ValueError("Import cannot include bridge state")
+            if path.is_file():
+                size = path.stat().st_size
+                if size > config.max_file_bytes:
+                    raise ValueError("Imported file exceeds max_file_bytes")
+                total += size
+                paths.append(path)
+                if total > config.max_backup_bytes or len(paths) > config.max_backup_files:
+                    raise ValueError("Imported workspace exceeds capture limits")
+        if not paths:
+            raise ValueError("Workspace contains no files")
+        root = self.bridge._folder() / "workspace"
+        root.mkdir()
+        copied = 0
+        for path in paths:
+            destination = root / path.relative_to(source)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("rb") as src, destination.open("xb") as dst:
+                remaining = min(config.max_file_bytes, config.max_backup_bytes - copied)
+                while chunk := src.read(min(65536, remaining + 1)):
+                    if len(chunk) > remaining:
+                        raise ValueError("Source grew during import; import aborted")
+                    dst.write(chunk)
+                    remaining -= len(chunk)
+                    copied += len(chunk)
+        item = self.store.register(root, "workspace", note=note)
+        self.bridge._audit("workspace_imported", artifact_id=item["artifact_id"], files=len(paths))
+        return {key: value for key, value in item.items() if key != "files"} | {"file_count": len(paths)}
+
+    def start_backup(self, robot_id: str, paths: list[str] | None = None, max_depth: int = 8,
+                     attempt_ascii: bool = True) -> dict:
+        access = self.bridge._access(robot_id)
+        if not 0 <= max_depth <= 16:
+            raise ValueError("max_depth must be between 0 and 16")
+        if paths is not None:
+            if not 1 <= len(paths) <= self.bridge.config.max_backup_files:
+                raise ValueError("Selected path list is empty or exceeds the file limit")
+            paths = [self.bridge._path(robot_id, path) for path in paths]
+
+        def work(context):
+            folder = self.bridge._folder()
+            self.bridge._audit("backup_started", job_id=context.identifier, robot_id=robot_id)
+            with self.bridge._robot_lock(robot_id):
+                result = None
+                try:
+                    root = BackupService(ScopedReadBackend(self.bridge, robot_id), access.connection_profile()).run(
+                        folder, max_depth=max_depth, attempt_ascii=attempt_ascii, selected_paths=paths,
+                        maximum_file_bytes=self.bridge.config.max_file_bytes,
+                        maximum_total_bytes=self.bridge.config.max_backup_bytes,
+                        maximum_files=self.bridge.config.max_backup_files,
+                        checkpoint=context.check, validate_path=lambda p: self.bridge._path(robot_id, p),
+                        redact_errors=True, progress=lambda info: context.progress(info.get("message", "Capturing")))
+                    manifest = json.loads((root / "backup_manifest.json").read_text(encoding="utf-8"))
+                    result = {"complete": not manifest["warnings"] and not any(row.get("error") for row in manifest["records"]),
+                              "warnings": manifest["warnings"], "records": len(manifest["records"])}
+                finally:
+                    candidates = list(folder.glob("*/backup_manifest.json"))
+                    if candidates:
+                        item = self.store.register(candidates[0].parent, "workspace", robot_id=robot_id,
+                                                   note="Full/selected robot capture; inspect backup manifest for completeness")
+                        self.jobs.update(context.identifier, artifact_id=item["artifact_id"])
+                        if result is not None:
+                            result["artifact_id"] = item["artifact_id"]
+            self.bridge._audit("backup_finished", job_id=context.identifier, robot_id=robot_id, **result)
+            return result
+
+        return self.jobs.start("backup", robot_id, work)
+
+    def analyze(self, artifact_id: str, kind: str, offset=0, limit=100, query="") -> dict:
+        return WorkspaceService.analyze(self.store.verify(artifact_id), kind, offset, limit, query)
+
+    def compare(self, before: str, after: str, offset=0, limit=100) -> dict:
+        return WorkspaceService.compare(self.store.verify(before), self.store.verify(after), offset, limit)
+
+    def edit(self, artifact_id: str, relative: str, kind: str, target: str, value: dict) -> dict:
+        source = self.store.file(artifact_id, relative)
+        name = uuid.uuid4().hex + "/" + source.name
+        destination = confined(self.bridge.config.source_dir, name)
+        result = WorkspaceService.edit(source, destination, kind, target, value)
+        self.bridge._audit("offline_edit", artifact_id=artifact_id, source_file=name, kind=kind, target=target)
+        return {**result, "source_file": name, "original_artifact_id": artifact_id,
+                "sha256": hashlib.sha256(destination.read_bytes()).hexdigest()}
+
+    @staticmethod
+    def _watch_specs(expressions):
+        if not 1 <= len(expressions) <= 100 or any(not WATCH_RE.fullmatch(item) for item in expressions):
+            raise ValueError("Supply 1-100 supported watch expressions such as R[1], PR[1] or DI[1]")
+        for item in expressions:
+            match = WATCH_RE.fullmatch(item)
+            if int(match.group(2)) < 1 or (match.group(3) and (match.group(1).upper() != "PR" or int(match.group(3)) < 1)):
+                raise ValueError("Watch indices must be positive; only PR supports group,index")
+        return [WatchSpec(item) for item in expressions]
+
+    def _sample_clock(self, robot_id):
+        host = self.bridge._access(robot_id).profile.host.casefold()
+        key = hashlib.sha256(host.encode()).hexdigest()
+        return self.bridge.config.state_dir / "sample-clocks" / (key + ".json")
+
+    def _last_sample_time(self, robot_id):
+        path = self._sample_clock(robot_id)
+        if not path.exists():
+            return 0.0
+        try:
+            value = float(json.loads(path.read_text(encoding="utf-8"))["monotonic"])
+            if not math.isfinite(value):
+                raise ValueError()
+            return value if value <= time.monotonic() else 0.0
+        except (ValueError, KeyError):
+            raise ValueError("Sampling clock is unreadable; inspect bridge state") from None
+
+    def sample(self, robot_id: str, expressions: list[str], *, checkpoint=None) -> dict:
+        specs = self._watch_specs(expressions)
+        access = self.bridge._access(robot_id)
+        needed = set()
+        for spec in specs:
+            typ = WATCH_RE.fullmatch(spec.expression).group(1).upper()
+            needed.add("NUMREG.VA" if typ == "R" else "POSREG.VA" if typ == "PR" else "IOSTATE.DG")
+        with self.bridge._robot_lock(robot_id):
+            elapsed = time.monotonic() - self._last_sample_time(robot_id)
+            if elapsed < 2:
+                raise ValueError("Live samples must be at least two seconds apart")
+            self._last_sample[robot_id] = time.monotonic()
+            atomic_json(self._sample_clock(robot_id), {"monotonic": self._last_sample[robot_id]})
+            folder = self.bridge._folder()
+            unavailable = []
+            for name in sorted(needed):
+                for root in access.profile.roots:
+                    if checkpoint:
+                        checkpoint()
+                    remote = root + name if root.endswith(":") else root.rstrip("/") + "/" + name
+                    try:
+                        self.bridge._controller(robot_id).download_file(
+                            self.bridge._path(robot_id, remote), folder / name, maximum=self.bridge.config.max_file_bytes)
+                        break
+                    except Exception:
+                        continue
+                else:
+                    unavailable.append(name)
+            sample = WorkspaceSampleProvider(folder).sample(specs)
+            atomic_json(folder / "sample.json", serial(sample))
+            artifact = self.store.register(folder, "sample", robot_id=robot_id)
+            self.bridge._audit("sample_captured", robot_id=robot_id, artifact_id=artifact["artifact_id"])
+            return {**serial(sample), "artifact_id": artifact["artifact_id"], "unavailable_files": unavailable,
+                    "capture_is_atomic": False, "source": "controller-generated file evidence"}
+
+    def start_watch(self, robot_id: str, expressions: list[str], samples: int = 10,
+                    interval_seconds: float = 2.0, cycle_signal: str = "") -> dict:
+        self.bridge._access(robot_id)
+        self._watch_specs(expressions)
+        if not 1 <= samples <= 300 or not math.isfinite(interval_seconds) or not 2 <= interval_seconds <= 60:
+            raise ValueError("Use 1-300 samples and a finite interval between 2 and 60 seconds")
+        if cycle_signal and cycle_signal not in expressions:
+            raise ValueError("cycle_signal must be one of the watch expressions")
+
+        def work(context):
+            trend, timeline, cycle = TrendRecorder(), TimelineRecorder(), CycleRecorder()
+            folder = self.bridge._folder()
+            sample_ids = []
+            try:
+                with self.bridge._robot_lock(robot_id):
+                    for index in range(samples):
+                        context.progress(f"Sample {index + 1}/{samples}")
+                        remaining = max(0, interval_seconds - (time.monotonic() - self._last_sample_time(robot_id)))
+                        if context.cancel.wait(remaining):
+                            context.check()
+                        data = self.sample(robot_id, expressions, checkpoint=context.check)
+                        sample_ids.append(data["artifact_id"])
+                        sample = Sample(data["timestamp"], data["values"], data["errors"])
+                        trend.add(sample)
+                        timeline.add(sample)
+                        if cycle_signal:
+                            cycle.add_sample_state(sample, cycle_signal)
+            finally:
+                trend.export_csv(folder / "trend.csv")
+                timeline.export_csv(folder / "timeline.csv")
+                cycle.export_json(folder / "cycle.json")
+                atomic_json(folder / "recording.json", {"samples": serial(trend.samples), "events": serial(timeline.events),
+                                                        "cycle": serial(cycle.events), "sample_artifacts": sample_ids,
+                                                        "profile_seconds": profile_cycle(cycle.events)})
+                artifact = self.store.register(folder, "recording", robot_id=robot_id)
+                self.jobs.update(context.identifier, artifact_id=artifact["artifact_id"])
+            return {"artifact_id": artifact["artifact_id"], "samples": len(trend.samples), "profile_seconds": profile_cycle(cycle.events)}
+
+        return self.jobs.start("watch", robot_id, work)
+
+    def snapshot(self, workspace_id: str, note: str = "") -> dict:
+        root = self.store.verify(workspace_id)
+        destination = self.bridge._folder()
+        path = capture_snapshot(root, destination, note=note[:1000])
+        item = self.store.register(destination, "snapshot", note=note)
+        return {"artifact_id": item["artifact_id"], "file": path.name}
+
+    def compare_snapshots(self, before: str, after: str) -> dict:
+        def selected(identifier):
+            item = self.store.get(identifier)
+            if item["kind"] != "snapshot" or len(item["files"]) != 1:
+                raise ValueError("Supply snapshot artifact IDs")
+            return self.store.file(identifier, item["files"][0]["path"])
+        return page(compare_snapshots(selected(before), selected(after)))
+
+    def prepare_restore(self, robot_id: str, artifact_id: str, relative: str,
+                        remote: str, expected_sha256: str) -> dict:
+        self.bridge._path(robot_id, remote, write=True)
+        source = self.store.file(artifact_id, relative)
+        staged_name = uuid.uuid4().hex + "/" + source.name
+        destination = confined(self.bridge.config.source_dir, staged_name)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        result = self.bridge.prepare_upload(robot_id, remote, staged_name, expected_sha256)
+        return {**result, "restore_source_artifact": artifact_id, "restore_source_file": relative}
+
+    def audit(self, offset=0, limit=100) -> dict:
+        if offset < 0 or not 1 <= limit <= 500:
+            raise ValueError("Use offset >= 0 and limit between 1 and 500")
+        path = self.bridge.config.state_dir / "audit.jsonl"
+        rows = []
+        total = 0
+        if path.exists():
+            with path.open(encoding="utf-8") as stream:
+                for index, line in enumerate(stream):
+                    total = index + 1
+                    if offset <= index < offset + limit:
+                        rows.append(json.loads(line))
+        return {"items": rows, "total": total, "offset": offset}
+
+    def inspect_program(self, artifact_id: str, relative: str) -> dict:
+        from fanuc_workbench.services.xref import validate_ls, program_flow
+        root = self.store.verify(artifact_id)
+        path = self.store.file(artifact_id, relative)
+        if path.suffix.upper() != ".LS":
+            raise ValueError("Program inspection requires an LS listing")
+        return {"validation": validate_ls(path, root), "flow": program_flow(path)[:500],
+                "compiler_acceptance": "not_verified"}
+
+    def make_package(self, artifact_id: str, kind: str, files: list[str] | None = None) -> dict:
+        root = self.store.verify(artifact_id)
+        destination = self.bridge._folder()
+        if kind == "documentation":
+            from fanuc_workbench.services.documentation import export_all
+            export_all(root, destination)
+        elif kind == "roboguide":
+            from fanuc_workbench.services.roboguide import stage_backup_for_roboguide
+            stage_backup_for_roboguide(root, destination)
+        elif kind == "baseline":
+            from fanuc_workbench.services.commissioning import create_baseline
+            create_baseline(root, destination)
+        elif kind == "deployment":
+            if not files or len(files) > self.bridge.config.max_backup_files:
+                raise ValueError("Deployment packages require an explicit bounded file list")
+            manifest = []
+            for relative in files:
+                source = self.store.file(artifact_id, relative)
+                target = confined(destination, relative)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists():
+                    raise ValueError("Duplicate deployment file")
+                shutil.copyfile(source, target)
+                manifest.append({"file": relative, "sha256": hashlib.sha256(target.read_bytes()).hexdigest()})
+            atomic_json(destination / "deployment_manifest.json", {"source_artifact": artifact_id, "files": manifest,
+                                                                  "controller_acceptance": "not_verified"})
+        else:
+            raise ValueError("Package kind must be documentation, roboguide, baseline or deployment")
+        item = self.store.register(destination, kind, note="Offline package; no controller acceptance implied")
+        self.bridge._audit("package_created", artifact_id=item["artifact_id"], kind=kind, source_artifact=artifact_id)
+        return {"artifact_id": item["artifact_id"], "file_count": len(item["files"]), "controller_written": False}
+
+    def analyze_recording(self, artifact_id: str, kind: str = "cycle_profile", workspace_id: str = "",
+                          mapping: list[dict] | None = None, window_seconds: float = 2.0) -> dict:
+        from fanuc_workbench.services.monitoring import TimelineEvent, CycleEvent
+        from fanuc_workbench.services.handshake import HandshakeSignal, analyze_handshake
+        from fanuc_workbench.services.diagnostics import alarm_intelligence
+        if self.store.get(artifact_id)["kind"] != "recording":
+            raise ValueError("Supply a recording artifact ID")
+        if not math.isfinite(window_seconds) or not 0 < window_seconds <= 120:
+            raise ValueError("window_seconds must be finite and in (0, 120]")
+        data = json.loads(self.store.file(artifact_id, "recording.json").read_text(encoding="utf-8"))
+        events = [TimelineEvent(**item) for item in data["events"]]
+        if kind == "cycle_profile":
+            return {"profile_seconds": profile_cycle([CycleEvent(**item) for item in data["cycle"]])}
+        if kind == "handshake":
+            if not mapping or len(mapping) > 100:
+                raise ValueError("Supply 1-100 handshake mappings")
+            rows = [HandshakeSignal(**item) for item in mapping]
+            return page(analyze_handshake(events, rows, window_seconds))
+        if kind == "alarm_correlation":
+            return page(alarm_intelligence(self.store.verify(workspace_id), events, window_seconds))
+        raise ValueError("Recording analysis must be cycle_profile, handshake or alarm_correlation")
+
+    def compare_recordings(self, before: str, after: str) -> dict:
+        from fanuc_workbench.services.monitoring import compare_cycle_profiles
+        a = self.analyze_recording(before)["profile_seconds"]
+        b = self.analyze_recording(after)["profile_seconds"]
+        return page(compare_cycle_profiles(a, b))
+
+    @staticmethod
+    def transform_pose(pose: list[float], old_frame: list[float], new_frame: list[float]) -> dict:
+        from fanuc_workbench.services.transforms import transform_pose_between_frames
+        for values in (pose, old_frame, new_frame):
+            if len(values) != 6 or any(not math.isfinite(value) for value in values):
+                raise ValueError("Poses require six finite X,Y,Z,W,P,R values")
+        return {"pose": transform_pose_between_frames(pose, old_frame, new_frame),
+                "convention": "Rz(R) Ry(P) Rx(W)", "controller_written": False, "physical_validation": "pending"}

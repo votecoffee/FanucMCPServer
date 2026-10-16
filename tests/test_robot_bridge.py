@@ -342,8 +342,10 @@ def test_mcp_stdio_handshake_schemas_and_readonly_policy(tmp_path):
             await session.initialize()
             listed = await session.list_tools()
             tools = {tool.name: tool for tool in listed.tools}
-            assert set(tools) == {"list_robots", "list_files", "read_file", "collect_logs",
-                                  "prepare_upload", "commit_upload", "cancel_upload"}
+            assert {"list_robots", "list_files", "read_file", "collect_logs", "prepare_upload", "commit_upload",
+                    "cancel_upload", "start_backup", "sample_robot", "analyze_workspace", "start_watch",
+                    "job_status", "read_artifact", "read_audit", "prepare_restore_file"} <= set(tools)
+            assert "ctx" not in tools["commit_upload"].inputSchema["properties"]
             assert tools["read_file"].annotations.readOnlyHint
             assert tools["commit_upload"].annotations.destructiveHint
             assert tools["commit_upload"].annotations.idempotentHint is False

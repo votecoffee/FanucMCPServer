@@ -2,7 +2,10 @@
   "state_dir": "robot-evidence",
   "source_dir": "robot-edits",
   "allow_writes": false,
+  "approval_mode": "elicitation",
   "max_file_bytes": 16777216,
+  "max_backup_files": 5000,
+  "max_backup_bytes": 536870912,
   "plan_ttl_seconds": 900,
   "robots": {
     "robot1": {

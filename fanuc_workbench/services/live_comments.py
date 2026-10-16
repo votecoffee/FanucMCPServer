@@ -3,9 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
+from urllib.request import Request, HTTPRedirectHandler, build_opener
 
 from fanuc_workbench.parsers.comments import CommentRecord
+
+
+class _NoWriteRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, new_url):
+        raise HTTPError(request.full_url, code, "Controller write redirects are refused", headers, response)
 
 
 # FANUC KAREL ComSet sFc values used by the controller's HTTP comment utility.
@@ -68,7 +73,7 @@ def set_live_comment(host: str, record: CommentRecord, comment: str, timeout: fl
     url = build_comset_url(host, target, comment)
     request = Request(url, method="GET")
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with build_opener(_NoWriteRedirect()).open(request, timeout=timeout) as response:
             status = getattr(response, "status", 200)
             if status != 200:
                 raise RuntimeError(f"FANUC ComSet returned HTTP {status}")
