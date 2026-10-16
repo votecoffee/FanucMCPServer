@@ -114,7 +114,7 @@ def validate_data(schema, value, *, maximum=MAX_REQUEST):
         raise ValueError("Operation data does not match its declared schema")
 
 
-def load_release(root: Path, expected: str | None = None) -> tuple[dict, str]:
+def load_release(root: Path, expected: str | None = None, *, packaged=False) -> tuple[dict, str]:
     root = root.resolve()
     if not root.is_dir():
         raise ValueError("Extension release directory is missing")
@@ -138,7 +138,10 @@ def load_release(root: Path, expected: str | None = None) -> tuple[dict, str]:
     if entrypoint not in files or not isinstance(entrypoint, str) or not entrypoint.endswith(".py"):
         raise ValueError("The Python entrypoint must be manifest-listed")
     expected_files = {"extension.json", *files}
-    actual_files = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
+    # Pip may compile bundled Python data. These caches are never captured or
+    # executed: this exception applies only while seeding the trusted host bundle.
+    actual_files = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()
+                    and not (packaged and p.parent.name == "__pycache__" and p.suffix == ".pyc")}
     if expected_files != actual_files:
         raise ValueError("Release contains missing or unlisted files")
     total = 0
@@ -220,13 +223,13 @@ def load_registry(root: Path) -> list[dict]:
     return rows
 
 
-def install_release(root: Path, source: Path, python: Path | None = None, *, bootstrap=False) -> dict:
+def install_release(root: Path, source: Path, python: Path | None = None, *, bootstrap=False, packaged=False) -> dict:
     """Operator-only staging. No code execution, overwrite, activation or robot contact."""
     root = root.absolute()
     root.mkdir(parents=True, exist_ok=True)
     if root.resolve() != root:
         raise ValueError("Extension state cannot be a redirected directory")
-    manifest, checksum = load_release(source)
+    manifest, checksum = load_release(source, packaged=packaged)
     interpreter = (python or Path(sys.executable)).absolute()
     if not interpreter.is_file():
         raise ValueError("Extension interpreter is missing")

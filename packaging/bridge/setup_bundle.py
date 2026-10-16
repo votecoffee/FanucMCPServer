@@ -118,7 +118,7 @@ def main():
     packages = list(wheels.glob("fanuc_workbench_bridge-*.whl"))
     if len(packages) != 1:
         raise ValueError("Bundle must contain exactly one FANUC bridge wheel")
-    subprocess.run([str(python), "-m", "pip", "install", "--no-index", "--find-links", str(wheels),
+    subprocess.run([str(python), "-B", "-m", "pip", "install", "--no-compile", "--no-index", "--find-links", str(wheels),
                     "--upgrade", "--force-reinstall", str(packages[0])], check=True, env=environment)
     subprocess.run([str(python), "-m", "pip", "check"], check=True, env=environment)
     if not config.exists():

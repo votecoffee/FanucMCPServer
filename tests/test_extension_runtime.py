@@ -47,6 +47,20 @@ def test_local_install_is_pinned_preserves_versions_and_does_not_overwrite(tmp_p
     assert (target / 'feature.py').read_bytes() == original
 
 
+def test_packaged_seed_never_copies_or_executes_pip_bytecode(tmp_path):
+    source = tmp_path / 'installed-package'
+    release(source)
+    cache = source / '__pycache__'
+    cache.mkdir()
+    (cache / 'feature.cpython-314.pyc').write_bytes(b'never executable')
+    with pytest.raises(ValueError, match='unlisted'):
+        load_release(source)
+    install_release(tmp_path / 'state', source, bootstrap=True, packaged=True)
+    target = tmp_path / 'state/releases/demo/1.0.0'
+    load_release(target)
+    assert not (target / '__pycache__').exists()
+
+
 @pytest.mark.parametrize('mutation', [
     lambda m: m.update(host_api=2),
     lambda m: m.update(id='core'),

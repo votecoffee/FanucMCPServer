@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import os
 import sys
 import threading
 import uuid
@@ -69,7 +70,7 @@ class ExtensionHost:
             raise ValueError("Extension state cannot redirect outside bridge state")
         if not (self.root / "registry.json").exists():
             builtin = Path(__file__).resolve().parents[1] / "extensions" / "analysis"
-            install_release(self.root, builtin, bootstrap=True)
+            install_release(self.root, builtin, bootstrap=True, packaged=True)
         return load_registry(self.root)
 
     @staticmethod
@@ -86,7 +87,7 @@ class ExtensionHost:
 
     def status(self):
         with self.lock:
-            return {"host_api": HOST_API, "loaded": self.current is not None,
+            return {"host_api": HOST_API, "host_pid": os.getpid(), "loaded": self.current is not None,
                     "generation": self.current.fingerprint if self.current else None,
                     "extensions": [{"id": key, "version": worker.manifest["version"],
                                     "manifest_sha256": worker.checksum, "worker_pid": worker.pid,
@@ -159,7 +160,7 @@ class ExtensionHost:
                 return {"status": "loaded" if initial else "reloaded", "invalidated_upload_plans": uploads,
                         "invalidated_comment_plans": comments, "controller_contacted": False,
                         "mcp_tools_changed": False, **self.status()}
-            except Exception as exc:
+            except Exception:
                 if candidate is not None:
                     candidate.close()
                 # Local metadata and exception text may contain private paths/data.
