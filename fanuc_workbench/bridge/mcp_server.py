@@ -82,6 +82,43 @@ def create_server(bridge: RobotBridge):
     class UploadApproval(BaseModel):
         approve: bool
 
+    @server.tool(annotations=read)
+    def list_operations(offset: int = 0, limit: int = 100) -> dict:
+        """Discover versioned feature operations behind this fixed MCP host. No controller contact."""
+        return bridge.extensions.list(offset, limit)
+
+    @server.tool(annotations=read)
+    def describe_operation(operation_id: str) -> dict:
+        """Read an operation's exact revision, effect, argument schema and result schema before invoking it."""
+        return bridge.extensions.describe(operation_id)
+
+    @server.tool(annotations=read)
+    def run_read_operation(operation_id: str, arguments: dict, revision: str) -> dict:
+        """Run a discovered offline read at its exact revision using verified saved evidence. Cannot prepare or commit writes."""
+        return bridge.extensions.run_read(operation_id, arguments, revision)
+
+    @server.tool(annotations=local)
+    def prepare_change(operation_id: str, arguments: dict, revision: str) -> dict:
+        """Compute and freeze a discovered file/description proposal under existing core policy. Review exact diff/hash; no controller write."""
+        return bridge.extensions.prepare(operation_id, arguments, revision)
+
+    @server.tool(annotations=local)
+    def reload_extensions() -> dict:
+        """Validate operator-staged local releases and atomically switch feature workers. No paths/code arguments or controller contact; changed reload invalidates plans."""
+        return bridge.extensions.reload()
+
+    @server.tool(annotations=write)
+    async def commit_change(plan_id: str, approved_sha256: str, ctx: Context) -> dict:
+        """After explicit approval of the exact frozen file/description proposal, use core preflight, commit and verified controller readback."""
+        import asyncio
+        if bridge.config.approval_mode == "elicitation":
+            review = bridge.change_review(plan_id, approved_sha256)
+            confirmation = await ctx.elicit(message="Approve this robot change? " + str(review), schema=UploadApproval)
+            if confirmation.action != "accept" or confirmation.data is None or not confirmation.data.approve:
+                raise ValueError("Change was not approved by the MCP client")
+            return await asyncio.to_thread(bridge.commit_change, plan_id, approved_sha256, client_approved=True)
+        return await asyncio.to_thread(bridge.commit_change, plan_id, approved_sha256)
+
     @server.tool(annotations=write)
     async def commit_upload(plan_id: str, approved_sha256: str, ctx: Context) -> dict:
         """After explicit approval, commit a prepared file create or replacement with preflight and exact byte readback."""

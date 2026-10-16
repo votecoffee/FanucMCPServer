@@ -69,6 +69,67 @@ schemas, host protocol, plugin metadata or skills still requires the appropriate
 client/plugin update. The existing 0.6/0.7 host must be updated once to acquire
 this extension interface. No Codex restart is performed by extension reload.
 
+## Operator commands
+
+The 0.8 host advertises 48 permanent MCP tools. Its bundled release moves all
+20 workspace analyses into the feature worker. The remaining controller,
+storage and approval services stay in the host. `analyze_workspace` preserves
+its existing arguments/results and delegates to that release.
+
+Use the headless runtime's interpreter for the local staging command:
+
+```powershell
+python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json list
+python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/RobotTools/MyFeature/1.1.0
+```
+
+Then ask the chat to call `reload_extensions`, followed by `list_operations`
+and `describe_operation`. New operations appear in this catalog during the
+same MCP session. No plugin reinstall, tool-list refresh or Codex restart is
+needed for features compatible with host API 1. Reinstalling a previously
+preserved release selects that version for the next reload, providing rollback.
+Keep versions immutable; changed bytes require a new version.
+
+`install ... --python C:/RobotTools/FeatureVenv/Scripts/python.exe` selects an
+independent interpreter for that release's dependencies. Install dependencies
+into that dedicated environment before staging; neither staging nor reload runs
+pip. This keeps feature dependency updates out of the host environment.
+
+Use `fanuc_workbench/extensions/analysis/extension.json` as a complete manifest
+example. A small read-only handler looks like:
+
+```python
+def self_test():
+    return True
+
+def handle(operation_id, arguments, context):
+    return {"message": arguments["message"]}
+```
+
+Give it a namespaced ID such as `cell.report`, a new release version and a
+`cell.report.echo` operation with `effect: "read"`. Declare object JSON Schemas
+for input/output and SHA-256 hashes of exact support-file bytes. Contexts can
+bind required artifact IDs to verified workspace/recording/snapshot paths.
+The handler receives no bridge object, controller connection or credentials.
+Prepared operations use `effect: "prepare"` and one of `file_replace`,
+`file_create`, or `comment_update` as `proposal_kind`. File proposals return
+only `data_base64` and `sha256`; description proposals return only `comment`.
+The host fixes robot/path/target from the validated request and freezes the
+result in its existing prepared plan. For replacement, required arguments are
+`robot_id`, `path`, `expected_sha256`; creation omits the hash. Description
+preparation requires `robot_id`, `listing_path`, `target`, `expected_sha256`.
+
+Requests are limited to 1 MiB including their envelope; responses to 4 MiB.
+Worker startup/self-test is bounded at 15 seconds and each call at 30 seconds.
+A crashed/timed-out worker remains unavailable until explicit reload. Reloading
+the same selected release recovers an unhealthy worker and invalidates plans.
+An unchanged healthy selection keeps its PID and pending plans.
+
+Release snapshots and prior versions remain in state for inspection. Remove
+obsolete versions only while the host is stopped and after preserving needed
+evidence. Extension execution is trusted local code; minimal environment and
+separate processes do not prevent it from accessing local OS resources.
+
 Codex separately documents `config/mcpServer/reload` for refreshing its MCP
 configuration. That client mechanism is separate from feature-worker reload:
 https://learn.chatgpt.com/docs/app-server

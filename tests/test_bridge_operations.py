@@ -349,7 +349,8 @@ def test_connection_failures_close_ftp_and_sftp_clients(monkeypatch):
 
 
 @pytest.mark.parametrize("client_supports_confirmation", [False, True])
-def test_mcp_client_confirmation_cannot_be_replaced_by_tool_arguments(tmp_path, client_supports_confirmation):
+@pytest.mark.parametrize("commit_tool", ["commit_upload", "commit_change"])
+def test_mcp_client_confirmation_cannot_be_replaced_by_tool_arguments(tmp_path, client_supports_confirmation, commit_tool):
     pytest.importorskip("mcp")
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
@@ -414,10 +415,10 @@ finally: bridge.close()
             assert not prepared.isError
             plan = json.loads(prepared.content[0].text)
             args = {"plan_id": plan["plan_id"], "approved_sha256": plan["proposed_sha256"]}
-            denied = await session.call_tool("commit_upload", args)
+            denied = await session.call_tool(commit_tool, args)
             assert denied.isError and not uploaded.exists()
             if client_supports_confirmation:
-                accepted = await session.call_tool("commit_upload", args)
+                accepted = await session.call_tool(commit_tool, args)
                 assert not accepted.isError and uploaded.exists()
                 assert all(plan["proposed_sha256"] in message and "md:MAIN.LS" in message for message in messages)
 

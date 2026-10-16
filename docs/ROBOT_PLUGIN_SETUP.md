@@ -41,6 +41,12 @@ it does not install dependencies or contact a controller on its own. Configurati
 and evidence live outside the plugin cache. Public marketplace submission and
 native Codex confirmation UI acceptance remain pending.
 
+The 0.8 host supports feature reload behind a stable MCP interface. See
+[ROBOT_EXTENSIONS.md](ROBOT_EXTENSIONS.md) for local staging, dependency isolation,
+reload, rollback and the operation catalog. Updating an older host to this
+interface is a one-time client/plugin update; later compatible feature changes
+use `reload_extensions` in the existing session.
+
 ## Configure a controller
 
 The initial runtime JSON contains zero robots, writes disabled and elicitation

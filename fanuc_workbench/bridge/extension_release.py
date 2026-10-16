@@ -68,7 +68,7 @@ def relative_file(root: Path, value: str) -> Path:
                     *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}):
             raise ValueError("Invalid release file component")
     result = root.joinpath(*value.split("/"))
-    if not result.resolve().is_relative_to(root.resolve()):
+    if not result.resolve().is_relative_to(root.resolve()) or result.resolve() != result.absolute():
         raise ValueError("Release path is outside its directory")
     return result
 
@@ -220,17 +220,19 @@ def load_registry(root: Path) -> list[dict]:
     return rows
 
 
-def install_release(root: Path, source: Path, python: Path | None = None) -> dict:
+def install_release(root: Path, source: Path, python: Path | None = None, *, bootstrap=False) -> dict:
     """Operator-only staging. No code execution, overwrite, activation or robot contact."""
     root = root.absolute()
     root.mkdir(parents=True, exist_ok=True)
     if root.resolve() != root:
         raise ValueError("Extension state cannot be a redirected directory")
     manifest, checksum = load_release(source)
-    interpreter = (python or Path(sys.executable)).resolve()
+    interpreter = (python or Path(sys.executable)).absolute()
     if not interpreter.is_file():
         raise ValueError("Extension interpreter is missing")
     with RobotLocks(root / "installer-locks").acquire("registry"):
+        if bootstrap and (root / "registry.json").exists():
+            return {"status": "existing_registry", "controller_contacted": False}
         target = release_path(root, manifest["id"], manifest["version"])
         if target.exists():
             load_release(target, checksum)
@@ -255,3 +257,20 @@ def install_release(root: Path, source: Path, python: Path | None = None) -> dic
             raise ValueError("Too many selected extensions")
         atomic_json(root / "registry.json", {"schema_version": 1, "extensions": rows})
         return {**selected, "status": "staged_only", "controller_contacted": False}
+
+
+def snapshot_release(source: Path, target: Path, expected: str) -> dict:
+    manifest, _ = load_release(source, expected)
+    target.mkdir(parents=True)
+    for relative in [*manifest["files"], "extension.json"]:
+        maximum = 262144 if relative == "extension.json" else 4 * 1024 * 1024
+        with relative_file(source, relative).open("rb") as stream:
+            data = stream.read(maximum + 1)
+        if len(data) > maximum:
+            raise ValueError("Source grew while taking an extension snapshot")
+        path = relative_file(target, relative)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("xb") as stream:
+            stream.write(data)
+    copied, _ = load_release(target, expected)
+    return copied

@@ -1,7 +1,7 @@
 # FANUC Workbench robot bridge (expanded development version)
 
 The GUI, local Python API and MCP adapter share controller, parser and analysis
-services. The server now exposes 42 tools. No physical robot has been contacted;
+services. The server now exposes 48 tools. No physical robot has been contacted;
 native acceptance remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 
 ## Setup
@@ -66,6 +66,7 @@ ordinary local files, not a tamper-proof ledger.
 
 | Area | Tools |
 | --- | --- |
+| Reloadable features | list_operations, describe_operation, run_read_operation, prepare_change, commit_change, reload_extensions |
 | Discovery/files | list_robots, capabilities, reload_connections, probe_robot, list_files, read_file, read_captured_file, collect_logs |
 | Artifacts | import_workspace, list_artifacts, artifact_files, read_artifact |
 | Backups/jobs | start_backup, start_fleet_backup, job_status, list_jobs, cancel_job |

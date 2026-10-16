@@ -1,0 +1,812 @@
+{
+  "schema_version": 1,
+  "id": "workbench.analysis",
+  "version": "1.0.0",
+  "host_api": 1,
+  "entrypoint": "feature.py",
+  "files": {
+    "feature.py": "ce48c44b13599fac05368c33d69ed3cefd07aa80167650f853f421bebf223eb9"
+  },
+  "operations": [
+    {
+      "id": "workbench.analysis.health",
+      "description": "Analyze preserved workspace evidence: health",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.options",
+      "description": "Analyze preserved workspace evidence: options",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.alarms",
+      "description": "Analyze preserved workspace evidence: alarms",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.alarm_intelligence",
+      "description": "Analyze preserved workspace evidence: alarm_intelligence",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.mastering",
+      "description": "Analyze preserved workspace evidence: mastering",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.dcs",
+      "description": "Analyze preserved workspace evidence: dcs",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.ethernetip",
+      "description": "Analyze preserved workspace evidence: ethernetip",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.lint",
+      "description": "Analyze preserved workspace evidence: lint",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.programs",
+      "description": "Analyze preserved workspace evidence: programs",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.dependencies",
+      "description": "Analyze preserved workspace evidence: dependencies",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.unused_programs",
+      "description": "Analyze preserved workspace evidence: unused_programs",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.xref",
+      "description": "Analyze preserved workspace evidence: xref",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.register_usage",
+      "description": "Analyze preserved workspace evidence: register_usage",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.comments",
+      "description": "Analyze preserved workspace evidence: comments",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.positions",
+      "description": "Analyze preserved workspace evidence: positions",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.variables",
+      "description": "Analyze preserved workspace evidence: variables",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.numeric_registers",
+      "description": "Analyze preserved workspace evidence: numeric_registers",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.position_registers",
+      "description": "Analyze preserved workspace evidence: position_registers",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.frames",
+      "description": "Analyze preserved workspace evidence: frames",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    },
+    {
+      "id": "workbench.analysis.io",
+      "description": "Analyze preserved workspace evidence: io",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "artifact_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "workspace",
+          "argument": "artifact_id",
+          "kind": "any"
+        }
+      ]
+    }
+  ]
+}

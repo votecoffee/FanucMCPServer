@@ -18,7 +18,11 @@ mcp = ["mcp>=1.30,<2"]
 fanuc-workbench = "fanuc_workbench.app:main"
 fanuc-workbench-mcp = "fanuc_workbench.bridge.mcp_server:main"
 fanuc-workbench-doctor = "fanuc_workbench.bridge.doctor:main"
+fanuc-workbench-extension = "fanuc_workbench.bridge.extensions_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["fanuc_workbench*"]
+
+[tool.setuptools.package-data]
+fanuc_workbench = ["extensions/**/*.json", "extensions/**/*.py"]

@@ -72,6 +72,10 @@ class WorkbenchOperations:
                                        "source": "bound local configuration file only",
                                        "policy_changes": "refused", "pending_plans": "invalidated on endpoint changes",
                                        "active_operations_and_jobs": "refused; finish first"},
+                "feature_extensions": {**self.bridge.extensions.status(),
+                                       "catalog": "list_operations and describe_operation",
+                                       "reload": "reload_extensions; fixed MCP tool schemas",
+                                       "code_trust": "trusted local releases; process isolation is not a sandbox"},
                 "uploads": "existing exact-allowlisted application files; new exact-allowlisted TXT/CSV storage files outside MD:",
                 "storage_file_creation": {"extensions": [".TXT", ".CSV"], "md_device": "refused",
                                           "atomic_no_clobber": False, "approval": "prepared change and configured client confirmation"},
@@ -250,7 +254,7 @@ class WorkbenchOperations:
         return self.jobs.start("backup", robot_id, work)
 
     def analyze(self, artifact_id: str, kind: str, offset=0, limit=100, query="") -> dict:
-        return WorkspaceService.analyze(self.store.verify(artifact_id), kind, offset, limit, query)
+        return self.bridge.extensions.legacy_analysis(artifact_id, kind, offset, limit, query)
 
     def compare(self, before: str, after: str, offset=0, limit=100) -> dict:
         return WorkspaceService.compare(self.store.verify(before), self.store.verify(after), offset, limit)

@@ -19,6 +19,16 @@ discard pending plans. The tool cannot change write/approval policy or credentia
 Do not edit configuration to bypass a refusal. Older server versions need a
 normal reconnect before the refresh tool becomes available.
 
+For feature operations, use `list_operations` and `describe_operation`, then pass
+the exact returned revision and schema-valid arguments to `run_read_operation`
+or `prepare_change`. Existing named tools remain supported. After an operator
+stages a trusted local release, `reload_extensions` replaces feature workers
+without changing the MCP connection or its tool schemas. Finish active robot
+operations/jobs first. A changed reload discards pending plans; retrieve and
+prepare them again. Failed reloads preserve the active features and plans.
+Extensions cannot introduce arbitrary native write classes; `commit_change`
+uses the same exact-proposal approval and core verification as the named tools.
+
 For troubleshooting, retrieve relevant files/logs or start a bounded backup.
 Follow job status, inspect capture completeness and unavailable-file errors, and
 use artifact IDs for analysis. Retain source hashes and distinguish captured

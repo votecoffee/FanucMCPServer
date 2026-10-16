@@ -63,6 +63,8 @@ class RobotBridge:
         self.operations = WorkbenchOperations(self)
         from fanuc_workbench.bridge.comments import CommentChanges
         self.comments = CommentChanges(self)
+        from fanuc_workbench.bridge.extension_host import ExtensionHost
+        self.extensions = ExtensionHost(self)
 
     @classmethod
     def from_config(cls, path: Path, backend_factory=create_backend):
@@ -71,6 +73,7 @@ class RobotBridge:
 
     def close(self):
         self.operations.jobs.close()
+        self.extensions.close()
 
     def __enter__(self):
         return self
@@ -85,6 +88,18 @@ class RobotBridge:
                 self._audit("comment_cancelled", plan_id=plan_id)
                 return {"plan_id": plan_id, "status": "cancelled"}
             return self.cancel_upload(plan_id)
+
+    def change_review(self, plan_id: str, approved_sha256: str) -> dict:
+        with self._lock:
+            if plan_id in self.comments.plans:
+                return self.comments.review(plan_id, approved_sha256)
+            return self.upload_review(plan_id, approved_sha256)
+
+    def commit_change(self, plan_id: str, approved_sha256: str, *, client_approved=False) -> dict:
+        with self._lock:
+            if plan_id in self.comments.plans:
+                return self.comments.commit(plan_id, approved_sha256, client_approved=client_approved)
+            return self.commit_upload(plan_id, approved_sha256, client_approved=client_approved)
 
     @contextmanager
     def _robot_lock(self, robot_id: str):
