@@ -1,3 +1,11 @@
+# Private notes, controller configuration, captures and local test reports.
+/.local/
+*.local.json
+.env
+.env.*
+!.env.example
+
+# Environments and generated build/test files.
 /.venv/
 /.pytest_cache/
 /build/
