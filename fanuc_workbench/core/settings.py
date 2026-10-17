@@ -13,12 +13,14 @@ class SettingsStore:
         base = Path(QStandardPaths.writableLocation(QStandardPaths.AppConfigLocation))
         base.mkdir(parents=True, exist_ok=True)
         self.path = base / "profiles.json"
+        self.legacy_path = base.parent / "FANUC Workbench" / "profiles.json"
 
     def load_profiles(self) -> list[RobotProfile]:
-        if not self.path.exists():
+        source = self.path if self.path.exists() else self.legacy_path
+        if not source.exists():
             return []
         try:
-            payload = json.loads(self.path.read_text(encoding="utf-8"))
+            payload = json.loads(source.read_text(encoding="utf-8"))
             return [RobotProfile.from_dict(item) for item in payload.get("profiles", [])]
         except Exception:
             return []

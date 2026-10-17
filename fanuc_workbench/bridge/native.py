@@ -209,7 +209,7 @@ class NativeChanges:
             if before != reference["value"]:
                 raise ValueError("Native program changed; retrieve and review it again")
             if before["exists"] and before["program"]["protection"] != 0:
-                raise ValueError("Native program is protected; Workbench will not change protection")
+                raise ValueError("Native program is protected; FanucMCPServer will not change protection")
             (folder / ("proposed_" + name + ".LS")).write_bytes(data)
             proposal.update(source_text=data.decode("ascii")[:32768], source_preview_truncated=len(data)>32768,
                 operation="replace" if before["exists"] else "create", executed=False,

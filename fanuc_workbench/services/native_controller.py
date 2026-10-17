@@ -20,7 +20,7 @@ class NativeControllerService:
         if sys.platform != "win32":
             raise RuntimeError("The FRRobot provider requires Windows and a licensed FANUC Robot Object installation")
         if importlib.util.find_spec("pythoncom") is None:
-            raise RuntimeError("Native FANUC access needs pywin32; install this version's Workbench dependencies")
+            raise RuntimeError("Native FANUC access needs pywin32; install this version's FanucMCPServer dependencies")
         bootstrap = Path(__file__).resolve().parents[1] / "bridge" / "native_worker.py"
         self.worker = RpcProcess([sys.executable, "-B", str(bootstrap), "--host", profile.host],
             {"provider": "frrobot"}, operation_timeout=min(120, max(10, profile.timeout * 3)))

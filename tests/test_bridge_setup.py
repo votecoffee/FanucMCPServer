@@ -105,7 +105,7 @@ def test_plugin_launcher_handles_paths_with_spaces(tmp_path):
 
     root = tmp_path / 'Plugin With Spaces'
     (root / 'server').mkdir(parents=True)
-    source = Path(__file__).resolve().parents[1] / 'plugins/fanuc-workbench/server/launch.py'
+    source = Path(__file__).resolve().parents[1] / 'plugins/fanuc-mcp-server/server/launch.py'
     launcher = root / 'server/launch.py'
     shutil.copyfile(source, launcher)
     config = root / 'Config With Spaces.json'

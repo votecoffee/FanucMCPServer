@@ -28,7 +28,7 @@ reported through `capabilities`.
 | Transformations | Finite six-axis frame conversion | Calculation only; physical verification pending |
 | Documentation | HTML/XLSX/PDF packages | Offline artifacts |
 | ROBOGUIDE | FTP/TCP file access, analysis and preserved handoff package | Explicit virtual-controller endpoints; no Windows automation required |
-| Fleet | Configured robots, reachability probes and grouped independent backup jobs | Scheduling stays in Workbench/host; no scheduler installed |
+| Fleet | Configured robots, reachability probes and grouped independent backup jobs | Scheduling stays in FanucMCPServer/host; no scheduler installed |
 | Project/cell | Project metadata versions, backup association, PLC tag maps and deployment packages | New local artifacts; originals preserved |
 | Local plugin setup | Offline wheels, stable runtime, launcher, skill, CLI registration and MCP doctor | Windows/Python-version-specific bundle; public distribution unverified |
 | New jobs/artifacts | History, cancellation, interruption after restart, artifact ranges and audit | No blind write retry or automatic recovery |

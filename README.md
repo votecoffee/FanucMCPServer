@@ -1,6 +1,14 @@
-# FANUC Workbench 2.1
+# FanucMCPServer 2.1
+
+Repository: [votecoffee/FanucMCPServer](https://github.com/votecoffee/FanucMCPServer).
 
 A modular Python/PySide6 engineering workbench for FANUC robot backup, offline analysis/editing, live troubleshooting, commissioning, fleet maintenance, integration documentation, and controlled restore.
+
+Renamed from FANUC Workbench. New installs use `fanuc-mcp-server` (GUI/shared
+services) or `fanuc-mcp-server-bridge` (headless runtime). The `fanuc-mcp-server`
+command starts MCP; `fanuc-mcp-server-gui` starts the GUI. Existing
+`fanuc_workbench` Python imports, SDK entry points, and `fanuc-workbench*`
+commands remain compatible. See [upgrade notes](docs/ROBOT_PLUGIN_SETUP.md#name-change-and-existing-installations).
 
 ## New in 2.1 development
 
@@ -21,10 +29,10 @@ and [reloadable features](docs/ROBOT_EXTENSIONS.md).
 
 This release adds the requested follow-on features **1–12, 14, 16, 17, 21, 22, 27, and 39** on top of the v1.0 feature set.
 
-1. **ROBOGUIDE integration** — discover/browse the ROBOGUIDE executable, stage an active FANUC backup into a virtual-controller handoff folder, optionally open a workcell, and launch ROBOGUIDE. Workbench intentionally does not automate unverified private ROBOGUIDE UI/COM interfaces.
+1. **ROBOGUIDE integration** — discover/browse the ROBOGUIDE executable, stage an active FANUC backup into a virtual-controller handoff folder, optionally open a workcell, and launch ROBOGUIDE. FanucMCPServer intentionally does not automate unverified private ROBOGUIDE UI/COM interfaces.
 2. **SFTP backend** — robot profiles can use FTP or SFTP. SFTP uses Paramiko/SSH, system host keys, unknown-host rejection by default, and explicit TOFU opt-in.
 3. **Fleet backup manager** — load configured robot profiles, select multiple robots, and back them up as one operation with per-robot status/change counts.
-4. **Scheduled backups + change alerts** — in-app scheduler with per-robot minute intervals; each completed backup is compared to the prior backup and marked `CHANGED` when differences are detected. The scheduler runs while Workbench is open.
+4. **Scheduled backups + change alerts** — in-app scheduler with per-robot minute intervals; each completed backup is compared to the prior backup and marked `CHANGED` when differences are detected. The scheduler runs while FanucMCPServer is open.
 5. **Live Watch table** — watch `R[]`, `PR[]`, and common FANUC I/O tokens. Source can be the active workspace or bounded live polling of controller-generated `NUMREG.VA`, `POSREG.VA`, and `IOSTATE.DG` files.
 6. **Signal/register trend recorder** — in-app numeric plot plus CSV export of captured samples.
 7. **I/O timeline recorder** — records value transitions with millisecond timestamps and exports CSV.
@@ -55,7 +63,7 @@ This release adds the requested follow-on features **1–12, 14, 16, 17, 21, 22,
 
 ## Live data model
 
-Workbench deliberately avoids undocumented controller web-page scraping. The built-in live provider polls human-readable controller-generated files at a **minimum two-second interval** and reports unavailable signals instead of fabricating data. The provider interface is designed so an OPC UA or verified KAREL/HTTPS implementation can be installed later without changing the UI.
+FanucMCPServer deliberately avoids undocumented controller web-page scraping. The built-in live provider polls human-readable controller-generated files at a **minimum two-second interval** and reports unavailable signals instead of fabricating data. The provider interface is designed so an OPC UA or verified KAREL/HTTPS implementation can be installed later without changing the UI.
 
 ## Safety model
 

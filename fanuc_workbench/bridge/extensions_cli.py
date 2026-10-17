@@ -10,7 +10,7 @@ from fanuc_workbench.bridge.extension_release import install_release, load_regis
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Stage trusted local Workbench feature releases (no robot contact)")
+    parser = argparse.ArgumentParser(description="Stage trusted local FanucMCPServer feature releases (no robot contact)")
     parser.add_argument("--config", type=Path, required=True)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="Read the selected local registry without activating code")

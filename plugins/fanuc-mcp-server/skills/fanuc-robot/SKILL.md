@@ -1,11 +1,11 @@
 ---
 name: fanuc-robot
-description: "Inspect FANUC robot files and diagnostic evidence, manage Workbench backups and local workspaces, and prepare reviewed application-file or description changes using the local FANUC Workbench MCP server. Use for this robot integration; not for general robotics questions or unsupported motion commands."
+description: "Inspect FANUC robot files and diagnostic evidence, manage FanucMCPServer backups and local workspaces, and prepare reviewed application-file or description changes using the local FanucMCPServer MCP server. Use for this robot integration; not for general robotics questions or unsupported motion commands."
 ---
 
 # FANUC robot work
 
-Use the FANUC Workbench tools for configured robots and preserved workspace
+Use the FanucMCPServer tools for configured robots and preserved workspace
 artifacts. Begin a new robot workflow by inspecting `list_robots` and
 `capabilities`; use `probe_robot` only for the user's intended target. An empty
 robot list needs local configuration before network work. Never guess addresses
@@ -75,5 +75,5 @@ do not invent a controller endpoint or substitute shell/network commands to
 bypass the bridge contract.
 
 The local bundle's setup guide covers installation and runtime diagnosis.
-Use `fanuc-workbench-doctor --config <file>` for an offline MCP check; adding
+Use `fanuc-mcp-server-doctor --config <file>` for an offline MCP check; adding
 `--probe <robot-id>` makes an explicit read-only controller connection.

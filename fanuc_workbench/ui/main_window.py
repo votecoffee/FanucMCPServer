@@ -31,7 +31,7 @@ from fanuc_workbench.ui.native_tab import NativeControllerTab
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
-        super().__init__(); self.setWindowTitle('FANUC Workbench'); self.resize(1500,900)
+        super().__init__(); self.setWindowTitle('FanucMCPServer'); self.resize(1500,900)
         self.thread_pool=QThreadPool.globalInstance(); self.settings=SettingsStore(); self.profiles=self.settings.load_profiles(); self.current_profile=self.profiles[0] if self.profiles else None; self.workspace: Path|None=None
         self.tabs=QTabWidget(); self.setCentralWidget(self.tabs)
         self.backup_tab=self._build_backup(); self.tabs.addTab(self.backup_tab,'Backup / History')

@@ -1,4 +1,4 @@
-"""FANUC Workbench plugin SDK template.
+"""FanucMCPServer plugin SDK template.
 
 Install your package with an entry point:
 [project.entry-points."fanuc_workbench.plugins"]

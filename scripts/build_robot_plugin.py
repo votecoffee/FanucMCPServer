@@ -21,7 +21,7 @@ def build(source: Path, output: Path):
     output.parent.mkdir(parents=True, exist_ok=True)
     output.mkdir()
     plugin = output / "plugin"
-    shutil.copytree(source / "plugins" / "fanuc-workbench", plugin,
+    shutil.copytree(source / "plugins" / "fanuc-mcp-server", plugin,
                     ignore=shutil.ignore_patterns("runtime.json", "__pycache__", "*.pyc"))
     shutil.copyfile(source / "packaging" / "bridge" / "setup_bundle.py", output / "setup.py")
     wheels = plugin / "wheels"
@@ -35,7 +35,7 @@ def build(source: Path, output: Path):
         shutil.copyfile(source / "packaging" / "bridge" / "pyproject.toml", stage / "pyproject.toml")
         subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", str(wheels), str(stage)],
                        check=True, env=environment)
-    own = next(wheels.glob("fanuc_workbench_bridge-*.whl"))
+    own = next(wheels.glob("fanuc_mcp_server_bridge-*.whl"))
     subprocess.run([sys.executable, "-m", "pip", "download", "--only-binary=:all:", "--dest", str(wheels), str(own)],
                    check=True, env=environment)
     docs = output / "docs"
@@ -45,8 +45,8 @@ def build(source: Path, output: Path):
     marketplace = output / ".agents" / "plugins"
     marketplace.mkdir(parents=True)
     (marketplace / "marketplace.json").write_text(json.dumps({
-        "name": "fanuc-workbench-local", "interface": {"displayName": "FANUC Workbench Local"},
-        "plugins": [{"name": "fanuc-workbench", "source": {"source": "local", "path": "./plugin"},
+        "name": "fanuc-mcp-server-local", "interface": {"displayName": "FanucMCPServer Local"},
+        "plugins": [{"name": "fanuc-mcp-server", "source": {"source": "local", "path": "./plugin"},
                      "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"}, "category": "Productivity"}]
     }, indent=2), encoding="utf-8")
     entries = [{"path": path.relative_to(output).as_posix(), "bytes": path.stat().st_size,

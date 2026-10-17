@@ -50,7 +50,7 @@ def export_html(root: Path, out: Path, baseline: Path | None = None) -> Path:
     sections=_rows(collect_report(root,baseline))
     def table(headers,rows):
         return '<table><thead><tr>'+''.join(f'<th>{html.escape(str(h))}</th>' for h in headers)+'</tr></thead><tbody>'+''.join('<tr>'+''.join(f'<td>{html.escape(str(c))}</td>' for c in r)+'</tr>' for r in rows)+'</tbody></table>'
-    parts=['<!doctype html><html><head><meta charset="utf-8"><title>FANUC Workbench Report</title><style>body{font-family:Segoe UI,Arial;margin:32px;color:#222}h1,h2{color:#222}table{border-collapse:collapse;width:100%;margin-bottom:24px;font-size:12px}th,td{border:1px solid #ccc;padding:5px;text-align:left;vertical-align:top}th{background:#eee}code{font-family:Consolas}</style></head><body>','<h1>FANUC Workbench Documentation</h1>']
+    parts=['<!doctype html><html><head><meta charset="utf-8"><title>FanucMCPServer Report</title><style>body{font-family:Segoe UI,Arial;margin:32px;color:#222}h1,h2{color:#222}table{border-collapse:collapse;width:100%;margin-bottom:24px;font-size:12px}th,td{border:1px solid #ccc;padding:5px;text-align:left;vertical-align:top}th{background:#eee}code{font-family:Consolas}</style></head><body>','<h1>FanucMCPServer Documentation</h1>']
     for title,(headers,rows) in sections.items():
         if title=='Changes vs Baseline' and baseline is None: continue
         parts.append(f'<h2>{html.escape(title)}</h2>'+table(headers,rows))
@@ -80,7 +80,7 @@ def export_pdf(root: Path, out: Path, baseline: Path | None = None) -> Path:
     from reportlab.lib.pagesizes import landscape, letter
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    sections=_rows(collect_report(root,baseline)); styles=getSampleStyleSheet(); story=[Paragraph('FANUC Workbench Documentation',styles['Title']),Spacer(1,12)]
+    sections=_rows(collect_report(root,baseline)); styles=getSampleStyleSheet(); story=[Paragraph('FanucMCPServer Documentation',styles['Title']),Spacer(1,12)]
     def add(title,headers,rows,limit=250):
         story.append(Paragraph(title,styles['Heading2'])); data=[headers]+[[str(x)[:120] for x in row] for row in rows[:limit]]
         t=Table(data,repeatRows=1); t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.lightgrey),('GRID',(0,0),(-1,-1),0.25,colors.grey),('FONT',(0,0),(-1,-1),'Helvetica',6),('VALIGN',(0,0),(-1,-1),'TOP')]))

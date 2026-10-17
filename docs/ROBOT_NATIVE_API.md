@@ -23,7 +23,7 @@ and transfers it to `md:NAME.LS` through the configured FTP/SFTP backend for the
 controller's ASCII loader. The controller needs compatible ASCII upload support.
 Transfer acceptance alone is not reported as successful compilation. Deployment
 never selects, starts or executes a program. FANUC's `IRobot.Load` takes a
-controller-device path; Workbench does not pass local PC filenames to that API.
+controller-device path; FanucMCPServer does not pass local PC filenames to that API.
 
 Every change starts from a preserved native read tied to robot, endpoint, target
 and SHA-256. Preparation freezes the proposal. Commit requires exact approval,
@@ -37,7 +37,7 @@ No physical controller or motion operation is part of this work.
 
 ## Configure and use
 
-Workbench 2.1 adds **Native Controller** with live values/status, reviewed R/PR
+FanucMCPServer 2.1 adds **Native Controller** with live values/status, reviewed R/PR
 editing and LS deployment. Load the same local robot policy used by the MCP
 bridge and choose a robot. The FTP/SFTP profile remains the file transport;
 the native adapter connects to that profile's host using the installed vendor

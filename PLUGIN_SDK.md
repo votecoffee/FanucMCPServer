@@ -1,6 +1,6 @@
-# FANUC Workbench Plugin SDK 1.0
+# FanucMCPServer Plugin SDK 1.0
 
-Plugins are ordinary Python packages installed into the same environment as FANUC Workbench. They add tabs without modifying the core application.
+Plugins are ordinary Python packages installed into the same environment as FanucMCPServer. They add tabs without modifying the core application.
 
 ## Entry point
 

@@ -19,9 +19,9 @@ def load_setup():
 def bundle(path,version):
     (path/'.agents/plugins').mkdir(parents=True)
     (path/'plugin').mkdir()
-    (path/'.agents/plugins/marketplace.json').write_text(json.dumps({'name':'fanuc-workbench-local',
-        'plugins':[{'name':'fanuc-workbench'}]}))
-    (path/'plugin/plugin.json').write_text(json.dumps({'name':'fanuc-workbench','version':version}))
+    (path/'.agents/plugins/marketplace.json').write_text(json.dumps({'name':'fanuc-mcp-server-local',
+        'plugins':[{'name':'fanuc-mcp-server'}]}))
+    (path/'plugin/plugin.json').write_text(json.dumps({'name':'fanuc-mcp-server','version':version}))
     (path/'BUNDLE_MANIFEST.json').write_text('{}')
 
 
@@ -35,7 +35,7 @@ def test_owned_marketplace_move_and_registration_rollback(tmp_path,monkeypatch,f
     def run(command,**kwargs):
         calls.append(command)
         if command[1:4]==['plugin','marketplace','list']:
-            return SimpleNamespace(stdout=json.dumps({'marketplaces':[{'name':'fanuc-workbench-local','root':str(old)}]}))
+            return SimpleNamespace(stdout=json.dumps({'marketplaces':[{'name':'fanuc-mcp-server-local','root':str(old)}]}))
         if command[1:3]==['plugin','add']:
             if fail_install: raise subprocess.CalledProcessError(2,command)
             return SimpleNamespace(stdout=json.dumps({'version':'0.4.0-dev'}))
@@ -58,7 +58,7 @@ def test_foreign_marketplace_is_not_removed(tmp_path,monkeypatch):
     calls=[]
     def run(command,**kwargs):
         calls.append(command)
-        return SimpleNamespace(stdout=json.dumps({'marketplaces':[{'name':'fanuc-workbench-local',
+        return SimpleNamespace(stdout=json.dumps({'marketplaces':[{'name':'fanuc-mcp-server-local',
             'root':str(tmp_path/'unrelated source')}]}))
     monkeypatch.setattr(module.subprocess,'run',run)
     with pytest.raises(ValueError,match='unrecognized'):
@@ -66,21 +66,29 @@ def test_foreign_marketplace_is_not_removed(tmp_path,monkeypatch):
     assert len(calls)==1
 
 
-def test_setup_remembers_custom_configuration_across_upgrade(tmp_path, monkeypatch):
+@pytest.mark.parametrize('legacy_name', [False, True])
+def test_setup_remembers_custom_configuration_across_upgrade(tmp_path, monkeypatch, legacy_name):
     module = load_setup()
     root = tmp_path / 'new bundle'
     wheels = root / 'plugin/wheels'
     wheels.mkdir(parents=True)
-    (wheels / 'fanuc_workbench_bridge-0.7.0.dev0-py3-none-any.whl').write_bytes(b'fake wheel')
+    (wheels / 'fanuc_mcp_server_bridge-0.7.0.dev0-py3-none-any.whl').write_bytes(b'fake wheel')
     module.__file__ = str(root / 'setup.py')
     monkeypatch.setattr(module, 'verify_bundle', lambda _: None)
     monkeypatch.setattr(module.venv, 'EnvBuilder', lambda **_: SimpleNamespace(create=lambda _: None))
-    monkeypatch.setattr(module.subprocess, 'run', lambda *a, **k: SimpleNamespace(
-        stdout=json.dumps({'tool_count': 42, 'configured_robots': 2})))
+    calls = []
+    def run(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(stdout=json.dumps({'tool_count': 48, 'configured_robots': 2}))
+    monkeypatch.setattr(module.subprocess, 'run', run)
     runtime = tmp_path / 'stable runtime'
     config = tmp_path / 'custom robot policy.json'
     original = b'{"state_dir":"retained-evidence","source_dir":"retained-edits","robots":{}}\r\n'
     config.write_bytes(original)
+    if legacy_name:
+        runtime.mkdir()
+        (runtime / 'installation.json').write_text(json.dumps({
+            'kind': 'fanuc-workbench-runtime', 'config': str(config.resolve())}))
     monkeypatch.setattr(sys, 'argv', ['setup.py', '--runtime-dir', str(runtime), '--config', str(config)])
     module.main()
     monkeypatch.setattr(sys, 'argv', ['setup.py', '--runtime-dir', str(runtime)])
@@ -88,6 +96,13 @@ def test_setup_remembers_custom_configuration_across_upgrade(tmp_path, monkeypat
     assert json.loads((runtime / 'installation.json').read_text())['config'] == str(config.resolve())
     assert json.loads((root / 'plugin/runtime.json').read_text())['config'] == str(config.resolve())
     assert config.read_bytes() == original and not (runtime / 'robot_bridge.local.json').exists()
+    assert json.loads((runtime / 'installation.json').read_text())['kind'] == 'fanuc-mcp-server-runtime'
+    removals = [i for i, cmd in enumerate(calls) if 'uninstall' in cmd]
+    if legacy_name:
+        assert len(removals) == 1 and calls[removals[0]][-1] == 'fanuc-workbench-bridge'
+        assert removals[0] < next(i for i, cmd in enumerate(calls) if 'install' in cmd)
+    else:
+        assert not removals
 
 
 def test_config_selection_handles_first_install_legacy_and_explicit_override(tmp_path):

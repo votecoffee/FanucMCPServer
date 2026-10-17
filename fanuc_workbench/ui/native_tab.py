@@ -4,7 +4,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import os
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Slot
@@ -15,6 +14,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFormLayout, Q
 from fanuc_workbench.bridge.service import RobotBridge
 from fanuc_workbench.core.workers import Worker
 from fanuc_workbench.services.native_programs import validate_source
+from fanuc_workbench.identity import configuration_environment
 
 
 def pretty(value):
@@ -28,7 +28,7 @@ class NativeControllerTab(QWidget):
         self.busy, self.controls = False, []
         layout = QVBoxLayout(self)
         row = QHBoxLayout()
-        self.config_path = QLineEdit(os.environ.get('FANUC_WORKBENCH_CONFIG', ''))
+        self.config_path = QLineEdit(configuration_environment() or '')
         row.addWidget(QLabel('Robot policy'))
         row.addWidget(self.config_path, 1)
         self.button(row, 'Browse…', self.choose_config)

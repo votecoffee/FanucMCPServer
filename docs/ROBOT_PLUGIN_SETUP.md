@@ -1,9 +1,37 @@
-# Local FANUC Workbench plugin setup
+# Local FanucMCPServer plugin setup
 
 The bridge runs on the Windows PC that can reach the controller. A headless
-Python distribution shares Workbench services without requiring Qt or changing
+Python distribution shares FanucMCPServer services without requiring Qt or changing
 the GUI's environment. Codex uses stdio MCP; other compatible clients can use
 the same server. There is no OpenAI model API call or API key in this bridge.
+
+## Name change and existing installations
+
+The project/repository is **FanucMCPServer**. New bundles identify the plugin
+and stdio server as `fanuc-mcp-server`, and the local marketplace as
+`fanuc-mcp-server-local`. Python distributions are `fanuc-mcp-server` for the
+GUI/shared services and `fanuc-mcp-server-bridge` for the headless runtime.
+Commands are `fanuc-mcp-server`, `fanuc-mcp-server-gui` (GUI distribution),
+`fanuc-mcp-server-doctor` and `fanuc-mcp-server-extension`.
+
+`fanuc_workbench` Python imports and the `fanuc_workbench.plugins` SDK entry-point
+group retain their names for compatibility. The old `fanuc-workbench*` commands
+remain aliases. `FANUC_MCP_SERVER_CONFIG` is the preferred configuration variable;
+`FANUC_WORKBENCH_CONFIG` remains a fallback. Explicit `--config` takes precedence.
+The GUI reads old FANUC Workbench profiles when its new profile file is absent,
+and preserves the old file when saving to the new location.
+
+The offline installer accepts existing `fanuc-workbench-runtime` ownership
+markers and retains their selected configuration. During that explicit upgrade,
+it uninstalls the old headless distribution before installing the renamed wheel
+so both distributions do not own the same Python files. For the GUI, use a fresh
+environment or uninstall `fanuc-workbench` before installing `fanuc-mcp-server`.
+
+Existing runtime folders and active Codex registrations can keep their current
+paths. A new bundle registers under the new plugin identity only when
+`--register` is requested. It does not remove the old registration. After checking
+the renamed connection, remove the old registration before using both against
+the same controller. Compatible feature reloads retain their existing behavior.
 
 ## Build and install
 

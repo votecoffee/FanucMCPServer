@@ -50,7 +50,7 @@ def select_config(runtime, explicit, installation):
 
 def register_plugin(codex, root, environment):
     """Update our local marketplace without taking over a name owned elsewhere."""
-    name = "fanuc-workbench-local"
+    name = "fanuc-mcp-server-local"
     listed = subprocess.run([codex, "plugin", "marketplace", "list", "--json"], check=True,
                             env=environment, capture_output=True, text=True)
     existing = next((row for row in json.loads(listed.stdout)["marketplaces"] if row["name"] == name), None)
@@ -60,9 +60,9 @@ def register_plugin(codex, root, environment):
         descriptor = previous / ".agents" / "plugins" / "marketplace.json"
         try:
             data = json.loads(descriptor.read_text(encoding="utf-8"))
-            owned = (data["name"] == name and [item["name"] for item in data["plugins"]] == ["fanuc-workbench"]
+            owned = (data["name"] == name and [item["name"] for item in data["plugins"]] == ["fanuc-mcp-server"]
                      and (previous / "BUNDLE_MANIFEST.json").is_file()
-                     and json.loads((previous / "plugin" / "plugin.json").read_text(encoding="utf-8"))["name"] == "fanuc-workbench")
+                     and json.loads((previous / "plugin" / "plugin.json").read_text(encoding="utf-8"))["name"] == "fanuc-mcp-server")
         except (OSError, ValueError, KeyError, TypeError):
             owned = False
         if not owned:
@@ -70,7 +70,7 @@ def register_plugin(codex, root, environment):
         subprocess.run([codex, "plugin", "marketplace", "remove", name, "--json"], check=True, env=environment)
     try:
         subprocess.run([codex, "plugin", "marketplace", "add", str(root), "--json"], check=True, env=environment)
-        installed = subprocess.run([codex, "plugin", "add", "fanuc-workbench@" + name, "--json"],
+        installed = subprocess.run([codex, "plugin", "add", "fanuc-mcp-server@" + name, "--json"],
                                    check=True, env=environment, capture_output=True, text=True)
         result = json.loads(installed.stdout)
         expected = json.loads((root / "plugin" / "plugin.json").read_text(encoding="utf-8"))["version"]
@@ -87,7 +87,7 @@ def register_plugin(codex, root, environment):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Install a local FANUC Workbench plugin runtime from bundled wheels")
+    parser = argparse.ArgumentParser(description="Install a local FanucMCPServer plugin runtime from bundled wheels")
     parser.add_argument("--runtime-dir", required=True, type=Path, help="Stable dedicated directory outside the plugin cache")
     parser.add_argument("--config", type=Path, help="Existing bridge JSON; otherwise retain the installed selection, or create a zero-robot configuration on first install")
     parser.add_argument("--register", choices=("none", "plugin", "mcp"), default="none")
@@ -102,11 +102,12 @@ def main():
     if runtime.exists() and any(runtime.iterdir()) and not marker.exists():
         raise ValueError("Runtime directory is not owned by this installer; choose an empty dedicated directory")
     installation = json.loads(marker.read_text(encoding="utf-8")) if marker.exists() else {}
-    if marker.exists() and (not isinstance(installation, dict) or installation.get("kind") != "fanuc-workbench-runtime"):
+    if marker.exists() and (not isinstance(installation, dict) or installation.get("kind") not in
+                            {"fanuc-mcp-server-runtime", "fanuc-workbench-runtime"}):
         raise ValueError("Unexpected runtime ownership marker")
     config = select_config(runtime, args.config, installation)
     runtime.mkdir(parents=True, exist_ok=True)
-    marker.write_text(json.dumps({**installation, "kind": "fanuc-workbench-runtime",
+    marker.write_text(json.dumps({**installation, "kind": installation.get("kind", "fanuc-mcp-server-runtime"),
                                  "compatibility": compatibility()}, indent=2), encoding="utf-8")
     environment = {key: value for key, value in os.environ.items() if key not in {"PYTHONPATH", "PYTHONHOME"}}
     environment.update(PYTHONNOUSERSITE="1", PYTHONDONTWRITEBYTECODE="1", PIP_CONFIG_FILE=os.devnull,
@@ -115,9 +116,14 @@ def main():
     venv.EnvBuilder(with_pip=True).create(venv_dir)
     python = venv_dir / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     wheels = root / "plugin" / "wheels"
-    packages = list(wheels.glob("fanuc_workbench_bridge-*.whl"))
+    packages = list(wheels.glob("fanuc_mcp_server_bridge-*.whl"))
     if len(packages) != 1:
         raise ValueError("Bundle must contain exactly one FANUC bridge wheel")
+    if installation.get("kind") == "fanuc-workbench-runtime":
+        # The renamed distributions share stable Python import paths. Remove
+        # the old wheel first so two distributions do not own the same files.
+        subprocess.run([str(python), "-B", "-m", "pip", "uninstall", "--yes", "fanuc-workbench-bridge"],
+                       check=True, env=environment)
     subprocess.run([str(python), "-B", "-m", "pip", "install", "--no-compile", "--no-index", "--find-links", str(wheels),
                     "--upgrade", "--force-reinstall", str(packages[0])], check=True, env=environment)
     subprocess.run([str(python), "-m", "pip", "check"], check=True, env=environment)
@@ -132,7 +138,7 @@ def main():
     doctor = json.loads(checked.stdout)
     (runtime / "doctor.json").write_text(json.dumps(doctor, indent=2), encoding="utf-8")
     (root / "plugin" / "runtime.json").write_text(json.dumps(settings, indent=2), encoding="utf-8")
-    marker.write_text(json.dumps({"kind": "fanuc-workbench-runtime", "compatibility": compatibility(),
+    marker.write_text(json.dumps({"kind": "fanuc-mcp-server-runtime", "compatibility": compatibility(),
                                  "config": str(config)}, indent=2), encoding="utf-8")
     if args.register != "none":
         codex = shutil.which("codex")
@@ -145,7 +151,7 @@ def main():
         if args.register == "plugin":
             register_plugin(codex, root, environment)
         else:
-            subprocess.run([codex, "mcp", "add", "fanuc_workbench", "--", str(python), "-B", "-m",
+            subprocess.run([codex, "mcp", "add", "fanuc-mcp-server", "--", str(python), "-B", "-m",
                             "fanuc_workbench.bridge.mcp_server", "--config", str(config)], check=True, env=environment)
     print(json.dumps({"status": "installed", "runtime": str(runtime), "config": str(config),
                       "registration": args.register, "tools": doctor["tool_count"],

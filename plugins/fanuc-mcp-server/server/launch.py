@@ -12,11 +12,11 @@ def main():
     root = Path(__file__).resolve().parent.parent
     settings = root / "runtime.json"
     if not settings.is_file():
-        raise SystemExit("FANUC Workbench runtime is not configured. Run the bundle setup.py before installing this local plugin.")
+        raise SystemExit("FanucMCPServer runtime is not configured. Run the bundle setup.py before installing this local plugin.")
     data = json.loads(settings.read_text(encoding="utf-8"))
     python, config = Path(data["python"]), Path(data["config"])
     if not python.is_file() or not config.is_file():
-        raise SystemExit("FANUC Workbench runtime/config is missing. Repair the local setup; no controller connection was attempted.")
+        raise SystemExit("FanucMCPServer runtime/config is missing. Repair the local setup; no controller connection was attempted.")
     arguments = [str(python), "-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", str(config)]
     # Windows CRT execv joins arguments without adding quotes. Preserve spaces
     # and embedded quotes using the same quoting rules as subprocess/CreateProcess.

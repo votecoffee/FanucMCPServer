@@ -1,13 +1,13 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "fanuc-workbench",
+  "name": "fanuc-mcp-server",
   "version": "0.9.0-dev",
   "description": "FANUC robot files, backups, diagnostics and reviewed changes through shared Workbench services.",
   "extensions": {
     "com.openai": {
       "requires_local_executor": true,
       "interface": {
-        "displayName": "FANUC Workbench",
+        "displayName": "FanucMCPServer",
         "shortDescription": "Robot evidence and reviewed changes from a local chat"
       }
     }
