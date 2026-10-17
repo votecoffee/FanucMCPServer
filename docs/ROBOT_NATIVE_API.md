@@ -31,9 +31,12 @@ rechecks state and consumes the plan before a vendor write. Readback and loader
 evidence distinguish verified results from uncertain failures. There is no
 atomic compare-and-swap guarantee against other clients and no automatic rollback.
 
-Development uses the user's two configured ROBOGUIDE virtual controllers. Native
-test changes require review of the exact prepared test proposal before committing.
-No physical controller or motion operation is part of this work.
+Validate native changes on an explicitly configured test controller before
+physical use. Review the exact prepared proposal before committing, preserve
+original values/files and verify readback. Keep controller-specific endpoints,
+approvals and acceptance reports in local storage outside version control.
+Native program deployment validation and physical-controller acceptance remain
+pending; offline tests do not establish either.
 
 ## Configure and use
 

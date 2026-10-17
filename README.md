@@ -1,131 +1,189 @@
-# FanucMCPServer 2.1
+# FanucMCPServer
 
-Repository: [votecoffee/FanucMCPServer](https://github.com/votecoffee/FanucMCPServer).
+MCP server and desktop workbench for FANUC robot files, diagnostics, and reviewed changes.
 
-A modular Python/PySide6 engineering workbench for FANUC robot backup, offline analysis/editing, live troubleshooting, commissioning, fleet maintenance, integration documentation, and controlled restore.
+Connect a compatible chat client or Python application to shared FANUC file,
+backup and analysis services. The optional desktop interface uses the same
+services. A stable MCP host supports feature extensions that can be reloaded
+within an existing session.
 
-Renamed from FANUC Workbench. New installs use `fanuc-mcp-server` (GUI/shared
-services) or `fanuc-mcp-server-bridge` (headless runtime). The `fanuc-mcp-server`
-command starts MCP; `fanuc-mcp-server-gui` starts the GUI. Existing
-`fanuc_workbench` Python imports, SDK entry points, and `fanuc-workbench*`
-commands remain compatible. See [upgrade notes](docs/ROBOT_PLUGIN_SETUP.md#name-change-and-existing-installations).
+The repository and application are named **FanucMCPServer**. The Python
+distribution is `fanuc-mcp-server`; the `fanuc_workbench` import namespace and
+legacy commands remain compatible with the former FANUC Workbench name.
+The MCP/native integration is under development; physical-controller acceptance
+and native program deployment validation remain pending.
 
-## New in 2.1 development
+## Table of Contents
 
-- **Native Controller**: TCP/API reads of R/PR/I/O, current position, tasks, alarms
-  and program metadata through the installed FANUC Robot Object data API.
-- **Reviewed live R/PR edits**: preserved values, exact target policy, frozen
-  proposals, explicit confirmation, stale-value checks and readback.
-- **Native LS deployment**: preserve old programs, load/compile and verify TP/LS
-  readback without selecting or executing the program.
-- **Stable MCP host**: 48 permanent tools with a versioned operation catalog
-  and reloadable feature workers, including all 20 workspace analyses.
+- [Background](#background)
+- [Install](#install)
+- [Usage](#usage)
+- [Capabilities and limits](#capabilities-and-limits)
+- [Documentation](#documentation)
+- [Development](#development)
+- [API](#api)
+- [Maintainers](#maintainers)
+- [Contributing](#contributing)
+- [License](#license)
 
-Native access defaults to disabled and requires a compatible licensed FANUC
-installation. See [native controller setup and limits](docs/ROBOT_NATIVE_API.md)
-and [reloadable features](docs/ROBOT_EXTENSIONS.md).
+## Background
 
-## New in 2.0
+Robot troubleshooting often involves collecting controller files, comparing
+backups and reviewing edits across several tools. FanucMCPServer exposes those
+operations through shared Python services, an MCP adapter and a PySide6 desktop
+application. FTP/SFTP provide file transport; an optional installed FANUC Robot
+Object provider adds native controller data over TCP.
 
-This release adds the requested follow-on features **1–12, 14, 16, 17, 21, 22, 27, and 39** on top of the v1.0 feature set.
+The MCP host owns configured targets, credentials, retained evidence, approval
+and readback. Reloadable Python workers supply analyses and change proposals
+behind a versioned operation catalog. Compatible feature updates use
+`reload_extensions` in the current MCP session. Host schemas, policy or plugin
+metadata changes require the corresponding host/client update.
 
-1. **ROBOGUIDE integration** — discover/browse the ROBOGUIDE executable, stage an active FANUC backup into a virtual-controller handoff folder, optionally open a workcell, and launch ROBOGUIDE. FanucMCPServer intentionally does not automate unverified private ROBOGUIDE UI/COM interfaces.
-2. **SFTP backend** — robot profiles can use FTP or SFTP. SFTP uses Paramiko/SSH, system host keys, unknown-host rejection by default, and explicit TOFU opt-in.
-3. **Fleet backup manager** — load configured robot profiles, select multiple robots, and back them up as one operation with per-robot status/change counts.
-4. **Scheduled backups + change alerts** — in-app scheduler with per-robot minute intervals; each completed backup is compared to the prior backup and marked `CHANGED` when differences are detected. The scheduler runs while FanucMCPServer is open.
-5. **Live Watch table** — watch `R[]`, `PR[]`, and common FANUC I/O tokens. Source can be the active workspace or bounded live polling of controller-generated `NUMREG.VA`, `POSREG.VA`, and `IOSTATE.DG` files.
-6. **Signal/register trend recorder** — in-app numeric plot plus CSV export of captured samples.
-7. **I/O timeline recorder** — records value transitions with millisecond timestamps and exports CSV.
-8. **Cycle recorder** — record state transitions from any watched signal/value, add manual event marks, and export JSON.
-9. **Cycle profiler** — totals elapsed time by captured state and shows percent of recorded cycle.
-10. **Cycle comparison** — compare two exported cycle recordings and show per-state timing deltas.
-11. **Alarm intelligence** — recurring alarm summary plus correlation with captured signal changes that occurred shortly before timestamp-compatible alarms.
-12. **Troubleshooting snapshots** — capture active workspace health/comments/positions/alarms/mastering/DCS evidence plus latest live values; compare two snapshots.
-14. **Commissioning baseline + checklist** — create a protected commissioned copy, compare future workspaces against it, and persist a per-workspace commissioning checklist.
-16. **Robot Lint** — engineering quality checks for missing CALL targets, missing/duplicate labels, undocumented R/PR/frames, and suspicious UF outliers.
-17. **Robot option inventory** — evidence-based scan for ASCII Program Loader, KAREL, iRVision, DCS, EtherNet/IP, BG Logic, OPC UA, SFTP, MQTT, Collision Guard, etc. `Not determined` is used when readable backup files do not prove status.
-21. **EtherNet/IP viewer** — read-only extraction of Adapter/Scanner evidence, connection/IP/slot, sizes, RPI, and status from human-readable controller data.
-22. **PLC/FANUC handshake analyzer** — persistent handshake map (`robot signal ↔ PLC tag ↔ expected peer`) and timing analysis against the captured live timeline.
-27. **Frame transformation calculator** — convert Cartesian X/Y/Z/W/P/R poses between user-frame coordinate systems while preserving physical pose. Uses the documented/common FANUC W/P/R matrix convention `Rz(R)·Ry(P)·Rx(W)` and includes a verification warning.
-39. **Plugin SDK 1.0** — manifest/API version, service registry, legacy compatibility, entry-point discovery, and a complete template. See `PLUGIN_SDK.md` and `examples/plugin_sdk_template.py`.
+## Install
 
-## Existing v1.0 capabilities retained
+### Dependencies
 
-- Recursive backup + ASCII companion attempts.
-- Backup history and semantic comparison.
-- Selective restore with live preview and explicit write confirmation.
-- LS program editor/validation/cross-reference/dependency/flow analysis.
-- R/PR/frame/comment editing and live supported comment writes.
-- I/O browser and PLC mapping CSV.
-- Alarm history, health, mastering read-only comparison, DCS read-only comparison.
-- Robot projects/cell comparison/golden deployment packages.
-- HTML/XLSX/PDF documentation generation.
+- Python 3.11 or newer and Git for a source installation.
+- Windows for the documented plugin launcher and optional native controller API.
+- A compatible MCP client to use chat tools. The bridge itself makes no model API
+  calls and requires no OpenAI API key.
+- For native access: a compatible licensed FANUC Robot Object installation. Vendor
+  libraries are installed separately and are not redistributed.
 
-## Live data model
-
-FanucMCPServer deliberately avoids undocumented controller web-page scraping. The built-in live provider polls human-readable controller-generated files at a **minimum two-second interval** and reports unavailable signals instead of fabricating data. The provider interface is designed so an OPC UA or verified KAREL/HTTPS implementation can be installed later without changing the UI.
-
-## Safety model
-
-- Back up before writes.
-- Unknown/binary controller files are preserved, not reverse-engineered.
-- Mastering and DCS remain inspection/diff only.
-- Restore/upload requires explicit confirmation.
-- Commissioning baselines are copies, never controller writes.
-- EtherNet/IP and option inventory are evidence/read-only tools.
-- Frame calculations are engineering aids; verify results on the pendant/virtual controller before production use.
-- SFTP rejects unknown host keys unless the user explicitly enables TOFU.
-- Passwords are not persisted in the normal profile JSON. Scheduled backups that need password authentication require credentials in the current session; SSH key/agent authentication can be used for SFTP.
-
-## Install on Windows
-
-Python 3.11+ is recommended. Double-click `install_and_run.bat`, or:
+Install the desktop application and MCP adapter from source on Windows:
 
 ```powershell
-py -m venv .venv
-.venv\Scripts\activate
-python -m pip install -e .
-python run.py
+git clone https://github.com/votecoffee/FanucMCPServer.git
+cd FanucMCPServer
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[mcp]"
 ```
 
-Dependencies: PySide6, XlsxWriter, ReportLab, and Paramiko.
+The default distribution includes the desktop dependencies. For a separate
+runtime without Qt, follow the [headless plugin bundle guide](docs/ROBOT_PLUGIN_SETUP.md).
+For desktop use alone, omit the `mcp` extra or run `install_and_run.bat`.
+Existing installations should follow the [upgrade notes](docs/ROBOT_PLUGIN_SETUP.md#name-change-and-existing-installations).
 
-## Codex / MCP robot bridge (development)
+## Usage
 
-The GUI and the optional local MCP adapter now share headless controller
-services. The expanded server exposes 48 tools for backup jobs, workspace
-analysis/editing, live samples/recordings, snapshots/packages, audit evidence,
-and reviewed application-file/comment changes. Install the adapter with
-`python -m pip install -e ".[mcp]"` and see
-[Robot bridge setup and API guide](docs/ROBOT_BRIDGE.md) for configuration,
-file/log tools, reviewed application-file replacement, and verification limits.
-Writes default to disabled; the example requests client-mediated confirmation.
-See the [service coverage matrix](docs/ROBOT_BRIDGE_COVERAGE.md) for unsupported
-native operations. Development plugins have been installed/tested with MCP
-clients and ROBOGUIDE; physical-controller acceptance remains pending.
+### CLI
 
-For development/testing:
+Create a private configuration from the example:
 
 ```powershell
-python -m pip install -e ".[dev]"
-python -m pytest -q
+New-Item -ItemType Directory -Path .local -Force | Out-Null
+Copy-Item .\examples\robot_bridge.example.json .\.local\robot_bridge.local.json
+.\.venv\Scripts\fanuc-mcp-server-doctor.exe --config .\.local\robot_bridge.local.json
 ```
 
-## Suggested workflow
+The example uses a placeholder address with writes and native access disabled.
+Edit the local configuration before connecting to a controller. Relative state
+and source paths resolve beside that file, inside the ignored `.local/` directory.
+Doctor checks the MCP session without contacting a robot unless `--probe` is given.
 
-1. Configure **Robot → Connection…** and choose FTP or SFTP.
-2. Take/open a backup and establish a commissioning baseline.
-3. Run **Robot Lint**, option inventory, and EtherNet/IP evidence scan.
-4. Configure a **Live / Recorder** watch set for the signals relevant to the problem.
-5. Capture trend/timeline/cycle evidence or a troubleshooting snapshot.
-6. Use the PLC handshake analyzer when diagnosing interface timing.
-7. Stage changes for ROBOGUIDE before production deployment when appropriate.
-8. Compare against the commissioned baseline and use Selective Restore for deliberate writes.
-9. Add robots to **Fleet / Scheduler** for recurring backups/change detection.
+Configure your MCP client to launch this environment's absolute Python path with
+the following arguments, replacing the example paths:
 
-## Validation
+```toml
+[mcp_servers.fanuc-mcp-server]
+command = "C:/path/to/FanucMCPServer/.venv/Scripts/python.exe"
+args = ["-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", "C:/path/to/FanucMCPServer/.local/robot_bridge.local.json"]
+```
 
-The original v2 release contains 26 baseline regression tests. The development
-bridge adds shared-service, policy, transfer-failure and MCP protocol coverage.
-Run `python -m pytest -q` from the project root; install the `mcp` extra to include
-the SDK protocol tests.
+`fanuc-mcp-server --config <path>` is the equivalent stdio server command.
+Start with `list_robots` and `capabilities`, then explicitly probe the configured
+target before listing files or collecting evidence. See the
+[MCP guide](docs/ROBOT_BRIDGE.md) for tools and reviewed changes.
+
+Launch the desktop interface with:
+
+```powershell
+.\.venv\Scripts\fanuc-mcp-server-gui.exe
+```
+
+Configure a connection through **Robot → Connection…**, take or open a backup,
+then inspect programs, diagnostics and comparisons. Detailed native setup is in
+the [native API guide](docs/ROBOT_NATIVE_API.md).
+
+### Python
+
+List configured targets locally without opening a controller connection:
+
+```python
+from pathlib import Path
+from fanuc_workbench.bridge.service import RobotBridge
+
+with RobotBridge.from_config(Path(".local/robot_bridge.local.json")) as bridge:
+    print(bridge.list_robots())
+```
+
+Keep the bridge alive while background jobs run and close it when finished.
+
+## Capabilities and limits
+
+| Area | Available capabilities |
+| --- | --- |
+| Files and backups | FTP/SFTP listing, exact file/log capture, backup jobs, manifests, comparisons and reviewed per-file recovery |
+| Offline engineering | LS inspection, lint, cross references, R/PR/frame/comment evidence, mastering/DCS comparisons and documentation packages |
+| Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation and troubleshooting snapshots |
+| Native controller API | R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR value changes and LS deployment |
+| Extensions | 48 stable MCP tools, a versioned operation catalog and reloadable feature workers, including 20 workspace analyses |
+| Desktop workflows | Fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |
+
+MCP writes default to disabled and require exact target policy, preserved originals,
+reviewed proposals and readback. The example configuration requests client
+confirmation; verify confirmation support in the chosen client before enabling
+writes. Passwords belong in named environment variables. The MCP bridge requires
+verified SFTP host keys; FTP traffic is unencrypted.
+
+Motion, program execution/start/stop, I/O forcing, frame writes and
+mastering/DCS writes are unsupported. Native deployment does not select or run a
+program. Offline analysis, file-transfer success and loader verification each
+have separate limits; none establishes production or commissioning acceptance.
+See the [coverage matrix](docs/ROBOT_BRIDGE_COVERAGE.md) for details.
+
+## Documentation
+
+- [MCP setup, tools and Python API](docs/ROBOT_BRIDGE.md)
+- [Headless plugin installation and upgrades](docs/ROBOT_PLUGIN_SETUP.md)
+- [Native controller configuration and verification limits](docs/ROBOT_NATIVE_API.md)
+- [Reloadable feature development](docs/ROBOT_EXTENSIONS.md)
+- [Shared-service coverage](docs/ROBOT_BRIDGE_COVERAGE.md)
+- [Desktop Plugin SDK](PLUGIN_SDK.md)
+- [Changelog](CHANGELOG.md)
+
+## Development
+
+Install the test dependencies and run the offline suite:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,mcp]"
+.\.venv\Scripts\python.exe -B -m pytest -q
+```
+
+The suite uses synthetic fixtures and simulated controller transports. Keep
+personal notes, configurations, captures and local test reports outside Git or
+under `.local/`. See [CONTRIBUTING.md](CONTRIBUTING.md) for repository hygiene and
+validation requirements.
+
+## API
+
+The [MCP and shared Python API guide](docs/ROBOT_BRIDGE.md) describes `RobotBridge`,
+tools, artifacts and prepared changes. Use the
+[extension contract](docs/ROBOT_EXTENSIONS.md) for reloadable operations, and the
+[Plugin SDK](PLUGIN_SDK.md) for desktop tabs.
+
+## Maintainers
+
+[@votecoffee](https://github.com/votecoffee)
+
+## Contributing
+
+Questions and bug reports belong in [GitHub issues](https://github.com/votecoffee/FanucMCPServer/issues).
+Pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md), include relevant
+validation, and use sanitized examples suitable for a public repository.
+
+## License
+
+[MIT](LICENSE) © 2026 votecoffee.

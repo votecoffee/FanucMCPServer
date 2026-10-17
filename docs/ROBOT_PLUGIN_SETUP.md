@@ -81,15 +81,17 @@ The initial runtime JSON contains zero robots, writes disabled and elicitation
 approval. Add explicit robot profiles using `examples/robot_bridge.example.json`
 as the schema reference. Configured roots restrict read access. Passwords belong
 in named environment variables, not JSON, command-line arguments or chat.
-Restart the MCP connection after a configuration change.
+Reload endpoint-only edits as described below. Other configuration changes
+require a new MCP process.
 
 For ROBOGUIDE, use the virtual controller's actual local TCP listener address and
 FTP port. A workcell's saved real-robot synchronization address is a different
 destination. Discover listeners from the running virtual controller or its
 documented service settings; do not assume an address/port across sessions.
 Read-only listing, retrieval, backups and analysis work through the same FTP
-backend used for real controllers. Program loading/execution and motion are
-outside this adapter.
+backend used for real controllers. Optional native program loading requires the
+separate provider and policy described in [ROBOT_NATIVE_API.md](ROBOT_NATIVE_API.md).
+Program execution and motion are unsupported.
 
 ROBOGUIDE can assign different loopback addresses when its virtual controllers
 restart. An open ROBOGUIDE application alone does not establish a running file

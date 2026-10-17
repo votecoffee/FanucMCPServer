@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "fanuc-mcp-server"
 version = "2.1.0"
-description = "Extensible FANUC robot engineering workbench: backup, compare, restore, program/data analysis, live monitoring, fleet backup, commissioning, integration, diagnostics, projects, and documentation"
+description = "MCP server and desktop workbench for FANUC robot files, diagnostics, and reviewed changes."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = ["PySide6>=6.7", "XlsxWriter>=3.2", "reportlab>=4.2", "paramiko>=3.5", "pywin32>=311; sys_platform == 'win32'"]

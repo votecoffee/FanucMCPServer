@@ -1,8 +1,8 @@
-# FanucMCPServer robot bridge (expanded development version)
+# FanucMCPServer MCP and Python API
 
 The GUI, local Python API and MCP adapter share controller, parser and analysis
-services. The server now exposes 48 tools. No physical robot has been contacted;
-physical acceptance remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
+services. The server exposes 48 tools. Physical-controller acceptance remains
+pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 
 FanucMCPServer 2.1 / bridge 0.9 adds native data, reviewed R/PR value edits and LS
 deployment through the existing operation catalog. See [native API setup and
@@ -13,29 +13,31 @@ verification limits](ROBOT_NATIVE_API.md). Native access is disabled by default.
 Use Python 3.11 or newer in the checkout containing these changes:
 
 ```powershell
-py -3.14 -m venv .venv
+py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[mcp,dev]"
-Copy-Item .\examples\robot_bridge.example.json .\robot_bridge.local.json
+New-Item -ItemType Directory -Path .local -Force | Out-Null
+Copy-Item .\examples\robot_bridge.example.json .\.local\robot_bridge.local.json
 ```
 
 An existing compatible environment can be used instead. Edit the JSON before
 connecting. The example address 192.0.2.1 is not a discovered robot. Paths resolve
 relative to the JSON. Keep local configuration, edits, evidence and credentials
-out of source control.
+out of source control. The ignored `.local/` directory is intended for these
+private files; keep local test reports and machine-specific notes there too.
 
 Add a local stdio server in Codex MCP settings using this environment's absolute
 Scripts/python.exe path and these arguments:
 
 ```text
--m fanuc_workbench.bridge.mcp_server --config C:/absolute/path/robot_bridge.local.json
+-B -m fanuc_workbench.bridge.mcp_server --config C:/path/to/FanucMCPServer/.local/robot_bridge.local.json
 ```
 
 Equivalent local configuration:
 
 ```toml
 [mcp_servers.fanuc-mcp-server]
-command = "C:/absolute/path/.venv/Scripts/python.exe"
-args = ["-m", "fanuc_workbench.bridge.mcp_server", "--config", "C:/absolute/path/robot_bridge.local.json"]
+command = "C:/path/to/FanucMCPServer/.venv/Scripts/python.exe"
+args = ["-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", "C:/path/to/FanucMCPServer/.local/robot_bridge.local.json"]
 ```
 
 Restart the connection, then call list_robots and capabilities before network
@@ -176,8 +178,10 @@ are refused. Existing encoding and line endings are preserved, or an
 unrepresentable edit fails.
 
 Edited VA/DG listings are offline documentation/analysis. They are not uploaded
-as live register or frame changes. Live register-value/frame writes and I/O
-forcing have no verified provider.
+as live register or frame changes. Live R/PR value edits use the separately
+configured native provider and reviewed core plans described in
+[ROBOT_NATIVE_API.md](ROBOT_NATIVE_API.md). Frame writes and I/O forcing are
+unsupported.
 
 capture_snapshot and compare_snapshots reuse troubleshooting snapshots.
 make_package supports documentation (HTML/XLSX/PDF), baseline, roboguide staging,
@@ -187,16 +191,18 @@ not establish commissioning approval, launch ROBOGUIDE, or load a controller.
 ## Samples and recordings
 
 sample_robot reads needed NUMREG.VA, POSREG.VA and IOSTATE.DG files for 1-100
-expressions. R, PR, common I/O and flags are supported when readable evidence
-exists. PR[group,index] selects multigroup records. Per-signal errors and source
-files are retained. The two-second minimum is shared by bridge clients using
-the same host and state directory.
+expressions by default. R, PR, common I/O and flags are supported when readable
+evidence exists. PR[group,index] selects multigroup records. When explicitly
+configured, the native provider supplies live values instead. Per-signal errors
+and source evidence are retained. The two-second minimum is shared by bridge
+clients using the same host and state directory.
 
 start_watch captures 1-300 samples at intervals of 2-60 seconds. It retains
 trend/timeline CSV, cycle JSON, recording JSON and source artifact IDs. Missing
 samples do not invent transitions. cycle_signal must name a watched expression.
-Failed/cancelled jobs preserve partial recordings. This is file-based sampling,
-not deterministic real-time controller I/O.
+Failed/cancelled jobs preserve partial recordings. Captures are sequential and
+bounded by the selected provider; they are not deterministic real-time controller
+I/O.
 
 analyze_recording supports cycle_profile, handshake with explicit mapping, and
 alarm_correlation with a workspace and compatible timestamps. compare_recordings
@@ -238,13 +244,12 @@ The response explicitly reports `atomic_no_clobber: false`. Creation does not
 grant replacement permission; add a path to `writable_files` separately when
 reviewed subsequent replacements are intended. There is no chat delete tool.
 
-ROBOGUIDE validation used `ud1:FWB_TCP.TXT` on two local virtual controllers.
-Create/replace/readback, declined confirmation, duplicate creation, replay and
-stale-plan rejection passed through real MCP and FTP/TCP. Eight fixture writes
-were verified; both fixtures were left with the same 32-byte baseline marker.
-The SDK confirmation callback was automated and restricted to fixture targets
-and hashes. This tests the protocol, not a human confirmation UI or independent
-human authentication. No existing user files/programs were targeted.
+Validate storage creation on a dedicated test controller and exact fixture path.
+Check creation/replacement/readback, declined confirmation, duplicate creation,
+replay and stale-plan rejection. Automated SDK confirmation exercises the
+protocol; it does not establish a human confirmation UI or independent human
+authentication. Keep endpoints, approved hashes and test captures in local
+acceptance records.
 
 Live descriptions additionally require comment_service_url as an HTTP(S) origin
 on that robot host and exact comment_targets, such as ["R[1]", "PR[1]", "DIN[1]"].
@@ -268,12 +273,11 @@ Observed display values before/after are reported; captures are not atomic.
 HTTP 200 alone is insufficient. Whole-file replacements retain their strict
 whole-file hash checks.
 
-Two ROBOGUIDE controllers passed four real HTTP description writes: R[999] was
-changed and restored on each. Its value remained zero and all 999 descriptions
-per controller were restored. A background register changed during the test,
-demonstrating why whole-listing byte equality cannot be assumed. The controller's
-served comment page established the tested numeric-register ComSet contract.
-Other description kinds and physical-controller behavior remain unverified.
+Verify the controller's served ComSet contract before enabling descriptions.
+Use a dedicated test target, preserve and restore its original description, and
+check fresh target readback. Unrelated live values can change between captures;
+whole-listing byte equality is not a valid description staleness check. Confirm
+each configured description kind and retain its acceptance evidence locally.
 
 Interrupted writes or mismatched readback produce uncertain state and consume
 the plan. Inspect actual bytes/comments before another change. Coordinate other
@@ -290,10 +294,9 @@ trusted roots without cross-root symlinks.
 
 ```python
 from pathlib import Path
-from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.service import RobotBridge
 
-with RobotBridge(BridgeConfig.load(Path("robot_bridge.local.json"))) as bridge:
+with RobotBridge.from_config(Path(".local/robot_bridge.local.json")) as bridge:
     robots = bridge.list_robots()
     supported = bridge.operations.capabilities()
     # job = bridge.operations.start_backup("robot1")
@@ -306,15 +309,16 @@ also use ControllerService directly. API applications can dispatch function call
 locally to these operations. This package makes no OpenAI API/model calls and
 needs no OpenAI API key. It supplies no hosted authenticated gateway or model loop.
 
-Run python -m pytest -q with dev and mcp extras. Coverage includes original
+Run python -B -m pytest -q with dev and mcp extras. Coverage includes original
 services, all analysis kinds, encoding/bytes, partial captures, cancellation,
 process locks, samples/recordings, packages, file/comment recovery and real SDK
-stdio/elicitation flows. Automated unit tests use simulated transports; separate
-ROBOGUIDE tests cover TCP reads and storage-file writes. Physical controllers,
-program load/compile/execution and the actual Codex confirmation UI remain
-unverified.
+stdio/elicitation flows. Automated unit tests use synthetic fixtures and simulated
+transports. Controller-specific TCP, storage, ComSet and native API acceptance
+checks are separate and must retain local evidence. Physical-controller
+acceptance, native program deployment validation and the actual client
+confirmation UI remain pending. Program execution is unsupported.
 
-Official documentation checked October 16, 2026:
+Related official documentation:
 
 - [Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
 - [MCP tools and elicitation](https://developers.openai.com/plugins/build/mcp-server)

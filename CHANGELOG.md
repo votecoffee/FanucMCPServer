@@ -2,12 +2,26 @@
 
 ## Unreleased
 
-- Expanded the local MCP server to 33 tools: durable backup/watch jobs,
-  hash-manifested artifacts, 20 analyses, separate offline edits, recordings,
-  snapshots, offline packages, per-file recovery and audit access.
-- Added optional MCP client elicitation, bridge locks and shared sampling limits,
-  and disabled-by-default ComSet changes with fresh listing readback. Native
-  load/run/value/frame/safety writes remain unsupported.
+- Renamed the project and repository to FanucMCPServer. New installs use the
+  `fanuc-mcp-server` desktop/shared-service distribution and
+  `fanuc-mcp-server-bridge` headless distribution. Legacy Python imports and
+  commands remain compatible; existing runtime upgrades preserve configuration.
+- Added a stable 48-tool MCP host with a versioned operation catalog and
+  reloadable feature workers. All 20 workspace analyses use the bundled feature
+  release; compatible extensions can reload within an existing MCP session.
+- Added optional FANUC Robot Object native data over TCP, reviewed R/PR value
+  changes, and LS deployment through controller ASCII loading with native
+  preflight and TP/LS verification. Native access defaults to disabled; native
+  program deployment validation and physical-controller acceptance remain pending.
+  Motion, program execution/start/stop, I/O forcing, frame and safety writes
+  remain unsupported.
+- Added durable backup/watch jobs, hash-manifested artifacts, separate offline
+  edits, recordings, snapshots, offline packages, per-file recovery and audit
+  access.
+- Added MCP client elicitation, bridge locks, shared sampling limits and
+  disabled-by-default ComSet changes with fresh target-description readback.
+- Added hash-checked captured-byte ranges, base64 proposal staging, exact-policy
+  TXT/CSV storage creation and endpoint-only connection reload.
 - Preserved text encodings, corrected multigroup PR/flag decoding, excluded
   unavailable samples from timelines, closed failed FTP/SFTP connections and
   refused controller write redirects.
@@ -18,7 +32,10 @@
   reviewed application-file replacement with byte preservation, stale-file
   checks, backups, bounded reads, readback verification and audit evidence.
 - Added local plugin development descriptors and setup/API documentation.
-- Physical robot and Codex plugin installation validation remain pending.
+- Documented public contribution guidance and ignored private `.local/` storage;
+  removed tracked Python bytecode and local test narratives from public guides.
+- Physical-controller acceptance and client confirmation UI acceptance remain
+  separate from offline and SDK protocol checks.
 
 ## 2.0.0
 
