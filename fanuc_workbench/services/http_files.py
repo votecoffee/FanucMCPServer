@@ -80,7 +80,7 @@ class HttpFileReader:
                         destination.write(chunk)
                     if length is not None and total != int(length):
                         raise ValueError("HTTP response ended before its declared length")
-        except Exception as exc:
+        except BaseException as exc:
             if created:
                 local.unlink(missing_ok=True)
             if isinstance(exc, HTTPError):

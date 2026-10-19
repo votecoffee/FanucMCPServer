@@ -88,6 +88,23 @@ def test_nonallowlisted_files_keep_ftp_and_http_failure_has_no_ftp_fallback(tmp_
     assert len(seen) == 1 and not robot.uploads
 
 
+@pytest.mark.parametrize('status', [200, 404])
+def test_http_sample_selection_never_probes_alternate_file_roots(tmp_path, web, status):
+    origin, replies, seen = web
+    replies['/MD/NUMREG.VA?_TEMPLATE='] = (status, {'Content-Type': 'text/plain'}, b"[1] = 42 'Count'\n")
+    path, document = policy(tmp_path, origin)
+    document['robots']['r1']['profile']['roots'] = ['mc:', 'md:']
+    path.write_text(json.dumps(document), encoding='utf-8')
+    robot = MemoryRobot()
+    with RobotBridge.from_config(path, lambda _: robot) as bridge:
+        result = bridge.operations.sample('r1', ['R[1]'])
+        if status == 200:
+            assert result['values']['R[1]'] == '42'
+        else:
+            assert result['values']['R[1]'] is None and 'R[1]' in result['errors']
+    assert len(seen) == 1 and robot.connects == robot.uploads == 0
+
+
 @pytest.mark.parametrize('status,headers,payload', [
     (302, {'Location': '/karel/ComSet'}, b''),
     (200, {'Content-Type': 'text/html'}, b'<html>Login</html>'),

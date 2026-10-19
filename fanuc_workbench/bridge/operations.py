@@ -336,10 +336,14 @@ class WorkbenchOperations:
             folder = self.bridge._folder()
             unavailable, transports = [], {}
             for name in sorted(needed):
-                for root in access.profile.roots:
+                http_files = [value for value in access.http_read_files
+                              if value.rsplit(':', 1)[-1].casefold() == name.casefold()]
+                remotes = http_files if access.http_read_url and http_files else [
+                    root + name if root.endswith(':') else root.rstrip('/') + '/' + name
+                    for root in access.profile.roots]
+                for remote in remotes:
                     if checkpoint:
                         checkpoint()
-                    remote = root + name if root.endswith(":") else root.rstrip("/") + "/" + name
                     try:
                         transports[name] = self.bridge._download_read(
                             robot_id, self.bridge._path(robot_id, remote), folder / name)
