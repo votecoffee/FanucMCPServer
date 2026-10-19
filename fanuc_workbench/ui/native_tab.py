@@ -217,9 +217,11 @@ class NativeControllerTab(QWidget):
         if self.bridge and self.robot.currentData():
             access = self.bridge.config.robots[self.robot.currentData()]
             mode = 'Read-only' if self.bridge.config.read_only else 'Reviewed writes enabled'
+            broad = self.bridge.config.write_scope == 'all_supported'
+            registers = 'all supported R/PR targets' if broad else (', '.join(access.native_register_targets) or 'none')
+            programs = 'all supported application programs' if broad else (', '.join(access.native_programs) or 'none')
             self.policy.setText(f'{access.profile.host} | Access: {mode} | Native provider: {access.native_provider} | '
-                f'Writable registers: {", ".join(access.native_register_targets) or "none"} | '
-                f'Program targets: {", ".join(access.native_programs) or "none"}')
+                f'Writable registers: {registers} | Program targets: {programs}')
 
     def clear_capture(self):
         self.capture = None
