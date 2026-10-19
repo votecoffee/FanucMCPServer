@@ -24,7 +24,7 @@ For an existing extension-capable runtime whose CLI does not yet list `snpx`,
 stage the self-contained release directory with its existing installer:
 
 ```powershell
-python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/snpx_v1_1_0
+python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/snpx_v1_2_0
 ```
 
 Then call `reload_extensions`, `list_operations` and
@@ -33,10 +33,11 @@ revision with `run_read_operation`. Staging does not execute code, contact a
 controller or overwrite a preserved release. Keep published versions immutable;
 changed releases need a new version. See [feature development](ROBOT_EXTENSIONS.md).
 
-`install-builtin snpx` selects 1.1.0. The original 1.0.0 release remains preserved
+`install-builtin snpx` selects 1.2.0, which also adds
+[wire-evidence inspection](SNPX_EVIDENCE.md). The original 1.0.0 release remains preserved
 under `fanuc_workbench/extensions/snpx`; select that directory with `install` and
 reload to roll back. The current release lives in the separate
-`snpx_v1_1_0` directory. No previous release bytes are edited or overwritten.
+`snpx_v1_2_0` directory; 1.1.0 remains in `snpx_v1_1_0`. No previous release bytes are edited or overwritten.
 After any version switch, describe operations again to obtain their new exact
 revisions; stale revisions are refused.
 

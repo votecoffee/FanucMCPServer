@@ -153,10 +153,10 @@ def test_decoder_release_is_self_contained_and_stages_without_controller_contact
     result = install_builtin(root, 'snpx')
     assert result['status'] == 'staged_only' and not result['controller_contacted']
     assert {row['id'] for row in load_registry(root)} == {'workbench.analysis', 'workbench.snpx'}
-    release = root / 'releases/workbench.snpx/1.1.0'
+    release = root / 'releases/workbench.snpx/1.2.0'
     manifest, _ = load_release(release, result['manifest_sha256'])
     assert manifest['host_api'] == 1 and manifest['operations'][0]['effect'] == 'read'
-    assert set(manifest['files']) == {'feature.py', 'decoder.py', 'LICENSE.txt'}
+    assert set(manifest['files']) == {'feature.py', 'decoder.py', 'wire.py', 'LICENSE.txt', 'APACHE-2.0.txt', 'NOTICE.txt'}
     with pytest.raises(ValueError, match='Unknown'):
         handle('unsupported', {}, {})
 

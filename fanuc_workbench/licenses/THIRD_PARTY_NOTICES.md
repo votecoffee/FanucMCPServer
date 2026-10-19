@@ -53,5 +53,9 @@ assignment-clearing command, exposes no write/command API, validates exact
 read policy and framing, bounds capture duration and preserves wire evidence.
 Group/analog I/O exposes explicit operator-selected signed/unsigned 16-bit raw
 decoding, with no engineering-unit scaling.
+The offline inspector in `extensions/snpx_v1_2_0/wire.py` adapts the same pinned
+wire layout for saved-trace diagnostics, hash binding and word-payload
+correlation. Its self-contained release includes `APACHE-2.0.txt` and `NOTICE.txt`,
+alongside the MIT license for the original decoder/comparison code.
 It does not use the upstream high-level `connect()` method, which also clears
 assignments. It does not incorporate RMI, Stream Motion or proprietary binaries.

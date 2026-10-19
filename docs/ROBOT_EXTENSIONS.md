@@ -96,10 +96,11 @@ The bundled optional [VQLOG feature](VQLOG_ANALYSIS.md) can be staged with
 without changing the 48 permanent tools. It is self-contained and read-only.
 
 The optional [offline SNPX decoder](SNPX_DECODING.md) stages with
-`install-builtin snpx`. Version 1.1.0 supplies `workbench.snpx.decode_words`
-and `workbench.snpx.compare_words` for captured raw words, with explicit
+`install-builtin snpx`. Version 1.2.0 supplies `workbench.snpx.decode_words`,
+`workbench.snpx.compare_words` and [wire evidence inspection](SNPX_EVIDENCE.md)
+through `workbench.snpx.inspect_evidence`, with explicit
 byte/word order, integer/float types, float tolerances and raw change evidence.
-The 1.0.0 release remains preserved for rollback. This feature never connects
+The 1.0.0 and 1.1.0 releases remain preserved for rollback. This feature never connects
 to a controller or verifies assignment meaning. A compatible older CLI can stage
 its release directory with the existing `install` command, then reload normally.
 

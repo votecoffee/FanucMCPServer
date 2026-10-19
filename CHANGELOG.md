@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `workbench.snpx` 1.2.0 with offline `inspect_evidence`: capture/wire hash
+  binding, handshake/reply diagnostics, bounded frame checks, raw-word payload
+  correlation and explicit limits for I/O binding, timing and physical identity.
+  Prior feature releases remain intact; component licenses ship with the release.
 - Added `workbench.snpx` 1.1.0 with offline `compare_words`, same-endpoint/span
   checks, exact integer/string deltas, explicit float tolerances, raw changes,
   unavailable/overflow handling, source hashes and pagination. Preserved the
