@@ -67,6 +67,12 @@ py -3 -m venv .venv
 
 The default distribution includes the desktop dependencies. For a separate
 runtime without Qt, follow the [headless plugin bundle guide](docs/ROBOT_PLUGIN_SETUP.md).
+
+The standalone Codex plugin remains supported. An optional
+[Universal Tools integration](docs/UNIVERSAL_BROKER.md) uses the same services
+through CodexMCPBroker. Bundle setup with `--register auto` prefers a ready broker
+on fresh installations, retains FANUC workflow guidance and preserves recorded
+routes on upgrades. Use `--register plugin` to explicitly choose standalone.
 For desktop use alone, omit the `mcp` extra or run `install_and_run.bat`.
 On Windows, that script also creates **Start > FanucMCPServer > FanucMCPServer**
 with the application icon for the current user. For a manual installation, run
@@ -215,6 +221,7 @@ it requires a compatible controller service/options and never changes assignment
 - [Desktop connections, layouts, PLC imports and policy creation](docs/DESKTOP_GUIDE.md)
 - [MCP setup, tools and Python API](docs/ROBOT_BRIDGE.md)
 - [Headless plugin installation and upgrades](docs/ROBOT_PLUGIN_SETUP.md)
+- [Standalone plugin and Universal Tools routing](docs/UNIVERSAL_BROKER.md)
 - [Native controller configuration and verification limits](docs/ROBOT_NATIVE_API.md)
 - [Controller interfaces and software requirements](docs/CONTROLLER_INTERFACES.md)
 - [Optional allowlisted HTTP file reads](docs/HTTP_READS.md)

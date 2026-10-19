@@ -5,6 +5,28 @@ description: "Inspect FANUC robot files and diagnostic evidence, manage FanucMCP
 
 # FANUC robot work
 
+Choose the configured integration route before starting a workflow. With the
+standalone plugin, call its FANUC tools directly. With Universal Tools, search
+for service `fanuc-mcp-server`, read `describe_service` and the exact outer tool
+schema with `describe_tool`, then acquire its exclusive context. Include that
+`context_id` and the current broker `catalog_revision` on routed calls. Use
+`call_read_tool` for classified reads; local preparation, jobs and controller
+commits use `call_write_tool` with a unique `request_id` when permitted by its
+exact outer-tool policy. The robot's write policy and approval still apply.
+
+Broker capability matches are discovery hints. Describe the capability at its
+`capability_revision`, then call its referenced read-only `describe_operation`
+through the broker to obtain the actual app revision and argument schema.
+After a feature reload, refresh the owned capability snapshot. Keep broker,
+operation, target and proposal revisions distinct.
+
+Keep one route and retained context throughout prepare/review/commit. Other
+frontends cannot borrow that context. Finish jobs and reconcile pending changes
+before release, expiry or switching routes; closing the app host loses its
+in-memory plans. After a lost broker write response, inspect `get_request_status`
+and app evidence. Do not replay with a new ID or fall back to the direct plugin.
+A recovery barrier requires operator reconciliation, not automatic reacquisition.
+
 Use the FanucMCPServer tools for configured robots and preserved workspace
 artifacts. Begin a new robot workflow by inspecting `list_robots` and
 `capabilities`; use `probe_robot` only for the user's intended target. An empty

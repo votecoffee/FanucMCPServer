@@ -217,6 +217,34 @@ class ExtensionHost:
                     "total": len(rows), "offset": offset,
                     "next_offset": offset + limit if offset + limit < len(rows) else None, **self.status()}
 
+    def discovery_snapshot(self):
+        """Installation metadata only: never start/reload workers or select a robot."""
+        with self.lock:
+            if self.closed:
+                raise ValueError("Extension host has closed")
+            if self.current is not None:
+                return copy.deepcopy([*core_operations().values(), *self.current.operations.values()])
+        operations = list(core_operations().values())
+        if (self.root / "registry.json").exists():
+            rows = load_registry(self.root)
+            releases = [(row, release_path(self.root, row["id"], row["version"])) for row in rows]
+        else:
+            source = Path(__file__).resolve().parents[1] / "extensions" / "analysis"
+            manifest, checksum = load_release(source, packaged=True)
+            releases = [({"id": manifest["id"], "version": manifest["version"],
+                          "manifest_sha256": checksum}, source)]
+        for row, source in releases:
+            manifest, _ = load_release(source, row["manifest_sha256"], packaged=not (self.root / "registry.json").exists())
+            if manifest["id"] != row["id"] or manifest["version"] != row["version"]:
+                raise ValueError("Selected extension identity changed")
+            operations.extend({**descriptor, "extension_id": row["id"],
+                "revision": f"{row['id']}@{row['version']}:{row['manifest_sha256']}"}
+                for descriptor in manifest["operations"])
+        ids = [row["id"] for row in operations]
+        if len(ids) != len(set(ids)) or len(ids) > 1000:
+            raise ValueError("Invalid discovery catalog")
+        return operations
+
     def describe(self, operation_id):
         core = core_operations().get(operation_id)
         if core is not None:

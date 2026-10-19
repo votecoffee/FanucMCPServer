@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Retained the standalone Codex plugin and added an optional Universal Tools
+  adapter with discovery-only feature metadata and exclusive retained sessions.
+  Added automatic fresh-install routing, explicit broker/standalone overrides,
+  route-preserving upgrades and owned FANUC skill installation. Broker write
+  permission remains separate from robot policy and exact-change approval.
+
 - Added bounded concurrent MCP/shared-API requests, a reserved bookkeeping lane,
   configurable controller-lock waiting and request status through the existing
   operation catalog. Independent controllers can overlap while each write keeps

@@ -51,6 +51,12 @@ the setup script verifies file hashes and installs only from bundled wheels:
 py -3.14 -B C:/RobotTools/FanucPluginBundle/setup.py --runtime-dir C:/RobotTools/FanucRuntime --register plugin
 ```
 
+Use `--register auto` to prefer a ready Universal Tools broker for a fresh install,
+or `--register broker` to require it. Both retain the standalone package; broker
+setup installs the app's route-aware skill separately and preserves app policy.
+Automatic upgrades retain their recorded route. See
+[Universal Tools integration](UNIVERSAL_BROKER.md) for prerequisites and limits.
+
 Use `--register mcp` for plain MCP registration, or omit registration to install
 only the runtime. Do not register both forms in the same profile. Optional
 `--codex-home C:/RobotTools/IsolatedCodexProfile` confines CLI registration to a
