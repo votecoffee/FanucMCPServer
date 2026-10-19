@@ -4,7 +4,8 @@
 
 Use **Robot > Connection** to create or edit a connection profile and the
 **Saved robot** selector on Backup / History to switch profiles. A successful
-connection test or backup remembers that robot for the next app session.
+connection test, backup, live file sample or raw-file upload remembers that robot
+for the next app session.
 Selection alone is also remembered when no previous successful connection is
 available. Reopening the app selects the profile without automatically connecting.
 Passwords are excluded from saved profiles and desktop preferences.

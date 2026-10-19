@@ -103,13 +103,16 @@ class LiveMonitorTab(QWidget):
         if self.source.currentIndex()==0:
             if not self.owner.workspace:return
             provider=WorkspaceSampleProvider(self.owner.workspace)
+            self._sample_profile=None
         else:
             if not self.owner.current_profile:return
             provider=ControllerFileSampleProvider(create_backend(self.owner.current_profile),self.owner.current_profile,max(2,self.interval.value()))
+            self._sample_profile=self.owner.current_profile
         self.inflight=True
         def work(*,progress):return provider.sample(specs)
         wk=Worker(work);wk.signals.result.connect(self.sample_ready);wk.signals.error.connect(lambda e:self.owner.statusBar().showMessage('Live sample failed: '+e.splitlines()[-1]));wk.signals.finished.connect(lambda:setattr(self,'inflight',False));self.owner.thread_pool.start(wk)
     def sample_ready(self,s):
+        if getattr(self,'_sample_profile',None) is not None and hasattr(self.owner,'remember_connection'):self.owner.remember_connection(self._sample_profile)
         self.last_sample=s;self.trend.add(s);before=len(self.timeline.events);self.timeline.add(s)
         aliases=[]
         for r,spec in self.spec_rows():

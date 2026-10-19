@@ -57,6 +57,26 @@ def test_last_successful_robot_is_restored_without_persisting_passwords(desktop,
     reopened.close()
 
 
+def test_successful_live_sampling_remembers_the_sampled_robot(desktop,monkeypatch):
+    from fanuc_workbench.ui import advanced_tabs
+    app,store=desktop
+    store.save_profiles([RobotProfile('First','192.0.2.1'),RobotProfile('Second','192.0.2.2')])
+    store.remember_profile(store.load_profiles()[0],connected=True)
+    window=main_window.MainWindow();window.profile_combo.setCurrentIndex(1)
+    class Immediate:
+        def start(self,worker):worker.run()
+    class Provider:
+        def __init__(self,*_):pass
+        def sample(self,specs):return Sample(1,{'PartCount':1})
+    window.thread_pool=Immediate()
+    monkeypatch.setattr(advanced_tabs,'create_backend',lambda _:None)
+    monkeypatch.setattr(advanced_tabs,'ControllerFileSampleProvider',Provider)
+    window.live_tab.source.setCurrentIndex(1);window.live_tab.poll_once()
+    assert store.preferences()['last_connected_robot']['host']=='192.0.2.2'
+    window.close()
+    reopened=main_window.MainWindow();assert reopened.current_profile.name=='Second';reopened.close()
+
+
 def test_column_widths_split_sizes_and_tab_visibility_order_survive_reopen(desktop):
     app, store = desktop
     window = main_window.MainWindow()

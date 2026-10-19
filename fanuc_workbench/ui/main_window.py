@@ -216,7 +216,10 @@ class MainWindow(QMainWindow):
         p=self.current_profile; self.upload_btn.setEnabled(False)
         def work(*,progress):
             return ControllerService(p).upload_file(local,remote)
-        wk=Worker(work); wk.signals.result.connect(lambda x:self.file_log.appendPlainText(f'Uploaded {local.name} -> {x}')); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Upload failed',e)); wk.signals.finished.connect(lambda:self.upload_btn.setEnabled(True)); self.thread_pool.start(wk)
+        def uploaded(remote):
+            self.remember_connection(p)
+            self.file_log.appendPlainText(f'Uploaded {local.name} -> {remote}')
+        wk=Worker(work); wk.signals.result.connect(uploaded); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Upload failed',e)); wk.signals.finished.connect(lambda:self.upload_btn.setEnabled(True)); self.thread_pool.start(wk)
 
     def closeEvent(self, event):
         if self.native_tab.busy:
