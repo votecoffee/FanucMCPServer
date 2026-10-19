@@ -144,7 +144,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 | Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation and troubleshooting snapshots |
 | Native controller API | R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR value changes and LS deployment |
 | Experimental SNPX | Optional digital/group/analog I/O samples with explicit word decoding and raw assigned-word reads over TCP; controller compatibility remains unverified |
-| Offline SNPX decoding | Optional reloadable integer/float interpretation of captured words with explicit byte/word order and unverified mappings |
+| Offline SNPX analysis | Reloadable integer/float decoding and capture comparison, with explicit byte/word order, exact integer deltas, float tolerances and unverified mappings |
 | Extensions | 48 stable MCP tools, a versioned operation catalog and reloadable feature workers, including 20 workspace analyses |
 | Visual Line Tracking | Optional reloadable VQLOG event analysis, filters, timelines and explicit tick-period assumptions |
 | Desktop workflows | Fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |
@@ -178,7 +178,7 @@ it requires a compatible controller service/options and never changes assignment
 - [Controller interfaces and software requirements](docs/CONTROLLER_INTERFACES.md)
 - [Optional allowlisted HTTP file reads](docs/HTTP_READS.md)
 - [Experimental read-only SNPX/HMI provider](docs/SNPX_READS.md)
-- [Reloadable offline SNPX word decoding](docs/SNPX_DECODING.md)
+- [Reloadable offline SNPX decoding and comparison](docs/SNPX_DECODING.md)
 - [Reloadable VQLOG analysis](docs/VQLOG_ANALYSIS.md)
 - [Community integration references](docs/COMMUNITY_INTEGRATIONS.md)
 - [Reloadable feature development](docs/ROBOT_EXTENSIONS.md)

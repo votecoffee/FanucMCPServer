@@ -127,6 +127,8 @@ The optional [offline decoder extension](SNPX_DECODING.md) can interpret preserv
 capture bytes as explicit integer/float layouts. It adds no controller access and
 keeps assignments and provenance unverified. Install/reload it through the
 existing feature catalog without changing MCP tool schemas.
+Version 1.1.0 also compares matching configured endpoints/spans with exact
+integer deltas, optional float tolerances and retained raw-word changes.
 
 ## Protocol and evidence
 

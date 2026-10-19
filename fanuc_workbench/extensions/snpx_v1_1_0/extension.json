@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "id": "workbench.snpx",
+  "version": "1.1.0",
+  "host_api": 1,
+  "entrypoint": "feature.py",
+  "files": {
+    "feature.py": "ffee0895a2b43f8bb29995a1824f6c902312b1eb3f6b91068507f74848ef9e92",
+    "decoder.py": "1d67ab4ca4fbc088d7b653b3891702131df2683965fd4c896467cc0b9234311a",
+    "LICENSE.txt": "9fdbc8c41abf794f69c3488f463798e06338bf90ebefbe2daee329d217c83d44"
+  },
+  "operations": [
+    {
+      "id": "workbench.snpx.decode_words",
+      "description": "Decode preserved SNPX raw words with explicit integer/float, byte and word order; mappings stay unverified",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,63}$"
+                },
+                "word_offset": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 127
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "u16",
+                    "i16",
+                    "u32",
+                    "i32",
+                    "f32",
+                    "u64",
+                    "i64",
+                    "f64"
+                  ]
+                },
+                "byte_order": {
+                  "type": "string",
+                  "enum": [
+                    "little",
+                    "big"
+                  ]
+                },
+                "word_order": {
+                  "type": "string",
+                  "enum": [
+                    "low_first",
+                    "high_first"
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 128
+                }
+              },
+              "required": [
+                "name",
+                "word_offset",
+                "type",
+                "byte_order",
+                "word_order"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "artifact_id",
+          "path",
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "capture",
+          "argument": "artifact_id",
+          "kind": "any",
+          "file_argument": "path"
+        }
+      ]
+    },
+    {
+      "id": "workbench.snpx.compare_words",
+      "description": "Compare two preserved same-endpoint SNPX word spans; exact integers, explicit float tolerances and retained raw changes",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "before_artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "before_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "after_artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "after_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,63}$"
+                },
+                "word_offset": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 127
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "u16",
+                    "i16",
+                    "u32",
+                    "i32",
+                    "f32",
+                    "u64",
+                    "i64",
+                    "f64"
+                  ]
+                },
+                "byte_order": {
+                  "type": "string",
+                  "enum": [
+                    "little",
+                    "big"
+                  ]
+                },
+                "word_order": {
+                  "type": "string",
+                  "enum": [
+                    "low_first",
+                    "high_first"
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 128
+                }
+              },
+              "required": [
+                "name",
+                "word_offset",
+                "type",
+                "byte_order",
+                "word_order"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "absolute_tolerance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1e+100
+          },
+          "relative_tolerance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "changes_only": {
+            "type": "boolean"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "before_artifact_id",
+          "before_path",
+          "after_artifact_id",
+          "after_path",
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "before",
+          "argument": "before_artifact_id",
+          "kind": "any",
+          "file_argument": "before_path"
+        },
+        {
+          "name": "after",
+          "argument": "after_artifact_id",
+          "kind": "any",
+          "file_argument": "after_path"
+        }
+      ]
+    }
+  ]
+}

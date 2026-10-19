@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added `workbench.snpx` 1.1.0 with offline `compare_words`, same-endpoint/span
+  checks, exact integer/string deltas, explicit float tolerances, raw changes,
+  unavailable/overflow handling, source hashes and pagination. Preserved the
+  immutable 1.0.0 release; both upgrades and rollback use the existing reload
+  command and 48 permanent MCP tools. Shared Python uses the current release.
 - Added a self-contained reloadable `workbench.snpx.decode_words` offline feature
   for captured 16/32/64-bit integers and IEEE floats, with explicit per-field
   byte/word order, bounded arrays, source hashes and unavailable/nonfinite errors.
