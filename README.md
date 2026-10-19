@@ -141,6 +141,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 | --- | --- |
 | Files and backups | FTP/SFTP listing, exact file/log capture, backup jobs, manifests, comparisons and reviewed per-file recovery |
 | Offline engineering | LS inspection, lint, cross references, R/PR/frame/comment evidence, mastering/DCS comparisons and documentation packages |
+| Program dependencies | Optional reloadable selected-LS call/run inspection, unresolved targets and static reachability from explicit entry programs |
 | Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation, troubleshooting snapshots, offline summaries, evidence bundles and sampled request/ack analysis |
 | Native controller API | R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR value changes and LS deployment |
 | Experimental SNPX | Optional digital/group/analog I/O samples with explicit word decoding and raw assigned-word reads over TCP; controller compatibility remains unverified |
@@ -188,6 +189,7 @@ it requires a compatible controller service/options and never changes assignment
 - [Reloadable VQLOG analysis](docs/VQLOG_ANALYSIS.md)
 - [Reloadable alarm records and recurrence analysis](docs/ALARM_ANALYSIS.md)
 - [Saved alarm log comparison](docs/ALARM_COMPARISON.md)
+- [Selected LS program dependencies and static reachability](docs/PROGRAM_DEPENDENCIES.md)
 - [Community integration references](docs/COMMUNITY_INTEGRATIONS.md)
 - [Reloadable feature development](docs/ROBOT_EXTENSIONS.md)
 - [Shared-service coverage](docs/ROBOT_BRIDGE_COVERAGE.md)

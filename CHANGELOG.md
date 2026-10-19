@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a self-contained MIT `workbench.programs` feature for bounded selected-LS
+  call/run references, comment/string masking, unresolved and ambiguous targets,
+  and explicit-entry static reachability. Controller inventory, compiler validity
+  and runtime reachability remain unverified; the 48 MCP tools stay unchanged.
 - Added `workbench.alarms` 1.1.0 saved-log comparison with independent explicit
   clocks, code presence/count deltas and complete severity/message pair checks.
   Count changes do not identify physical events or comparable capture windows;

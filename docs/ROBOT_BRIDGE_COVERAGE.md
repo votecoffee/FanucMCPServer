@@ -19,7 +19,7 @@ reported through `capabilities`.
 | Comment/data editing | Separate source copies through existing setters | Generated listings stay offline; no live value/frame writes |
 | Live comments | ComSet preparation/approval/readback with preserved references and target description staleness checks | Exact target/origin and byte/encoding policy; controller-specific ComSet compatibility must be verified |
 | Diagnostics | Health, alarms, recurrence, optional explicit-clock text log analysis/comparison, mastering and DCS evidence | Offline count differences do not identify physical occurrences or comparable capture windows; mastering/DCS read-only |
-| Lint and cross references | Lint, dependencies, unused programs, register usage, LS validation and flow | Structural evidence; no compiler |
+| Lint and cross references | Lint, dependencies, unused programs, register usage, LS validation/flow and optional selected-LS static graph | Explicit graph entry names and unresolved references; structural evidence; no compiler or runtime reachability verification |
 | Option inventory | Matches and unknown status | Does not authenticate installed options |
 | EtherNet/IP | Adapter/scanner evidence | No configuration write |
 | Monitoring | Samples, watch jobs, trend/timeline/cycle exports, profiles, offline summaries and recording evidence bundles | Two-second minimum; sample links and retained SNPX traces can be inspected offline; physical provenance and I/O wire-value mapping stay unverified |

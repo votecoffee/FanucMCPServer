@@ -104,6 +104,12 @@ Version 1.1.0 adds [saved-log comparison](ALARM_COMPARISON.md) using full parsed
 severity/message distributions and independent clocks. Version 1.0.0 remains
 unchanged under `extensions/alarms` for rollback.
 
+The optional [selected-LS program inspector](PROGRAM_DEPENDENCIES.md) stages
+with `install-builtin programs`. `workbench.programs.dependencies` masks quoted
+and comment text, retains unresolved/ambiguous calls, and computes a static graph
+from explicit entry names. It is a self-contained MIT release for host API 1;
+runtime reachability and compiler validity remain unverified.
+
 The optional [offline SNPX decoder](SNPX_DECODING.md) stages with
 `install-builtin snpx`. Version 1.3.0 supplies `workbench.snpx.decode_words`,
 `workbench.snpx.compare_words` and [wire evidence inspection](SNPX_EVIDENCE.md)
