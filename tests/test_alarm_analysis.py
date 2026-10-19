@@ -194,8 +194,9 @@ def test_builtin_staging_preserves_analysis_and_pins_self_contained_mit_release(
     result = install_builtin(tmp_path, 'alarms')
     assert result['status'] == 'staged_only' and not result['controller_contacted']
     assert {row['id'] for row in load_registry(tmp_path)} == {'workbench.analysis', 'workbench.alarms'}
-    manifest, _ = load_release(tmp_path / 'releases/workbench.alarms/1.0.0', result['manifest_sha256'])
-    assert set(manifest['files']) == {'feature.py', 'LICENSE.txt'} and manifest['operations'][0]['effect'] == 'read'
+    manifest, _ = load_release(tmp_path / 'releases/workbench.alarms/1.1.0', result['manifest_sha256'])
+    assert set(manifest['files']) == {'feature.py', 'parser.py', 'comparison.py', 'LICENSE.txt'}
+    assert all(operation['effect'] == 'read' for operation in manifest['operations'])
     with pytest.raises(ValueError, match='Unknown'):
         handle('other', {}, {})
 
@@ -232,7 +233,7 @@ def test_same_mcp_session_loads_alarm_feature_and_handles_large_page_with_48_too
                 'artifact_id': imported['artifact_id'], 'path': 'alarm.txt', 'date_order': 'ymd', 'utc_offset_minutes': 0}}
             result = (await call('run_read_operation', request))['result']
             assert result['parsed_alarm_records'] == 100 and len(result['items']) == 100
-            assert not result['alarm_occurrences_verified'] and (await call('list_operations', {}))['total'] == 35
+            assert not result['alarm_occurrences_verified'] and (await call('list_operations', {}))['total'] == 36
             assert (await session.call_tool('run_read_operation', {**request,
                 'arguments': {**request['arguments'], 'path': '../outside'}})).isError
             assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).isError

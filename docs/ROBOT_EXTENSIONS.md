@@ -100,6 +100,9 @@ The optional [text alarm feature](ALARM_ANALYSIS.md) stages with
 retains unrecognized lines, and reports code recurrence with explicit date order,
 fixed UTC offset and file-order assumptions. It is a self-contained MIT release
 using only the standard library; compatible host API 1 sessions can reload it.
+Version 1.1.0 adds [saved-log comparison](ALARM_COMPARISON.md) using full parsed
+severity/message distributions and independent clocks. Version 1.0.0 remains
+unchanged under `extensions/alarms` for rollback.
 
 The optional [offline SNPX decoder](SNPX_DECODING.md) stages with
 `install-builtin snpx`. Version 1.3.0 supplies `workbench.snpx.decode_words`,

@@ -1,10 +1,14 @@
 # Offline text alarm analysis
 
-The optional `workbench.alarms` 1.0.0 feature analyzes an explicitly selected
+The optional `workbench.alarms` feature analyzes an explicitly selected
 saved text file. It preserves unrecognized lines, groups parsed alarm codes and
 converts supported timestamps under explicit clock assumptions. It opens no
 controller connection and modifies no input. Local Python and MCP share the
 same implementation, which needs only Python's standard library.
+
+Version 1.1.0 also adds [two-log comparison](ALARM_COMPARISON.md), preserving the
+single-log result contract. The original 1.0.0 release remains unchanged under
+`extensions/alarms`; the current release is `extensions/alarms_v1_1_0`.
 
 ## Activate and call
 
@@ -19,12 +23,13 @@ An older extension-capable installer can stage the self-contained directory
 through its existing `install` command:
 
 ```powershell
-python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/alarms
+python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/alarms_v1_1_0
 ```
 
-The catalog gains `workbench.alarms.analyze`; the permanent 48 MCP tools stay
-unchanged. Staging does not activate code, install dependencies or contact a
-robot. See [feature reload](ROBOT_EXTENSIONS.md) for activation and versioning.
+The catalog gains `workbench.alarms.analyze` and `workbench.alarms.compare`;
+the permanent 48 MCP tools stay unchanged. Staging does not activate code,
+install dependencies or contact a robot. See
+[feature reload](ROBOT_EXTENSIONS.md) for activation and versioning.
 
 Describe `workbench.alarms.analyze`, then call `run_read_operation` with its
 exact revision and these arguments:

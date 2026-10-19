@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `workbench.alarms` 1.1.0 saved-log comparison with independent explicit
+  clocks, code presence/count deltas and complete severity/message pair checks.
+  Count changes do not identify physical events or comparable capture windows;
+  the original 1.0.0 release and 48 permanent MCP tool schemas are preserved.
 - Added a self-contained MIT `workbench.alarms` feature for bounded selected-log
   analysis, unrecognized/malformed evidence, explicit date order/UTC offsets,
   exact microseconds and paginated code recurrence. Parsed records do not verify
