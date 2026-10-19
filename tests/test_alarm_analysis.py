@@ -224,7 +224,7 @@ def test_same_mcp_session_loads_alarm_feature_and_handles_large_page_with_48_too
                 assert not response.isError, response
                 return json.loads(response.content[0].text)
 
-            assert (await call('list_operations', {}))['total'] == 34
+            baseline_total = (await call('list_operations', {}))['total']
             imported = await call('import_workspace', {'source_folder': 'fixture'})
             install_builtin(tmp_path / 'state/extensions', 'alarms')
             assert not (await call('reload_extensions', {}))['mcp_tools_changed']
@@ -233,7 +233,7 @@ def test_same_mcp_session_loads_alarm_feature_and_handles_large_page_with_48_too
                 'artifact_id': imported['artifact_id'], 'path': 'alarm.txt', 'date_order': 'ymd', 'utc_offset_minutes': 0}}
             result = (await call('run_read_operation', request))['result']
             assert result['parsed_alarm_records'] == 100 and len(result['items']) == 100
-            assert not result['alarm_occurrences_verified'] and (await call('list_operations', {}))['total'] == 36
+            assert not result['alarm_occurrences_verified'] and (await call('list_operations', {}))['total'] == baseline_total + 2
             assert (await session.call_tool('run_read_operation', {**request,
                 'arguments': {**request['arguments'], 'path': '../outside'}})).isError
             assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).isError

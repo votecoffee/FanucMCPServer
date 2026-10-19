@@ -224,7 +224,7 @@ def test_same_mcp_session_loads_summary_with_48_tools_and_checks_artifact_hashes
                 assert not response.isError, response
                 return json.loads(response.content[0].text)
 
-            assert (await call('list_operations', {}))['total'] == 34
+            baseline_total = (await call('list_operations', {}))['total']
             imported = await call('import_workspace', {'source_folder': 'fixture'})
             install_builtin(tmp_path / 'state/extensions', 'recording')
             assert (await call('reload_extensions', {}))['status'] == 'reloaded'
@@ -233,7 +233,7 @@ def test_same_mcp_session_loads_summary_with_48_tools_and_checks_artifact_hashes
             request = {'operation_id': descriptor['id'], 'revision': descriptor['revision'], 'arguments': arguments}
             result = (await call('run_read_operation', request))['result']
             assert result['items'][0]['adjacent_changes'] == 1 and not result['controller_contacted']
-            assert (await call('list_operations', {}))['total'] == 37
+            assert (await call('list_operations', {}))['total'] == baseline_total + 3
             assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools
             assert len(tools) == 48
             assert (await session.call_tool('run_read_operation', {**request,

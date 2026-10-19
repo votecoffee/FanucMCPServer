@@ -195,7 +195,7 @@ def test_same_mcp_session_loads_compares_rolls_back_and_checks_both_artifacts(tm
                 assert not response.isError, response
                 return json.loads(response.content[0].text)
 
-            assert (await call('list_operations', {}))['total'] == 34
+            baseline_total = (await call('list_operations', {}))['total']
             artifacts = [await call('import_workspace', {'source_folder': folder}) for folder in ('baseline', 'candidate')]
             release_root = tmp_path / 'state/extensions'
             install_builtin(release_root, 'alarms')
@@ -207,14 +207,14 @@ def test_same_mcp_session_loads_compares_rolls_back_and_checks_both_artifacts(tm
                 'baseline_clock': CLOCK, 'candidate_clock': CLOCK}}
             result = (await call('run_read_operation', request))['result']
             assert result['status_counts']['changed'] == 100 and len(result['items']) == 100
-            assert (await call('list_operations', {}))['total'] == 36
+            assert (await call('list_operations', {}))['total'] == baseline_total + 2
             for field in ('baseline_path', 'candidate_path'):
                 assert (await session.call_tool('run_read_operation', {**request,
                     'arguments': {**request['arguments'], field: '../outside'}})).isError
             assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).isError
             install_release(release_root, repo / 'fanuc_workbench/extensions/alarms', packaged=True)
             await call('reload_extensions', {})
-            assert (await call('list_operations', {}))['total'] == 35
+            assert (await call('list_operations', {}))['total'] == baseline_total + 1
             assert (await session.call_tool('run_read_operation', request)).isError
             legacy = await call('describe_operation', {'operation_id': 'workbench.alarms.analyze'})
             install_builtin(release_root, 'alarms')

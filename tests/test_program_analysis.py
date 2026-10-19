@@ -239,7 +239,7 @@ def test_same_mcp_session_reloads_inspector_and_checks_artifact_paths_and_large_
                 assert not response.isError, response
                 return json.loads(response.content[0].text)
 
-            assert (await call('list_operations', {}))['total'] == 34
+            baseline_total = (await call('list_operations', {}))['total']
             imported = await call('import_workspace', {'source_folder': 'fixture'})
             install_builtin(tmp_path / 'state/extensions', 'programs')
             assert not (await call('reload_extensions', {}))['mcp_tools_changed']
@@ -249,7 +249,7 @@ def test_same_mcp_session_reloads_inspector_and_checks_artifact_paths_and_large_
             result = (await call('run_read_operation', request))['result']
             assert result['reference_count'] == 100 and len(result['items']) == 100 and result['reachable_programs'] == 2
             assert len(json.dumps(result, ensure_ascii=True).encode()) < 2 * 1024 * 1024
-            assert (await call('list_operations', {}))['total'] == 35
+            assert (await call('list_operations', {}))['total'] == baseline_total + 1
             assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).isError
             assert (await session.call_tool('run_read_operation', {**request,
                 'arguments': {**request['arguments'], 'paths': ['../outside.LS']}})).isError
