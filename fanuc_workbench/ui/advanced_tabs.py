@@ -19,7 +19,7 @@ from fanuc_workbench.services.snapshots import capture_snapshot,compare_snapshot
 from fanuc_workbench.services.diagnostics import alarm_intelligence
 from fanuc_workbench.services.display import watch_value
 from fanuc_workbench.services.profiles import copy_profile,profile_signature
-from fanuc_workbench.services.live_recording import LiveRecording,recording_source
+from fanuc_workbench.services.live_recording import LiveRecording,recording_source,numeric_segments
 
 def item(v,editable=False):
     x=QTableWidgetItem('' if v is None else str(v))
@@ -35,24 +35,22 @@ def browse_file(edit,title,flt='All files (*)'):
     if p:edit.setText(p)
 
 class TrendPlot(QWidget):
-    def __init__(self,parent=None):super().__init__(parent);self.samples=[];self.key='';self.setMinimumHeight(180)
-    def set_data(self,samples,key):self.samples=samples;self.key=key;self.update()
+    def __init__(self,parent=None):super().__init__(parent);self.samples=[];self.key='';self.break_before=[];self.setMinimumHeight(180)
+    def set_data(self,samples,key,*,break_before=()):self.samples=samples;self.key=key;self.break_before=list(break_before);self.update()
     def paintEvent(self,e):
         p=QPainter(self);p.fillRect(self.rect(),self.palette().base());p.setPen(QPen(self.palette().text().color()));p.drawText(8,18,self.key or 'Select a numeric watch signal')
-        vals=[]
-        for s in self.samples:
-            v=s.values.get(self.key)
-            try:v=float(v)
-            except (TypeError,ValueError):continue
-            vals.append((s.timestamp,v))
-        if len(vals)<2:return
+        segments=numeric_segments(self.samples,self.key,break_before=self.break_before)
+        vals=[point for segment in segments for point in segment]
+        if not vals:return
         left,top,right,bottom=45,28,self.width()-12,self.height()-28
-        t0,t1=vals[0][0],vals[-1][0];v0=min(v for _,v in vals);v1=max(v for _,v in vals)
+        t0,t1=min(t for t,_ in vals),max(t for t,_ in vals);v0=min(v for _,v in vals);v1=max(v for _,v in vals)
         if t1==t0:t1=t0+1
-        if v1==v0:v1=v0+1
         p.drawLine(left,bottom,right,bottom);p.drawLine(left,top,left,bottom);p.drawText(2,top+5,f'{v1:.3g}');p.drawText(2,bottom,f'{v0:.3g}')
-        pts=[QPointF(left+(t-t0)/(t1-t0)*(right-left),bottom-(v-v0)/(v1-v0)*(bottom-top)) for t,v in vals]
-        for a,b in zip(pts,pts[1:]):p.drawLine(a,b)
+        scale=max(abs(v0),abs(v1),1);low,high=v0/scale,v1/scale
+        for segment in segments:
+            pts=[QPointF(left+(t-t0)/(t1-t0)*(right-left),bottom-((v/scale-low)/(high-low) if high!=low else .5)*(bottom-top)) for t,v in segment]
+            if len(pts)==1:p.drawPoint(pts[0])
+            for a,b in zip(pts,pts[1:]):p.drawLine(a,b)
 
 class LiveMonitorTab(QWidget):
     def __init__(self,owner):
@@ -127,6 +125,7 @@ class LiveMonitorTab(QWidget):
     def pause_sampling(self,reason,*,end_cycle=False):
         paused=self.timer.isActive() or self.inflight or self.cycle_recording
         self.timer.stop();self.start.setText('Start');self._sample_generation=getattr(self,'_sample_generation',0)+1
+        self.recording.pause(reason)
         if end_cycle and self.cycle_recording:self.cycle.mark('END',reason);self.cycle_recording=False;self.render_profile()
         return paused
     def new_recording(self):
@@ -165,7 +164,7 @@ class LiveMonitorTab(QWidget):
         return out
     def specs(self):return [s for _,s in self.spec_rows()]
     def _trend_ui(self):
-        w=QWidget();l=QVBoxLayout(w);row=QHBoxLayout();self.plot_key=QComboBox();self.plot_key.currentTextChanged.connect(lambda k:self.plot.set_data(self.trend.samples,k));row.addWidget(QLabel('Signal'));row.addWidget(self.plot_key);b=QPushButton('Export CSV…');b.clicked.connect(self.export_trend);row.addWidget(b);b=QPushButton('Clear');b.clicked.connect(lambda:(self.trend.clear(),self.plot.update()));row.addWidget(b);row.addStretch();l.addLayout(row);self.plot=TrendPlot();l.addWidget(self.plot,1);return w
+        w=QWidget();l=QVBoxLayout(w);row=QHBoxLayout();self.plot_key=QComboBox();self.plot_key.currentTextChanged.connect(lambda k:self.plot.set_data(self.trend.samples,k,break_before=self.recording.trend_breaks));row.addWidget(QLabel('Signal'));row.addWidget(self.plot_key);b=QPushButton('Export CSV…');b.clicked.connect(self.export_trend);row.addWidget(b);b=QPushButton('Clear');b.clicked.connect(lambda:(self.trend.clear(),self.plot.set_data(self.trend.samples,self.plot_key.currentText())));row.addWidget(b);row.addStretch();l.addLayout(row);self.plot=TrendPlot();l.addWidget(self.plot,1);return w
     def _timeline_ui(self):
         w=QWidget();l=QVBoxLayout(w);self.events=QTableWidget(0,4);self.events.setHorizontalHeaderLabels(['Time','Signal','Old','New']);self.events.horizontalHeader().setSectionResizeMode(1,QHeaderView.Stretch);l.addWidget(self.events);row=QHBoxLayout();b=QPushButton('Export timeline CSV…');b.clicked.connect(self.export_timeline);row.addWidget(b);b=QPushButton('Clear timeline');b.clicked.connect(self.clear_timeline);row.addWidget(b);row.addStretch();l.addLayout(row);return w
     def _cycle_ui(self):
@@ -237,7 +236,7 @@ class LiveMonitorTab(QWidget):
         self.watch.resizeRowsToContents()
         current=self.plot_key.currentText();self.plot_key.blockSignals(True);self.plot_key.clear();self.plot_key.addItems(aliases);self.plot_key.setCurrentText(current if current in aliases else (aliases[0] if aliases else ''));self.plot_key.blockSignals(False)
         current2=self.cycle_key.currentText();self.cycle_key.clear();self.cycle_key.addItems(aliases);self.cycle_key.setCurrentText(current2 if current2 in aliases else (aliases[0] if aliases else ''))
-        self.plot.set_data(self.trend.samples,self.plot_key.currentText())
+        self.plot.set_data(self.trend.samples,self.plot_key.currentText(),break_before=self.recording.trend_breaks)
         for e in self.timeline.events[before:]:
             r=self.events.rowCount();self.events.insertRow(r)
             for c,v in enumerate([e.iso_time,e.signal,e.old,e.new]):self.events.setItem(r,c,item(v))
@@ -248,7 +247,7 @@ class LiveMonitorTab(QWidget):
     def export_timeline(self):
         p,_=QFileDialog.getSaveFileName(self,'Export timeline','fanuc_timeline.csv','CSV (*.csv)');
         if p:self.timeline.export_csv(Path(p))
-    def clear_timeline(self):self.timeline=TimelineRecorder();self.events.setRowCount(0)
+    def clear_timeline(self):self.recording.clear_timeline();self.events.setRowCount(0)
     def start_cycle(self):
         if self.cycle_recording:self.owner.statusBar().showMessage('Cycle recording is already running. Stop / Profile it before starting another.');return
         try:self.recording.ensure_context(self.current_source(),self.specs())

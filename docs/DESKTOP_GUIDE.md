@@ -118,6 +118,14 @@ Connection passwords are excluded from the source snapshot. Export uses atomic
 replacement, retaining the previous file if writing fails. Individual trend/
 timeline CSV and cycle JSON exports remain available.
 
+Trend lines break at missing/error/nonfinite values and explicit pauses. Timeline
+changes require consecutive valid observations, so a value seen after a gap
+starts a new baseline. Cycle profiles show `UNAVAILABLE` and `PAUSED` periods
+separately. Recording JSON retains pause timestamps/reasons and zero-based
+`gap_before_samples` sequence numbers; `first_retained_sample` locates retained
+trend rows after Clear. It preserves sampled evidence without asserting values
+between observations.
+
 Collection stops at 10,000 received samples per recording, including samples
 whose trend rows were later cleared. Export and start a new recording to
 continue. Invalid or backwards sample timestamps stop collection while retaining

@@ -9,9 +9,10 @@ import math
 import os
 from pathlib import Path
 import tempfile
+import time
 from uuid import uuid4
 
-from fanuc_workbench.services.monitoring import (CycleRecorder, Sample, TimelineRecorder,
+from fanuc_workbench.services.monitoring import (CycleEvent, CycleRecorder, Sample, TimelineRecorder,
     TrendRecorder, WATCH_RE)
 
 
@@ -40,6 +41,25 @@ def watch_definitions(specs) -> list[dict]:
     return result
 
 
+def numeric_segments(samples, key, *, break_before=()):
+    """Split plotted points wherever a signal is missing, invalid or paused."""
+    segments, segment, previous = [], [], None
+    breaks = set(break_before)
+    for index, sample in enumerate(samples):
+        try:
+            value = float(sample.values.get(key))
+            valid = key not in sample.errors and math.isfinite(value) and math.isfinite(sample.timestamp)
+        except (TypeError, ValueError, OverflowError):
+            valid = False
+        if not valid or index in breaks or (previous is not None and sample.timestamp < previous):
+            if segment:segments.append(segment)
+            segment = []
+        if valid:segment.append((sample.timestamp, value));previous = sample.timestamp
+        else:previous = None
+    if segment:segments.append(segment)
+    return segments
+
+
 class LiveRecording:
     def __init__(self, *, sample_limit=10000):
         if type(sample_limit) is not int or sample_limit < 1:
@@ -51,6 +71,8 @@ class LiveRecording:
         self.trend, self.timeline, self.cycle = TrendRecorder(), TimelineRecorder(), CycleRecorder()
         self.last_sample = None
         self.cycle_recording = False
+        self.pauses, self.gap_before_samples = [], []
+        self._gap_pending, self._timeline_reset_pending = False, False
 
     @property
     def has_data(self):
@@ -85,17 +107,53 @@ class LiveRecording:
         if any(not isinstance(key, str) for key in [*captured.values, *captured.errors]) or any(not isinstance(error, str) for error in captured.errors.values()):
             raise ValueError('Sample names and error messages must be strings.')
         json.dumps(asdict(captured), allow_nan=False)
-        self.trend.add(captured);self.timeline.add(captured)
-        if self.cycle_recording and cycle_key and cycle_key not in captured.errors:
-            self.cycle.add_sample_state(captured, cycle_key)
+        timeline = TimelineRecorder()
+        timeline.events = self.timeline.events
+        if self.last_sample is not None and not self._gap_pending and not self._timeline_reset_pending:
+            previous = self.last_sample
+            valid = {key: value for key, value in previous.values.items()
+                     if value is not None and key not in previous.errors and key in captured.values
+                     and captured.values[key] is not None and key not in captured.errors}
+            timeline.add(Sample(previous.timestamp, valid))
+        timeline.add(captured)
+        if self._gap_pending and self.received_samples:
+            self.gap_before_samples.append(self.received_samples)
+        self.trend.add(captured);self.timeline = timeline
+        if self.cycle_recording and cycle_key:
+            value = captured.values.get(cycle_key)
+            if cycle_key in captured.errors or value is None or isinstance(value, (dict,list)):
+                if not self.cycle.events or self.cycle.events[-1].state!='UNAVAILABLE':
+                    self.cycle.events.append(CycleEvent(captured.timestamp,'UNAVAILABLE',cycle_key))
+            else:self.cycle.add_sample_state(captured, cycle_key)
         self.last_sample = captured
         self.received_samples += 1
+        self._gap_pending = self._timeline_reset_pending = False
+
+    def pause(self, reason, *, timestamp=None):
+        if not self.has_data or self._gap_pending:return
+        timestamp = time.time() if timestamp is None else timestamp
+        if type(timestamp) not in (int,float) or not math.isfinite(timestamp):
+            raise ValueError('Pause timestamp must be finite.')
+        self.pauses.append({'timestamp':timestamp, 'after_sample':self.received_samples-1, 'reason':reason})
+        self._gap_pending = True
+        if self.cycle_recording:self.cycle.events.append(CycleEvent(timestamp,'PAUSED',reason))
+
+    def clear_timeline(self):
+        self.timeline = TimelineRecorder()
+        self._timeline_reset_pending = True
+
+    @property
+    def trend_breaks(self):
+        first = self.received_samples - len(self.trend.samples)
+        return [index-first for index in self.gap_before_samples if first<=index<self.received_samples]
 
     def document(self):
         return {'format': 'fanuc-desktop-recording', 'schema_version': 1,
             'recording_id': self.recording_id, 'created_at_utc': self.created_at,
             'source': deepcopy(self.source), 'watches': deepcopy(self.watches),
             'sample_limit': self.sample_limit, 'received_samples': self.received_samples,
+            'first_retained_sample': self.received_samples-len(self.trend.samples),
+            'gap_before_samples': list(self.gap_before_samples), 'pauses': deepcopy(self.pauses),
             'samples': [asdict(sample) for sample in self.trend.samples],
             'timeline': [asdict(event) for event in self.timeline.events],
             'cycle': [asdict(event) for event in self.cycle.events],

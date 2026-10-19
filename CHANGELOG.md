@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Split desktop trend lines at unavailable values and pauses, rebased timeline
+  comparisons after gaps, and retained explicit unavailable/paused cycle periods
+  plus pause/sequence metadata in recording exports.
 - Added source/watch-bound desktop recordings, explicit new-recording reset,
   complete atomic JSON export and saved watch drafts. Late workspace results,
   changed-source collection, duplicate watch keys and invalid/backwards samples

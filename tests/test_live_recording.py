@@ -51,7 +51,7 @@ def test_duplicate_keys_invalid_expressions_and_error_values_do_not_create_false
     with pytest.raises(ValueError,match='Unsupported'):recording.ensure_context(source,[WatchSpec('EXEC program')])
     recording.cycle_recording=True
     recording.add(Sample(1,{'Count':1},{'Count':'Unavailable'}),cycle_key='Count')
-    assert not recording.cycle.events
+    assert [event.state for event in recording.cycle.events]==['UNAVAILABLE']
 
 
 def test_failed_export_preserves_existing_file_and_cleans_temporary_output(tmp_path,monkeypatch):
@@ -61,3 +61,34 @@ def test_failed_export_preserves_existing_file_and_cleans_temporary_output(tmp_p
     monkeypatch.setattr(live_recording.os,'replace',fail)
     with pytest.raises(OSError):recording.export_json(path)
     assert path.read_bytes()==b'original export' and list(tmp_path.iterdir())==[path]
+
+
+def test_numeric_plot_segments_break_on_errors_missing_values_nonfinite_data_and_pauses():
+    samples=[Sample(1,{'Count':1}),Sample(2,{'Count':2}),Sample(3,{'Count':999},{'Count':'Unavailable'}),
+             Sample(4,{'Count':4}),Sample(5,{}),Sample(6,{'Count':'nan'}),Sample(7,{'Count':7}),Sample(8,{'Count':8})]
+    assert live_recording.numeric_segments(samples,'Count',break_before=[7])==[
+        [(1,1.0),(2,2.0)],[(4,4.0)],[(7,7.0)],[(8,8.0)]]
+
+
+def test_timeline_does_not_infer_transitions_across_unavailable_or_paused_observation():
+    recording,_,_=make_recording()
+    recording.add(Sample(1,{'Count':0}));recording.add(Sample(2,{'Count':999},{'Count':'Unavailable'}))
+    recording.add(Sample(3,{'Count':1}));assert not recording.timeline.events
+    recording.add(Sample(4,{'Count':2}));assert len(recording.timeline.events)==1
+    recording.pause('User pause',timestamp=4.5)
+    recording.add(Sample(6,{'Count':4}));assert len(recording.timeline.events)==1
+    assert recording.trend_breaks==[4] and recording.document()['gap_before_samples']==[4]
+    recording.clear_timeline();recording.add(Sample(7,{'Count':5}));assert not recording.timeline.events
+    recording.trend.clear();recording.add(Sample(8,{'Count':6}))
+    assert not recording.trend_breaks and recording.document()['first_retained_sample']==6
+    assert recording.received_samples==7
+
+
+def test_cycle_records_unavailable_and_paused_periods_separately():
+    recording,_,_=make_recording();recording.cycle_recording=True
+    recording.add(Sample(1,{'Count':1}),cycle_key='Count')
+    recording.add(Sample(2,{'Count':None},{'Count':'Unavailable'}),cycle_key='Count')
+    recording.add(Sample(3,{'Count':2}),cycle_key='Count')
+    recording.pause('User pause',timestamp=3.5)
+    recording.add(Sample(5,{'Count':3}),cycle_key='Count')
+    assert [event.state for event in recording.cycle.events]==['1','UNAVAILABLE','2','PAUSED','3']
