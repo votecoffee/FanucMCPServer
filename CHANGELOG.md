@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added a separate offline desktop recording viewer with paged samples/errors,
+  gap-aware trends, supplied timeline/cycle/pause history, metadata and file hash.
+  Its shared Qt-free reader validates bounded versioned JSON; opening captures
+  preserves active collection and connection settings. Viewer columns/tabs have
+  separate local preferences. The stable MCP host and tool schemas are unchanged.
 - Split desktop trend lines at unavailable values and pauses, rebased timeline
   comparisons after gaps, and retained explicit unavailable/paused cycle periods
   plus pause/sequence metadata in recording exports.

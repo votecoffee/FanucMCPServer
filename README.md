@@ -115,6 +115,10 @@ and removals, then save and select the desired robot. Names are unique; custom
 ports/timeouts are retained, and switching the active target pauses live file polling.
 Live / Recorder remembers watch drafts, binds recordings to their source/watches,
 and offers **New recording** and **Export recording JSON** for separate captures.
+Use **Open recording JSON** to inspect saved desktop captures offline, including
+paged values/errors, gap-aware trends, timeline/cycle events and the file hash.
+The viewer leaves active collection and connection settings unchanged; see the
+[desktop guide](docs/DESKTOP_GUIDE.md#saved-recordings).
 Use **Help → Open desktop log folder** for local startup/error diagnostics and
 **Help → About FanucMCPServer** for version and settings locations.
 

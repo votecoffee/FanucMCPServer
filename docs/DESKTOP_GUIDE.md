@@ -133,6 +133,50 @@ accepted data. Recordings stay in memory until exported; only watch drafts and
 desktop preferences are restored on app launch. Current-workspace snapshots and
 timeline analysis exclude watch data belonging to a different source/watch list.
 
+### Saved recordings
+
+Choose **Open recording JSON** on Live / Recorder to review an exported desktop
+capture in a separate offline viewer. Select a signal to inspect its sample
+values/errors or numeric trend. Tables show 200 rows per page; **Previous**,
+**Next** and the page number navigate longer captures. Position-register axes
+use the same wrapped display as live values. Tooltips retain captured values
+when a sample has an error. Long display text is truncated; the source JSON
+retains the complete value.
+
+Other tabs show the supplied I/O timeline, cycle events and pause records. Times
+are displayed in UTC. The source/watch metadata tab includes the selected file's
+byte count and SHA-256, retained-row offset and recorded gap sequence numbers.
+Column widths and tab preferences are saved locally, separately from the main
+desktop layout. Opening or closing a viewer leaves live collection, watch drafts
+and selected connections unchanged. An open cycle in an export remains historical
+metadata and does not start recording.
+
+The reader accepts `fanuc-desktop-recording` schema version 1, including earlier
+exports without pause/offset fields. Missing offsets are inferred from received
+and retained counts; missing pause/gap fields mean no such metadata was supplied.
+This format differs from MCP watch-job recordings and standalone cycle JSON.
+Embedded paths and controller profiles are displayed without opening or resolving
+them. The original file is never rewritten. Structural validation and a file hash
+do not authenticate its source, events, completeness or observations between samples.
+
+Limits apply together: 32 MiB UTF-8 JSON, 10,000 received samples, 1000 watch/signal
+names, 100,000 timeline and cycle events each, 10,001 pauses, 32 nesting levels,
+500,000 JSON values/field names and 65,536 characters per string. Duplicate fields,
+unknown schema fields/versions, nonfinite numbers, backwards sample timestamps
+and inconsistent retained counts are refused before a viewer opens.
+
+The shared reader also works without Qt:
+
+```python
+from pathlib import Path
+from fanuc_workbench.services.saved_recording import load_recording
+
+saved = load_recording(Path("captures/desktop-recording.json"))
+print(saved.sha256, saved.byte_count)
+print(len(saved.samples), saved.trend_breaks)
+metadata_and_history = saved.document()  # defensive copy
+```
+
 ## Fleet / Scheduler
 
 The **Run** checkbox controls both **Back up checked now** and scheduled backups.

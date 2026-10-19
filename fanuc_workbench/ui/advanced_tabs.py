@@ -1,8 +1,7 @@
 from __future__ import annotations
-import json, math
+import json
 from pathlib import Path
-from PySide6.QtCore import Qt,QTimer,QPointF,QSignalBlocker
-from PySide6.QtGui import QPainter,QPen
+from PySide6.QtCore import Qt,QTimer,QSignalBlocker
 from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QLineEdit,QPushButton,QTableWidget,QTableWidgetItem,QHeaderView,QComboBox,QSpinBox,QDoubleSpinBox,QCheckBox,QFileDialog,QMessageBox,QPlainTextEdit,QTabWidget,QAbstractItemView,QSplitter)
 from fanuc_workbench.backends.factory import create_backend
 from fanuc_workbench.core.workers import Worker
@@ -19,7 +18,9 @@ from fanuc_workbench.services.snapshots import capture_snapshot,compare_snapshot
 from fanuc_workbench.services.diagnostics import alarm_intelligence
 from fanuc_workbench.services.display import watch_value
 from fanuc_workbench.services.profiles import copy_profile,profile_signature
-from fanuc_workbench.services.live_recording import LiveRecording,recording_source,numeric_segments
+from fanuc_workbench.services.live_recording import LiveRecording,recording_source
+from fanuc_workbench.services.saved_recording import load_recording
+from fanuc_workbench.ui.trend_plot import TrendPlot
 
 def item(v,editable=False):
     x=QTableWidgetItem('' if v is None else str(v))
@@ -34,24 +35,6 @@ def browse_file(edit,title,flt='All files (*)'):
     p,_=QFileDialog.getOpenFileName(edit,title,edit.text() or str(Path.home()),flt)
     if p:edit.setText(p)
 
-class TrendPlot(QWidget):
-    def __init__(self,parent=None):super().__init__(parent);self.samples=[];self.key='';self.break_before=[];self.setMinimumHeight(180)
-    def set_data(self,samples,key,*,break_before=()):self.samples=samples;self.key=key;self.break_before=list(break_before);self.update()
-    def paintEvent(self,e):
-        p=QPainter(self);p.fillRect(self.rect(),self.palette().base());p.setPen(QPen(self.palette().text().color()));p.drawText(8,18,self.key or 'Select a numeric watch signal')
-        segments=numeric_segments(self.samples,self.key,break_before=self.break_before)
-        vals=[point for segment in segments for point in segment]
-        if not vals:return
-        left,top,right,bottom=45,28,self.width()-12,self.height()-28
-        t0,t1=min(t for t,_ in vals),max(t for t,_ in vals);v0=min(v for _,v in vals);v1=max(v for _,v in vals)
-        if t1==t0:t1=t0+1
-        p.drawLine(left,bottom,right,bottom);p.drawLine(left,top,left,bottom);p.drawText(2,top+5,f'{v1:.3g}');p.drawText(2,bottom,f'{v0:.3g}')
-        scale=max(abs(v0),abs(v1),1);low,high=v0/scale,v1/scale
-        for segment in segments:
-            pts=[QPointF(left+(t-t0)/(t1-t0)*(right-left),bottom-((v/scale-low)/(high-low) if high!=low else .5)*(bottom-top)) for t,v in segment]
-            if len(pts)==1:p.drawPoint(pts[0])
-            for a,b in zip(pts,pts[1:]):p.drawLine(a,b)
-
 class LiveMonitorTab(QWidget):
     def __init__(self,owner):
         super().__init__();self.owner=owner;self.recording=LiveRecording();self.inflight=False;self._workspace_identity=None
@@ -65,6 +48,7 @@ class LiveMonitorTab(QWidget):
         b=QPushButton('New recording');b.clicked.connect(self.new_recording);row.addWidget(b)
         b=QPushButton('Export recording JSON…');b.clicked.connect(self.export_recording);row.addWidget(b)
         self.recording_label=QLabel();self.recording_label.setWordWrap(True);row.addWidget(self.recording_label)
+        history=QHBoxLayout();b=QPushButton('Open recording JSON…');b.clicked.connect(self.open_recording);history.addWidget(b);history.addWidget(QLabel('Inspect a saved capture in a separate offline viewer.'));history.addStretch();l.addLayout(history)
         self.watch.setColumnWidth(2,520);self.watch.setWordWrap(True);self.watch.horizontalHeader().sectionResized.connect(lambda *_:self.watch.resizeRowsToContents())
         self.splitter=QSplitter(Qt.Vertical);self.splitter.setChildrenCollapsible(False);self.watch.setMinimumHeight(100);self.splitter.addWidget(self.watch);l.addWidget(self.splitter,1)
         sub=QTabWidget();self.recorders=sub;sub.setMinimumHeight(100);self.splitter.addWidget(sub);self.splitter.setSizes([300,450]);sub.addTab(self._trend_ui(),'Trend');sub.addTab(self._timeline_ui(),'I/O Timeline');sub.addTab(self._cycle_ui(),'Cycle Recorder / Profiler');sub.addTab(self._snapshot_ui(),'Troubleshooting Snapshot');sub.addTab(self._alarm_ui(),'Alarm Intelligence')
@@ -142,6 +126,15 @@ class LiveMonitorTab(QWidget):
         try:self.recording.export_json(Path(path))
         except (OSError,ValueError,TypeError) as exc:QMessageBox.critical(self,'Recording export failed',str(exc));return
         self.owner.statusBar().showMessage('Recording exported: '+path)
+    def open_recording(self):
+        path,_=QFileDialog.getOpenFileName(self,'Open saved recording',str(Path.home()),'Desktop recording JSON (*.json)')
+        if not path:return
+        try:recording=load_recording(Path(path))
+        except (OSError,ValueError) as exc:QMessageBox.critical(self,'Recording could not be opened',str(exc));return
+        from fanuc_workbench.ui.recording_viewer import RecordingViewer
+        viewer=RecordingViewer(recording,self.owner.settings,self)
+        try:viewer.exec()
+        finally:viewer.deleteLater()
     def add_watch(self):
         if self.watch.rowCount()>=1000:self.owner.statusBar().showMessage('Watch list reached 1000 rows. Remove a row before adding another.');return
         with QSignalBlocker(self.watch):

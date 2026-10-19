@@ -84,15 +84,16 @@ def tab_controls(tabs, changed):
 
 
 class DesktopLayout(QObject):
-    def __init__(self, owner):
+    def __init__(self, owner, *, preference_key='layout'):
         super().__init__(owner)
         self.owner, self.tables, self.splitters, self.tabs = owner, {}, {}, {}
+        self.preference_key = preference_key
         self.default_widths, self.default_tabs = {}, {}
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.setInterval(250)
         self.timer.timeout.connect(self.save)
-        saved = owner.settings.preferences().get('layout', {})
+        saved = owner.settings.preferences().get(self.preference_key, {})
         saved = saved if isinstance(saved, dict) else {}
         for index in range(owner.tabs.count()):
             page = owner.tabs.widget(index)
@@ -197,7 +198,7 @@ class DesktopLayout(QObject):
                 'current': tabs.currentWidget().objectName() if tabs.currentWidget() else None}
                 for key, tabs in self.tabs.items()}}
         try:
-            self.owner.settings.update_preferences(layout=state)
+            self.owner.settings.update_preferences(**{self.preference_key: state})
         except OSError:
             self.owner.statusBar().showMessage('Could not save desktop layout preferences.')
             return False
