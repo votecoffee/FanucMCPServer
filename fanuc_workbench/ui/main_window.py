@@ -25,6 +25,8 @@ from fanuc_workbench.plugins.sdk import ServiceRegistry
 from fanuc_workbench.services.backup import BackupService
 from fanuc_workbench.services.controller import ControllerService
 from fanuc_workbench.ui.connection_dialog import ConnectionDialog
+from fanuc_workbench.ui.profiles_dialog import ProfilesDialog
+from fanuc_workbench.services.profiles import ProfileCatalog
 from fanuc_workbench.ui.feature_tabs import (
     CompareRestoreTab, ProgramEditorTab, SearchAnalysisTab, DataTab, IOTab,
     DiagnosticsTab, ProjectTab, DocumentationTab,
@@ -71,6 +73,8 @@ class MainWindow(QMainWindow):
 
     def _menu(self):
         robot=self.menuBar().addMenu('Robot'); a=QAction('Connection…',self); a.triggered.connect(self.edit_connection); robot.addAction(a); a=QAction('Test connection',self); a.triggered.connect(self.test_connection); robot.addAction(a)
+        new=QAction('New connection…',self);new.triggered.connect(self.new_connection);robot.addAction(new)
+        manage=QAction('Manage connections…',self);manage.triggered.connect(self.manage_connections);robot.addAction(manage)
         ws=self.menuBar().addMenu('Workspace'); a=QAction('Open backup/workspace…',self); a.triggered.connect(self.choose_workspace); ws.addAction(a); a=QAction('Refresh all views',self); a.triggered.connect(self.refresh_workspace); ws.addAction(a)
         self.settings_menu = self.menuBar().addMenu('Settings')
         self.mcp_access_action = QAction('MCP access…', self)
@@ -145,26 +149,57 @@ class MainWindow(QMainWindow):
         self.profile_combo.blockSignals(False)
         if self.current_profile:self.profile_label.setText(f'{self.current_profile.name} — {self.current_profile.host} — {self.current_profile.transport.upper()} — roots: {", ".join(self.current_profile.roots)}')
         else:self.profile_label.setText('No robot configured')
+        self.live_tab.update_target_label()
 
     def select_profile(self, index):
         profile = self.profile_combo.itemData(index)
         if profile is not None:
+            paused=self.live_tab.pause_connection_polling() if profile!=self.current_profile else False
             self.current_profile = profile
-            self.settings.remember_profile(profile)
             self._update_profile()
+            try:self.settings.remember_profile(profile)
+            except (OSError,ValueError) as exc:QMessageBox.warning(self,'Selection not saved',str(exc))
+            if paused:self.statusBar().showMessage('Live file polling paused after changing connections. Start it again when ready.')
 
     def remember_connection(self, profile):
         self.settings.remember_profile(profile, connected=True)
 
     def edit_connection(self):
-        d=ConnectionDialog(self.current_profile,self)
+        index=next((i for i,p in enumerate(self.profiles) if p==self.current_profile),None)
+        self._edit_connection(index)
+
+    def new_connection(self):self._edit_connection()
+
+    def _edit_connection(self,index=None):
+        catalog=ProfileCatalog(self.profiles)
+        d=ConnectionDialog(catalog.profiles[index] if index is not None else None,self,
+            existing_names=[p.name for i,p in enumerate(self.profiles) if i!=index])
         if not d.exec():return
-        p=d.profile()
-        if not p.host:QMessageBox.warning(self,'Missing host','Enter robot IP address or hostname.');return
-        self.current_profile=p; i=next((i for i,x in enumerate(self.profiles) if x.name==p.name),None)
-        if i is None:self.profiles.append(p)
-        else:self.profiles[i]=p
-        self.settings.save_profiles(self.profiles); self.settings.remember_profile(p); self._update_profile()
+        try:
+            if index is None:index=catalog.add(d.profile())
+            else:catalog.update(index,d.profile())
+        except ValueError as exc:
+            QMessageBox.warning(self,'Connection details',str(exc));return
+        self._save_connections(catalog,index)
+
+    def manage_connections(self):
+        ProfilesDialog(self.profiles,self.current_profile,self._save_connections,self).exec()
+
+    def _save_connections(self,catalog,index):
+        try:
+            profiles=catalog.validated_profiles()
+            updates=catalog.preference_updates(self.settings.preferences(),index)
+            self.settings.save_profiles(profiles)
+        except (OSError,ValueError) as exc:
+            QMessageBox.critical(self,'Connections not saved',str(exc));return False
+        selected=profiles[index] if index is not None else None
+        paused=self.live_tab.pause_connection_polling() if selected!=self.current_profile else False
+        self.profiles=profiles;self.current_profile=selected
+        self._update_profile();self.fleet.load_profiles()
+        try:self.settings.update_preferences(**updates)
+        except (OSError,ValueError) as exc:QMessageBox.warning(self,'Selection not saved',f'Connections were saved, but the remembered selection could not be updated.\n\n{exc}')
+        self.statusBar().showMessage('Connections saved. Live file polling paused; start it again when ready.' if paused else 'Connections saved. Select Test connection when ready.')
+        return True
 
     def test_connection(self):
         if not self.current_profile:self.edit_connection()

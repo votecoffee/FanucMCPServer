@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added staged connection management, explicit new-profile creation, validated
+  unique names and retained custom ports/timeouts. Renames update the original
+  entry and remembered identity. Active-target changes pause live file polling
+  and discard previous-target completions; failed saves retain the old UI state.
 - Bound Fleet rows/jobs to displayed connection settings, honored unchecked rows
   in scheduled backups, preserved choices on reload and deferred row replacement
   until active jobs finish. Added a shared offline profile catalog for validated

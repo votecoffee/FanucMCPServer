@@ -46,8 +46,15 @@ private paths or controller details.
 
 ## Connections
 
-Use **Robot > Connection** to create or edit a connection profile and the
-**Saved robot** selector on Backup / History to switch profiles. A successful
+Use **Robot > Connection** to edit the selected connection, **New connection** to
+add one, or **Manage connections** to add, edit, duplicate and remove profiles in
+one dialog. Manager changes stay staged until **Save and select**; Cancel keeps
+the original list. Renaming replaces the selected profile. Connection names must
+be unique, and the editor validates the address, transport, port and timeout.
+Custom ports and timeouts are retained; switching transport adjusts only a
+standard FTP/SFTP port. Passwords are available in memory for this app session.
+
+Use the **Saved robot** selector on Backup / History to switch profiles. A successful
 connection test, backup, live file sample or raw-file upload remembers that robot
 for the next app session.
 Selection alone is also remembered when no previous successful connection is
@@ -56,6 +63,10 @@ Passwords are excluded from saved profiles and desktop preferences.
 Profiles and desktop preferences are flushed to a temporary file before atomic
 replacement. A failed serialization, flush or replacement retains the previous
 saved file and removes the incomplete temporary file.
+Renaming a connection preserves its remembered successful identity; changing its
+endpoint does not mark the new endpoint as successfully connected. Saving or
+selecting a profile makes no immediate connection. Desktop profiles configure
+FTP/SFTP; MCP and Native Controller access use their separately loaded policy files.
 
 ## Tables, panes and tabs
 
@@ -89,6 +100,10 @@ raw JSON. Hover over the value for the full captured data. Unavailable values
 show their error in the tooltip. Display formatting leaves recorded data intact.
 Use **Add watch row** and **Remove selected watch rows** to change the watch list,
 and drag the vertical splitter to expose more rows.
+Live file sampling shows the selected robot/address. Changing that connection
+pauses live file polling and ignores a late sample or error from the previous
+target. Start polling again explicitly when ready. Existing captured series are
+retained; export and clear them before collecting a separate robot's series.
 
 ## Fleet / Scheduler
 

@@ -110,6 +110,9 @@ Launch the desktop interface with:
 Configure a connection through **Robot → Connection…**, take or open a backup,
 then inspect programs, diagnostics and comparisons. Detailed native setup is in
 the [native API guide](docs/ROBOT_NATIVE_API.md).
+Use **Robot → Manage connections…** to stage profile additions, edits, copies
+and removals, then save and select the desired robot. Names are unique; custom
+ports/timeouts are retained, and switching the active target pauses live file polling.
 Use **Help → Open desktop log folder** for local startup/error diagnostics and
 **Help → About FanucMCPServer** for version and settings locations.
 

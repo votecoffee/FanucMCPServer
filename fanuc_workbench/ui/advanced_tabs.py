@@ -58,6 +58,7 @@ class LiveMonitorTab(QWidget):
         super().__init__();self.owner=owner;self.trend=TrendRecorder();self.timeline=TimelineRecorder();self.cycle=CycleRecorder();self.last_sample=None;self.inflight=False;self.cycle_recording=False
         self.timer=QTimer(self);self.timer.timeout.connect(self.poll_once)
         l=QVBoxLayout(self);top=QHBoxLayout();self.source=QComboBox();self.source.addItems(['Active workspace snapshot','Live controller files']);top.addWidget(QLabel('Source'));top.addWidget(self.source);self.interval=QDoubleSpinBox();self.interval.setRange(.5,60);self.interval.setValue(2);self.interval.setSuffix(' s');top.addWidget(QLabel('Poll'));top.addWidget(self.interval);self.start=QPushButton('Start');self.start.clicked.connect(self.toggle);top.addWidget(self.start);b=QPushButton('Sample Once');b.clicked.connect(self.poll_once);top.addWidget(b);top.addStretch();l.addLayout(top)
+        self.target_label=QLabel();self.target_label.setWordWrap(True);self.target_label.setMaximumWidth(520);top.addWidget(self.target_label);self.source.currentIndexChanged.connect(self.update_target_label)
         self.watch=QTableWidget(6,3);self.watch.setHorizontalHeaderLabels(['Expression','Alias','Live Value']);self.watch.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch);self.watch.horizontalHeader().setSectionResizeMode(1,QHeaderView.Stretch)
         defaults=[('R[1]','PartCount'),('PR[1]','PickPR'),('DI[1]','DI1'),('DO[1]','DO1')]
         for r,(a,b) in enumerate(defaults):self.watch.setItem(r,0,item(a,True));self.watch.setItem(r,1,item(b,True));self.watch.setItem(r,2,item(''))
@@ -97,6 +98,16 @@ class LiveMonitorTab(QWidget):
         ms=max(500,int(self.interval.value()*1000));
         if self.source.currentIndex()==1:ms=max(2000,ms)
         self.timer.start(ms);self.start.setText('Stop');self.poll_once()
+    def update_target_label(self,*_):
+        profile=self.owner.current_profile
+        self.target_label.setText(f'File target: {profile.name} — {profile.host}:{profile.port}' if profile else 'No file target selected')
+        self.target_label.setToolTip(self.target_label.text());self.target_label.setVisible(self.source.currentIndex()==1)
+    def pause_connection_polling(self):
+        if self.source.currentIndex()!=1:return False
+        paused=self.timer.isActive() or self.inflight
+        self.timer.stop();self.start.setText('Start')
+        self._sample_generation=getattr(self,'_sample_generation',0)+1
+        return paused
     def poll_once(self):
         if self.inflight:return
         specs=self.specs()
@@ -110,8 +121,15 @@ class LiveMonitorTab(QWidget):
             provider=ControllerFileSampleProvider(create_backend(self.owner.current_profile),self.owner.current_profile,max(2,self.interval.value()))
             self._sample_profile=self.owner.current_profile
         self.inflight=True
+        generation=getattr(self,'_sample_generation',0);source=self.source.currentIndex();profile=self._sample_profile
         def work(*,progress):return provider.sample(specs)
-        wk=Worker(work);wk.signals.result.connect(self.sample_ready);wk.signals.error.connect(lambda e:self.owner.statusBar().showMessage('Live sample failed: '+e.splitlines()[-1]));wk.signals.finished.connect(lambda:setattr(self,'inflight',False));self.owner.thread_pool.start(wk)
+        def current():
+            return generation==getattr(self,'_sample_generation',0) and self.source.currentIndex()==source and (profile is None or profile==self.owner.current_profile)
+        def ready(sample):
+            if current():self.sample_ready(sample)
+        def failed(error):
+            if current():self.owner.statusBar().showMessage('Live sample failed: '+error.splitlines()[-1])
+        wk=Worker(work);wk.signals.result.connect(ready);wk.signals.error.connect(failed);wk.signals.finished.connect(lambda:setattr(self,'inflight',False));self.owner.thread_pool.start(wk)
     def sample_ready(self,s):
         if getattr(self,'_sample_profile',None) is not None and hasattr(self.owner,'remember_connection'):self.owner.remember_connection(self._sample_profile)
         self.last_sample=s;self.trend.add(s);before=len(self.timeline.events);self.timeline.add(s)
