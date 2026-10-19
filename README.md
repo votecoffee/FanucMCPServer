@@ -151,6 +151,11 @@ with RobotBridge.from_config(Path(".local/robot_bridge.local.json")) as bridge:
 
 Keep the bridge alive while background jobs run and close it when finished.
 
+Shared offline program services include `trace_logic`, `explain_wait` and
+`TriggeredRecorder` in `fanuc_workbench.services.program_analysis`. They retain
+unresolved references and require explicit observed source/revision metadata;
+see [program diagnostics](docs/PROGRAM_DIAGNOSTICS.md).
+
 ## Capabilities and limits
 
 | Area | Available capabilities |

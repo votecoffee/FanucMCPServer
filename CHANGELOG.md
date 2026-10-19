@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added shared LS instruction/access tracing, explicit indirect-reference evidence,
+  conservative branch edges, revision-bound sampled WAIT evaluation and bounded
+  pre/post diagnostic capture models. Unsupported syntax and unavailable/stale
+  observations remain unresolved; these services do not contact a controller.
 - Added a separate offline desktop recording viewer with paged samples/errors,
   gap-aware trends, supplied timeline/cycle/pause history, metadata and file hash.
   Its shared Qt-free reader validates bounded versioned JSON; opening captures
