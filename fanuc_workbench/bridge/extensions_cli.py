@@ -9,6 +9,15 @@ from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.extension_release import install_release, load_registry
 
 
+def install_builtin(root: Path, name: str):
+    if name not in {'analysis', 'vqlog'}:
+        raise ValueError("Unknown bundled feature")
+    bundled = Path(__file__).resolve().parents[1] / 'extensions'
+    # Keep the standard analyses when staging into a brand-new registry.
+    install_release(root, bundled / 'analysis', bootstrap=True, packaged=True)
+    return install_release(root, bundled / name, packaged=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Stage trusted local FanucMCPServer feature releases (no robot contact)")
     parser.add_argument("--config", type=Path, required=True)
@@ -17,10 +26,14 @@ def main():
     install = commands.add_parser("install", help="Validate, preserve and select a local release; does not activate it")
     install.add_argument("source", type=Path)
     install.add_argument("--python", type=Path, help="Separate local feature interpreter with its own dependencies")
+    builtin = commands.add_parser('install-builtin', help='Stage a bundled feature without activating code')
+    builtin.add_argument('name', choices=['analysis', 'vqlog'])
     args = parser.parse_args()
     root = BridgeConfig.load(args.config.resolve()).state_dir / "extensions"
     if args.command == "install":
         result = install_release(root, args.source.resolve(), args.python)
+    elif args.command == 'install-builtin':
+        result = install_builtin(root, args.name)
     else:
         result = {"extensions": load_registry(root) if (root / "registry.json").exists() else [],
                   "controller_contacted": False, "code_activated": False}

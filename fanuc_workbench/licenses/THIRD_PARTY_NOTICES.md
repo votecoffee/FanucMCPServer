@@ -18,3 +18,20 @@ These notices and license texts are included in desktop and headless wheels.
 The HTTP adapter adds exact-file policy, same-host origins, byte limits,
 HTML/redirect rejection, separate optional credentials and disabled environment
 proxies. It does not adopt the upstream write API or network defaults.
+
+## ONE Robotics vqlog.js
+
+- Source: [onerobotics/vqlog.js](https://github.com/onerobotics/vqlog.js)
+- Pinned commit: `49287e0ad706154cf3e2d2a2a6e13a0cd4d3648b`
+- Upstream files adapted: `lib/vqlog/entry.js`, `event.js`, `utilities.js`,
+  `log.js` and the ten event classifiers under `lib/vqlog/events/`.
+- Adaptation: `fanuc_workbench/extensions/vqlog/feature.py`, including the event
+  field formats and conventional 2 ms tick default.
+- Copyright (c) 2014 Jay Strybis
+- License: [MIT](vqlog-MIT.txt), also retained as `LICENSE.txt` inside the
+  self-contained VQLOG extension release.
+
+The Python adaptation preserves unknown/malformed rows, uses null for wildcard
+IDs, corrects skip-field extraction, bounds input/output and exposes tick period
+as an unverified analysis parameter. It does not silently replace missing values
+or assume clock wraparound.

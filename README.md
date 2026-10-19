@@ -144,6 +144,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 | Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation and troubleshooting snapshots |
 | Native controller API | R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR value changes and LS deployment |
 | Extensions | 48 stable MCP tools, a versioned operation catalog and reloadable feature workers, including 20 workspace analyses |
+| Visual Line Tracking | Optional reloadable VQLOG event analysis, filters, timelines and explicit tick-period assumptions |
 | Desktop workflows | Fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |
 
 MCP writes default to disabled and require exact target policy, preserved originals,
@@ -172,6 +173,8 @@ for feature-specific dependencies, including SFTP server options.
 - [Native controller configuration and verification limits](docs/ROBOT_NATIVE_API.md)
 - [Controller interfaces and software requirements](docs/CONTROLLER_INTERFACES.md)
 - [Optional allowlisted HTTP file reads](docs/HTTP_READS.md)
+- [Reloadable VQLOG analysis](docs/VQLOG_ANALYSIS.md)
+- [Community integration references and SNPX evaluation](docs/COMMUNITY_INTEGRATIONS.md)
 - [Reloadable feature development](docs/ROBOT_EXTENSIONS.md)
 - [Shared-service coverage](docs/ROBOT_BRIDGE_COVERAGE.md)
 - [Desktop Plugin SDK](PLUGIN_SDK.md)

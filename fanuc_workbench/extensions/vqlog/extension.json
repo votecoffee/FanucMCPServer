@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "id": "workbench.vqlog",
+  "version": "1.0.0",
+  "host_api": 1,
+  "entrypoint": "feature.py",
+  "files": {
+    "feature.py": "6b514e19b40003876ab309654d34a0dd555a2411d4b7cce0550b5c3a305d71f5",
+    "LICENSE.txt": "009df82a75cd61344bce5e7bf11f19024c7d22cd15ce5f0e04f920c32e0838e2"
+  },
+  "operations": [
+    {
+      "id": "workbench.vqlog.analyze",
+      "description": "Analyze preserved FANUC Visual Line Tracking VQLOG events and timing with explicit clock assumptions",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "",
+              "Acknowledgement",
+              "Addition",
+              "Allocation",
+              "Clear",
+              "LoadBalance",
+              "Overlap",
+              "Request",
+              "SetLBD",
+              "Skip",
+              "Timeout",
+              "Unknown",
+              "Malformed",
+              "Empty"
+            ]
+          },
+          "area_id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "work_id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "tick_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 3600
+          }
+        },
+        "required": [
+          "artifact_id",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "log",
+          "argument": "artifact_id",
+          "kind": "any",
+          "file_argument": "path"
+        }
+      ]
+    }
+  ]
+}

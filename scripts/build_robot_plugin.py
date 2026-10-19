@@ -33,6 +33,7 @@ def build(source: Path, output: Path):
         shutil.copytree(source / "fanuc_workbench", stage / "fanuc_workbench",
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         shutil.copyfile(source / "packaging" / "bridge" / "pyproject.toml", stage / "pyproject.toml")
+        shutil.copyfile(source / "LICENSE", stage / "LICENSE")
         subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", str(wheels), str(stage)],
                        check=True, env=environment)
     own = next(wheels.glob("fanuc_mcp_server_bridge-*.whl"))
@@ -40,9 +41,10 @@ def build(source: Path, output: Path):
                    check=True, env=environment)
     docs = output / "docs"
     docs.mkdir()
-    for name in ("ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md", "CONTROLLER_INTERFACES.md", "HTTP_READS.md"):
+    for name in ("ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md", "CONTROLLER_INTERFACES.md", "HTTP_READS.md", "VQLOG_ANALYSIS.md", "COMMUNITY_INTEGRATIONS.md"):
         shutil.copyfile(source / "docs" / name, docs / name)
     shutil.copytree(source / "fanuc_workbench" / "licenses", output / "fanuc_workbench" / "licenses")
+    shutil.copyfile(source / "LICENSE", output / "LICENSE")
     marketplace = output / ".agents" / "plugins"
     marketplace.mkdir(parents=True)
     (marketplace / "marketplace.json").write_text(json.dumps({

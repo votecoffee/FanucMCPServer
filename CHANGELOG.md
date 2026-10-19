@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added an optional self-contained `workbench.vqlog` feature with ten event
+  formats, source hashes, filters/pagination, retained unknown/malformed rows and
+  explicit tick/clock limits. `install-builtin vqlog` stages it for same-session
+  reload without adding MCP tool schemas. Retained upstream MIT notices and
+  documented the controller-mapping boundary for a future SNPX provider.
 - Added optional same-host HTTP(S) reads of exact allowlisted MD text files for
   reads, logs and file samples. Preserved byte hashes, bounded requests, separate
   optional credentials, redirect/HTML rejection and origin-bound receipts;

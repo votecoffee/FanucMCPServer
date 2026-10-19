@@ -90,6 +90,11 @@ needed for features compatible with host API 1. Reinstalling a previously
 preserved release selects that version for the next reload, providing rollback.
 Keep versions immutable; changed bytes require a new version.
 
+The bundled optional [VQLOG feature](VQLOG_ANALYSIS.md) can be staged with
+`install-builtin vqlog` using the same CLI/configuration, then activated through
+`reload_extensions`. It adds `workbench.vqlog.analyze` to the operation catalog
+without changing the 48 permanent tools. It is self-contained and read-only.
+
 `install ... --python C:/RobotTools/FeatureVenv/Scripts/python.exe` selects an
 independent interpreter for that release's dependencies. Install dependencies
 into that dedicated environment before staging; neither staging nor reload runs
