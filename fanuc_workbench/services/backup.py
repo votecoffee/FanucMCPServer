@@ -69,6 +69,8 @@ class BackupService:
         self.attempts = 0
         self.listed_entries = 0
         self.seen: set[str] = set()
+        self.pending, self.queued = [], set()
+        self.completed = 0
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         backup_dir = destination / f"{safe_component(self.profile.name)}_{stamp}"
         backup_dir.mkdir(parents=True, exist_ok=False)
@@ -85,17 +87,37 @@ class BackupService:
                     for path in selected_paths:
                         path = self.validate_path(path)
                         root = next(r for r in roots if path == r or path.startswith(r if r.endswith(':') else r.rstrip('/') + '/'))
-                        self._file(root, path, backup_dir, manifest, attempt_ascii, progress)
+                        self._queue(root, path)
                 else:
                     for root in roots:
                         self._walk(root, root, backup_dir, manifest, 0, max_depth, attempt_ascii, progress)
+                def transfer_progress(event):
+                    progress({**event, **self._counts(manifest), 'phase': 'downloading'})
+                transfer_progress({'message': f'Discovered {len(self.pending)} files'})
+                for root, path, size in self.pending:
+                    self._file(root, path, backup_dir, manifest, attempt_ascii, transfer_progress, size)
+                    self.completed += 1
+                    transfer_progress({'message': f'Processed {self.completed}/{len(self.pending)} listed files'})
         except BaseException as exc:
             manifest.warnings.append(f"Capture interrupted: {type(exc).__name__}")
+            progress({'message': 'Backup interrupted', 'phase': 'failed', **self._counts(manifest)})
             raise
         finally:
             manifest_path = backup_dir / "backup_manifest.json"
             manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
+        progress({'message': 'Backup finished; manifest saved', 'phase': 'complete', **self._counts(manifest), 'percent': 100})
         return backup_dir
+
+    def _counts(self, manifest):
+        return {'completed_files': self.completed, 'total_files': len(self.pending),
+            'percent': min(99, self.completed * 100 // len(self.pending)) if self.pending else 0,
+            'failed_files': sum(record.error is not None for record in manifest.records),
+            'warning_count': len(manifest.warnings)}
+
+    def _queue(self, root, path, size=None):
+        if path not in self.queued:
+            self.queued.add(path)
+            self.pending.append((root, path, size))
 
     def _download(self, remote: str, local: Path):
         self.checkpoint()
@@ -149,6 +171,7 @@ class BackupService:
             manifest.warnings.append(f"Maximum recursion depth reached at {remote_dir}")
             return
         try:
+            progress({'message': f'Listing {remote_dir}', 'phase': 'discovering', 'percent': None})
             entries = self.backend.list_dir(remote_dir)
         except Exception as exc:
             manifest.warnings.append(f"Could not list {remote_dir}: {type(exc).__name__ if self.redact_errors else exc}")
@@ -167,7 +190,7 @@ class BackupService:
             if entry.is_dir:
                 self._walk(root, path, backup_dir, manifest, depth + 1, max_depth, attempt_ascii, progress)
                 continue
-            self._file(root, path, backup_dir, manifest, attempt_ascii, progress, entry.size)
+            self._queue(root, path, entry.size)
 
     def _try_ascii_companion(
         self,

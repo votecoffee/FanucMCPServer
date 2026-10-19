@@ -139,7 +139,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 
 | Area | Available capabilities |
 | --- | --- |
-| Files and backups | FTP/SFTP listing, exact file/log capture, backup jobs, manifests, comparisons and reviewed per-file recovery |
+| Files and backups | FTP/SFTP listing, exact file/log capture, file-based backup progress, manifests, comparisons and reviewed per-file recovery |
 | Offline engineering | LS inspection, lint, cross references, R/PR/frame/comment evidence, mastering/DCS comparisons and documentation packages |
 | Program dependencies | Optional reloadable selected-LS call/run inspection, unresolved targets and static reachability from explicit entry programs |
 | Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation, troubleshooting snapshots, offline summaries, evidence bundles and sampled request/ack analysis |

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added backup discovery status and file-based percentage progress through the
+  shared service and GUI, with retained failure/warning counts and manifest-first
+  completion reporting.
 - Added local desktop persistence for successful robot/profile selection, table
   widths, draggable pane sizes, and tab order/visibility. Live PR axes wrap into
   readable rows with full-value tooltips; watch rows can be added or removed.

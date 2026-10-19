@@ -33,3 +33,12 @@ raw JSON. Hover over the value for the full captured data. Unavailable values
 show their error in the tooltip. Display formatting leaves recorded data intact.
 Use **Add watch row** and **Remove selected watch rows** to change the watch list,
 and drag the vertical splitter to expose more rows.
+
+## Backup progress
+
+Backup / History shows an activity indicator during directory discovery, then a
+percentage based on processed listed files. ASCII companion attempts are included
+in their source file's work. This is file-based progress, independent of file size
+or transfer speed. The bar reaches 100% after the manifest has been saved.
+Failed files and unavailable companions appear in the final counts and manifest;
+100% means the capture finished, and can include failures or warnings.

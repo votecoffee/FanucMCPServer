@@ -7,7 +7,7 @@ from PySide6.QtCore import QThreadPool
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
-    QMainWindow, QMessageBox, QPushButton, QPlainTextEdit, QSpinBox, QTabWidget,
+    QMainWindow, QMessageBox, QPushButton, QPlainTextEdit, QProgressBar, QSpinBox, QTabWidget,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -87,6 +87,8 @@ class MainWindow(QMainWindow):
         self.profile_combo=QComboBox();self.profile_combo.currentIndexChanged.connect(self.select_profile)
         self.ascii=QCheckBox('Attempt ASCII companions (.TP→.LS, .VR→.VA)'); self.ascii.setChecked(True); self.depth=QSpinBox(); self.depth.setRange(1,32); self.depth.setValue(8); f.addRow('Saved robot',self.profile_combo);f.addRow('Robot',self.profile_label); f.addRow('Destination',row); f.addRow('Recursion limit',self.depth); f.addRow('ASCII export',self.ascii); l.addLayout(f)
         row2=QHBoxLayout(); self.backup_btn=QPushButton('Back Up Robot'); self.backup_btn.clicked.connect(self.start_backup); row2.addWidget(self.backup_btn); b=QPushButton('Refresh Backup History'); b.clicked.connect(self.refresh_history); row2.addWidget(b); row2.addStretch(); l.addLayout(row2)
+        self.backup_progress_bar=QProgressBar();self.backup_progress_bar.setRange(0,100);self.backup_progress_bar.setValue(0);self.backup_progress_bar.setFormat('Ready');l.addWidget(self.backup_progress_bar)
+        self.backup_progress_label=QLabel('Progress is based on listed files; companion attempts are included with their source file.');l.addWidget(self.backup_progress_label)
         self.backup_log=QPlainTextEdit(); self.backup_log.setReadOnly(True); self.backup_log.setMaximumHeight(220); l.addWidget(self.backup_log)
         l.addWidget(QLabel('Backup history')); self.history=QTableWidget(0,5); self.history.setHorizontalHeaderLabels(['Robot','Created','Host','Folder','Files']); self.history.horizontalHeader().setSectionResizeMode(3,QHeaderView.Stretch); self.history.doubleClicked.connect(self.open_history); l.addWidget(self.history,1); return w
 
@@ -140,12 +142,32 @@ class MainWindow(QMainWindow):
         if not self.current_profile:self.edit_connection()
         if not self.current_profile:return
         destination=Path(self.dest.text()).expanduser(); destination.mkdir(parents=True,exist_ok=True); p=self.current_profile; self._backup_profile=p; self.backup_btn.setEnabled(False); self.backup_log.appendPlainText(f'Starting backup of {p.name} ({p.host})')
-        def work(*,progress):return ControllerService(p).backup(destination,attempt_ascii=self.ascii.isChecked(),max_depth=self.depth.value(),progress=progress)
-        wk=Worker(work); wk.signals.progress.connect(lambda x:self.backup_log.appendPlainText(x.get('message',str(x)) if isinstance(x,dict) else str(x))); wk.signals.error.connect(lambda e:QMessageBox.critical(self,'Backup failed',e)); wk.signals.result.connect(self.backup_finished); wk.signals.finished.connect(lambda:self.backup_btn.setEnabled(True)); self.thread_pool.start(wk)
+        attempt_ascii,max_depth=self.ascii.isChecked(),self.depth.value()
+        self.backup_progress_bar.setRange(0,0);self.backup_progress_bar.setFormat('Discovering files…')
+        def work(*,progress):return ControllerService(p).backup(destination,attempt_ascii=attempt_ascii,max_depth=max_depth,progress=progress)
+        wk=Worker(work); wk.signals.progress.connect(self.backup_progress); wk.signals.error.connect(self.backup_failed); wk.signals.result.connect(self.backup_finished); wk.signals.finished.connect(lambda:self.backup_btn.setEnabled(True)); self.thread_pool.start(wk)
+
+    def backup_progress(self, event):
+        if not isinstance(event,dict):self.backup_log.appendPlainText(str(event));return
+        self.backup_log.appendPlainText(event.get('message',''))
+        percent=event.get('percent')
+        if percent is None:
+            self.backup_progress_bar.setRange(0,0)
+        else:
+            self.backup_progress_bar.setRange(0,100);self.backup_progress_bar.setValue(percent)
+            self.backup_progress_bar.setFormat(f"%p% — {event.get('completed_files',0)}/{event.get('total_files',0)} listed files processed")
+        self.backup_progress_label.setText(event.get('message','')+f" — {event.get('failed_files',0)} failed, {event.get('warning_count',0)} warnings")
+
+    def backup_failed(self, error):
+        if self.backup_progress_bar.maximum()==0:self.backup_progress_bar.setRange(0,100);self.backup_progress_bar.setValue(0)
+        self.backup_progress_bar.setFormat('Interrupted — %p%');self.backup_progress_label.setText('Backup interrupted; inspect the log and retained manifest.')
+        QMessageBox.critical(self,'Backup failed',error)
 
     def backup_finished(self,path):
         if getattr(self,'_backup_profile',None) is not None:self.remember_connection(self._backup_profile)
-        self.workspace=Path(path); self.backup_log.appendPlainText(f'Backup complete: {path}'); self.refresh_history(); self.refresh_workspace(); QMessageBox.information(self,'Backup complete',str(path))
+        self.workspace=Path(path); self.backup_log.appendPlainText(f'Backup complete: {path}'); self.refresh_history(); self.refresh_workspace()
+        manifest=json.loads((self.workspace/'backup_manifest.json').read_text(encoding='utf-8'));failed=sum(record.get('error') is not None for record in manifest.get('records',[]));warnings=len(manifest.get('warnings',[]))
+        QMessageBox.information(self,'Backup finished',f'{path}\n\n{failed} failed files; {warnings} warnings. See the retained manifest for details.')
 
     def refresh_history(self):
         self.history.setRowCount(0); root=Path(self.dest.text()).expanduser()
