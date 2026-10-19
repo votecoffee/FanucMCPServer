@@ -3,6 +3,7 @@ from dataclasses import replace
 from PySide6.QtCore import Qt
 
 from fanuc_workbench.core.models import RobotProfile
+from fanuc_workbench.services.fleet import FleetManager,FleetResult
 from fanuc_workbench.ui import main_window
 from test_desktop_preferences import desktop
 
@@ -56,4 +57,34 @@ def test_reloading_during_a_job_waits_for_its_rows_to_finish(desktop):
     fleet._finished()
     assert fleet.table.rowCount() == 1 and fleet.table.item(0, 1).text() == 'Replacement'
     assert fleet.table.item(0, 0).checkState() == Qt.Unchecked
+    window.close()
+
+
+def test_job_updates_the_same_fleet_record_that_is_saved(desktop,tmp_path,monkeypatch):
+    _,store=desktop
+    window=make_window(store);fleet=window.fleet;fleet.dest.setText(str(tmp_path/'fleet'))
+    class Immediate:
+        def start(self,worker):worker.run()
+    window.thread_pool=Immediate()
+    def backup(manager,row,destination,**kwargs):
+        assert any(robot is row for robot in manager.robots)
+        row.last_backup=str(destination/'synthetic-backup');manager.save()
+        return FleetResult(row.profile.name,'OK',row.last_backup)
+    monkeypatch.setattr(FleetManager,'backup_one',backup)
+    fleet.table.item(1,0).setCheckState(Qt.Unchecked)
+    fleet.backup_checked()
+    saved=FleetManager(tmp_path/'fleet'/'fleet.json').load()
+    assert saved.robots[0].last_backup==str(tmp_path/'fleet'/'synthetic-backup')
+    assert saved.robots[1].enabled is False and not saved.robots[1].last_backup
+    assert not fleet.running
+    window.close()
+
+
+def test_setup_failure_leaves_fleet_available_to_retry(desktop,tmp_path,monkeypatch):
+    _,store=desktop
+    window=make_window(store);fleet=window.fleet;fleet.dest.setText(str(tmp_path/'fleet'))
+    def fail(*_):raise OSError('Synthetic fleet state failure')
+    monkeypatch.setattr(FleetManager,'save',fail)
+    fleet.backup_checked()
+    assert not fleet.running and 'could not start' in fleet.log.toPlainText()
     window.close()

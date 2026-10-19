@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed Fleet jobs to update the same records written to local fleet history and
+  leave the scheduler available to retry after a setup/state-save failure.
 - Added staged connection management, explicit new-profile creation, validated
   unique names and retained custom ports/timeouts. Renames update the original
   entry and remembered identity. Active-target changes pause live file polling

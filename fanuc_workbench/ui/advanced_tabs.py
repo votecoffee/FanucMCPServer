@@ -231,8 +231,17 @@ class FleetTab(QWidget):
         mgr=self.manager();rows=[x for x in self._rows(False) if mgr.due(x[1])];self._run(rows)
     def _run(self,rows):
         if self.running or not rows:return
-        self.running=True;dest=Path(self.dest.text());dest.mkdir(parents=True,exist_ok=True);mgr=self.manager();mgr.robots=[x[1] for x in self._rows(False)];mgr.save()
-        def work(*,progress):return [(idx,mgr.backup_one(fr,dest,progress=progress)) for idx,fr in rows]
+        current=self._rows(False)
+        requested={idx:profile_signature(fr.profile) for idx,fr in rows}
+        jobs=[(idx,fr) for idx,fr in current if requested.get(idx)==profile_signature(fr.profile)]
+        if not jobs:return
+        try:
+            dest=Path(self.dest.text());dest.mkdir(parents=True,exist_ok=True)
+            mgr=self.manager();mgr.robots=[fr for _,fr in current];mgr.save()
+        except (OSError,ValueError) as exc:
+            self.log.appendPlainText('Fleet backup could not start: '+str(exc));return
+        self.running=True
+        def work(*,progress):return [(idx,mgr.backup_one(fr,dest,progress=progress)) for idx,fr in jobs]
         wk=Worker(work);wk.signals.progress.connect(lambda x:self.log.appendPlainText(x.get('message',str(x)) if isinstance(x,dict) else str(x)));wk.signals.result.connect(self._done);wk.signals.error.connect(lambda e:self.log.appendPlainText(e));wk.signals.finished.connect(self._finished);self.owner.thread_pool.start(wk)
     def _finished(self):
         self.running=False
