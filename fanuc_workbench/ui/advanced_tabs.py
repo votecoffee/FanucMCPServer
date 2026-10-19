@@ -3,7 +3,7 @@ import json, math
 from pathlib import Path
 from PySide6.QtCore import Qt,QTimer,QPointF
 from PySide6.QtGui import QPainter,QPen
-from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QLineEdit,QPushButton,QTableWidget,QTableWidgetItem,QHeaderView,QComboBox,QSpinBox,QDoubleSpinBox,QCheckBox,QFileDialog,QMessageBox,QPlainTextEdit,QTabWidget,QAbstractItemView)
+from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QLineEdit,QPushButton,QTableWidget,QTableWidgetItem,QHeaderView,QComboBox,QSpinBox,QDoubleSpinBox,QCheckBox,QFileDialog,QMessageBox,QPlainTextEdit,QTabWidget,QAbstractItemView,QSplitter)
 from fanuc_workbench.backends.factory import create_backend
 from fanuc_workbench.core.workers import Worker
 from fanuc_workbench.services.monitoring import WatchSpec,WorkspaceSampleProvider,ControllerFileSampleProvider,TrendRecorder,TimelineRecorder,CycleRecorder,profile_cycle,compare_cycle_profiles,CycleEvent
@@ -17,6 +17,7 @@ from fanuc_workbench.services.handshake import HandshakeSignal,load_handshake,sa
 from fanuc_workbench.services.transforms import transform_pose_between_frames
 from fanuc_workbench.services.snapshots import capture_snapshot,compare_snapshots
 from fanuc_workbench.services.diagnostics import alarm_intelligence
+from fanuc_workbench.services.display import watch_value
 
 def item(v,editable=False):
     x=QTableWidgetItem('' if v is None else str(v))
@@ -59,8 +60,18 @@ class LiveMonitorTab(QWidget):
         self.watch=QTableWidget(6,3);self.watch.setHorizontalHeaderLabels(['Expression','Alias','Live Value']);self.watch.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch);self.watch.horizontalHeader().setSectionResizeMode(1,QHeaderView.Stretch)
         defaults=[('R[1]','PartCount'),('PR[1]','PickPR'),('DI[1]','DI1'),('DO[1]','DO1')]
         for r,(a,b) in enumerate(defaults):self.watch.setItem(r,0,item(a,True));self.watch.setItem(r,1,item(b,True));self.watch.setItem(r,2,item(''))
-        l.addWidget(self.watch)
-        sub=QTabWidget();l.addWidget(sub,1);sub.addTab(self._trend_ui(),'Trend');sub.addTab(self._timeline_ui(),'I/O Timeline');sub.addTab(self._cycle_ui(),'Cycle Recorder / Profiler');sub.addTab(self._snapshot_ui(),'Troubleshooting Snapshot');sub.addTab(self._alarm_ui(),'Alarm Intelligence')
+        row=QHBoxLayout();b=QPushButton('Add watch row');b.clicked.connect(self.add_watch);row.addWidget(b);b=QPushButton('Remove selected watch rows');b.clicked.connect(self.remove_watches);row.addWidget(b);row.addStretch();l.addLayout(row)
+        self.watch.setColumnWidth(2,520);self.watch.setWordWrap(True);self.watch.horizontalHeader().sectionResized.connect(lambda *_:self.watch.resizeRowsToContents())
+        self.splitter=QSplitter(Qt.Vertical);self.splitter.setChildrenCollapsible(False);self.watch.setMinimumHeight(100);self.splitter.addWidget(self.watch);l.addWidget(self.splitter,1)
+        sub=QTabWidget();self.recorders=sub;sub.setMinimumHeight(100);self.splitter.addWidget(sub);self.splitter.setSizes([300,450]);sub.addTab(self._trend_ui(),'Trend');sub.addTab(self._timeline_ui(),'I/O Timeline');sub.addTab(self._cycle_ui(),'Cycle Recorder / Profiler');sub.addTab(self._snapshot_ui(),'Troubleshooting Snapshot');sub.addTab(self._alarm_ui(),'Alarm Intelligence')
+    def add_watch(self):
+        row=self.watch.rowCount();self.watch.insertRow(row)
+        for column in range(3):self.watch.setItem(row,column,item('',column<2))
+        self.watch.setCurrentCell(row,0)
+    def remove_watches(self):
+        rows={index.row() for index in self.watch.selectedIndexes()}
+        for row in sorted(rows,reverse=True):self.watch.removeRow(row)
+        if not self.watch.rowCount():self.add_watch()
     def spec_rows(self):
         out=[]
         for r in range(self.watch.rowCount()):
@@ -102,7 +113,8 @@ class LiveMonitorTab(QWidget):
         self.last_sample=s;self.trend.add(s);before=len(self.timeline.events);self.timeline.add(s)
         aliases=[]
         for r,spec in self.spec_rows():
-            k=spec.alias or spec.expression;aliases.append(k);v=s.values.get(k);self.watch.setItem(r,2,item(json.dumps(v,sort_keys=True) if isinstance(v,dict) else v))
+            k=spec.alias or spec.expression;aliases.append(k);v=s.values.get(k);text,detail=watch_value(v,s.errors.get(k) if k in s.errors else None);cell=item(text);cell.setToolTip(detail);self.watch.setItem(r,2,cell)
+        self.watch.resizeRowsToContents()
         current=self.plot_key.currentText();self.plot_key.blockSignals(True);self.plot_key.clear();self.plot_key.addItems(aliases);self.plot_key.setCurrentText(current if current in aliases else (aliases[0] if aliases else ''));self.plot_key.blockSignals(False)
         current2=self.cycle_key.currentText();self.cycle_key.clear();self.cycle_key.addItems(aliases);self.cycle_key.setCurrentText(current2 if current2 in aliases else (aliases[0] if aliases else ''))
         self.plot.set_data(self.trend.samples,self.plot_key.currentText())

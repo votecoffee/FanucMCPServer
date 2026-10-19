@@ -149,7 +149,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 | Extensions | 48 stable MCP tools, a versioned operation catalog and reloadable feature workers, including 20 workspace analyses |
 | Visual Line Tracking | Optional reloadable VQLOG event analysis, filters, timelines and explicit tick-period assumptions |
 | Alarm logs | Optional reloadable text alarm records, recurrence and two-log code/text comparison with explicit clocks and retained unrecognized lines |
-| Desktop workflows | Fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |
+| Desktop workflows | Remembered robot selection, saved adjustable columns/panes/tabs, fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |
 
 MCP writes default to disabled and require exact target policy, preserved originals,
 reviewed proposals and readback. The example configuration requests client
@@ -174,6 +174,7 @@ it requires a compatible controller service/options and never changes assignment
 
 ## Documentation
 
+- [Desktop connections, layouts and recorder display](docs/DESKTOP_GUIDE.md)
 - [MCP setup, tools and Python API](docs/ROBOT_BRIDGE.md)
 - [Headless plugin installation and upgrades](docs/ROBOT_PLUGIN_SETUP.md)
 - [Native controller configuration and verification limits](docs/ROBOT_NATIVE_API.md)

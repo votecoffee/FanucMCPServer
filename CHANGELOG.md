@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added local desktop persistence for successful robot/profile selection, table
+  widths, draggable pane sizes, and tab order/visibility. Live PR axes wrap into
+  readable rows with full-value tooltips; watch rows can be added or removed.
 - Added a self-contained MIT `workbench.programs` feature for bounded selected-LS
   call/run references, comment/string masking, unresolved and ambiguous targets,
   and explicit-entry static reachability. Controller inventory, compiler validity
