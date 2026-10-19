@@ -127,6 +127,31 @@ def test_tab_menu_can_recover_hidden_tabs_and_keeps_one_visible(desktop):
     window.close()
 
 
+def test_help_actions_open_local_logs_and_show_version_details(desktop, tmp_path, monkeypatch):
+    from fanuc_workbench import __version__
+    app, store = desktop
+    directory = tmp_path / 'local logs'
+    monkeypatch.setattr(main_window, 'desktop_log_directory', lambda: directory)
+    opened = []
+    monkeypatch.setattr(main_window.QDesktopServices, 'openUrl', lambda url: opened.append(url.toLocalFile()) or True)
+    details = []
+    monkeypatch.setattr(main_window.QMessageBox, 'exec', lambda dialog: details.append((dialog.text(), dialog.detailedText())))
+    window = main_window.MainWindow()
+    menu_actions = window.menuBar().actions()
+    help_menu = next(action.menu() for action in menu_actions if action.text() == 'Help')
+    help_menu.actions()[0].trigger()
+    assert directory.is_dir() and [main_window.Path(path) for path in opened] == [directory]
+    help_menu.actions()[1].trigger()
+    assert details[0][0] == f'FanucMCPServer {__version__}'
+    assert str(store.path.parent) in details[0][1] and str(directory) in details[0][1]
+    warnings = []
+    monkeypatch.setattr(main_window.QDesktopServices, 'openUrl', lambda _: False)
+    monkeypatch.setattr(main_window.QMessageBox, 'warning', lambda *args: warnings.append(args[2]))
+    window.open_desktop_logs()
+    assert str(directory) in warnings[0]
+    window.close()
+
+
 def test_corrupt_preferences_and_unknown_deleted_profile_use_defaults(desktop):
     _, store = desktop
     store.preferences_path.write_text('{bad')

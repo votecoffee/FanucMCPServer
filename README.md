@@ -110,6 +110,8 @@ Launch the desktop interface with:
 Configure a connection through **Robot → Connection…**, take or open a backup,
 then inspect programs, diagnostics and comparisons. Detailed native setup is in
 the [native API guide](docs/ROBOT_NATIVE_API.md).
+Use **Help → Open desktop log folder** for local startup/error diagnostics and
+**Help → About FanucMCPServer** for version and settings locations.
 
 ### Controller access mode
 

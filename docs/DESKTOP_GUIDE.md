@@ -24,6 +24,26 @@ moved virtual environment may also need to be recreated. To remove the shortcut:
 Removal retains the application, settings and other Start menu entries. The
 headless MCP bundle has its own installer and does not create desktop shortcuts.
 
+## Startup and local diagnostics
+
+The desktop records startup and unexpected Python exceptions in a local rotating
+`desktop.log`, including launches from Start without a console. A startup error
+shows a dialog with the log location. Unexpected GUI callback errors are logged
+and reported too. These logs are separate from controller evidence and MCP audit
+records; handled operation errors continue to use their existing messages.
+
+Use **Help > Open desktop log folder** to open the directory. Windows logs live
+under `%LOCALAPPDATA%\FanucMCPServer\logs`; the log rotates at 1 MiB with
+three rotated backups. macOS uses `~/Library/Application Support/FanucMCPServer/logs`;
+Linux uses `$XDG_STATE_HOME/FanucMCPServer/logs`, defaulting to
+`~/.local/state/FanucMCPServer/logs`. If the directory cannot be written, normal
+startup can still continue and an error dialog explains that no log was written.
+
+**Help > About FanucMCPServer** shows the app version and expandable details for
+the Python executable, settings directory and desktop log location. Logs stay on
+the local machine. Review them before sharing: exception messages can contain
+private paths or controller details.
+
 ## Connections
 
 Use **Robot > Connection** to create or edit a connection profile and the

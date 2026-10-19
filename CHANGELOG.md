@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added local rotating desktop startup/error logs, visible failure reporting for
+  console-free launches, and Help menu entries for logs and version/settings
+  details. Corrected the Python module version to match desktop package 2.1.0.
 - Added the supplied application icon, a console-free Windows GUI launcher and
   per-user Start menu shortcut creation through the desktop installer, with
   explicit commands to refresh or remove the shortcut.

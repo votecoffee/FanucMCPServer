@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 
-from PySide6.QtCore import QThreadPool
-from PySide6.QtGui import QAction
+from PySide6.QtCore import QThreadPool, QUrl
+from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QPushButton, QPlainTextEdit, QProgressBar, QSpinBox, QTabWidget,
@@ -12,6 +13,9 @@ from PySide6.QtWidgets import (
 )
 
 from fanuc_workbench.backends.factory import create_backend
+from fanuc_workbench import __version__
+from fanuc_workbench.desktop_runtime import desktop_log_directory
+from fanuc_workbench.identity import APP_NAME
 from fanuc_workbench.core.models import RobotProfile
 from fanuc_workbench.core.settings import SettingsStore
 from fanuc_workbench.core.workers import Worker
@@ -73,6 +77,31 @@ class MainWindow(QMainWindow):
         self.mcp_access_action.triggered.connect(self.edit_mcp_access)
         self.settings_menu.addAction(self.mcp_access_action)
         create=QAction('Create robot policy…',self);create.triggered.connect(self.create_robot_policy);self.settings_menu.addAction(create)
+        self.help_menu = self.menuBar().addMenu('Help')
+        logs = QAction('Open desktop log folder', self)
+        logs.triggered.connect(self.open_desktop_logs)
+        self.help_menu.addAction(logs)
+        about = QAction(f'About {APP_NAME}…', self)
+        about.triggered.connect(self.show_about)
+        self.help_menu.addAction(about)
+
+    def open_desktop_logs(self):
+        directory = desktop_log_directory()
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory))):
+                raise OSError('The system could not open the log folder.')
+        except OSError as exc:
+            QMessageBox.warning(self, 'Desktop logs', f'{exc}\n\n{directory}')
+
+    def show_about(self):
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle(f'About {APP_NAME}')
+        dialog.setText(f'{APP_NAME} {__version__}')
+        dialog.setInformativeText('FANUC robot files, diagnostics and reviewed changes.')
+        dialog.setDetailedText(f'Python: {sys.version.split()[0]}\nExecutable: {sys.executable}\n'
+            f'Settings: {self.settings.path.parent}\nDesktop logs: {desktop_log_directory()}')
+        dialog.exec()
 
     def create_robot_policy(self):
         from fanuc_workbench.ui.policy_dialog import PolicyDialog
