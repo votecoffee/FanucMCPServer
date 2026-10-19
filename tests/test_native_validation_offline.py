@@ -1,3 +1,4 @@
+import configparser
 import hashlib
 import json
 from pathlib import Path
@@ -15,6 +16,9 @@ def setup_tools(root):
     maker,printer,config=root/'maketp.exe',root/'printtp.exe',root/'robot.ini'
     maker.write_bytes(b'Synthetic compiler');printer.write_bytes(b'Synthetic printer')
     config.write_text('[WinOLPC_Util]\nRobot=old\nVersion=V9.40-1\nPath=profile\nSupport=old\nOutput=old\n')
+    profile=root/'profile';profile.mkdir()
+    for name in ('asc2bint.dll','bin2asct.dll'):
+        (profile/name).write_bytes(b'Synthetic offline translator component')
     context=root/'source_context';context.mkdir();(context/'support').mkdir();(context/'support/config.dat').write_bytes(b'synthetic context')
     return {'maketp':maker,'printtp':printer,'configuration':config,'robot_context':context,'version':'V9.40-1'}
 
@@ -24,6 +28,12 @@ def test_isolated_compile_readback_hash_review_preserves_sources_and_never_deplo
     original=path.read_bytes();options=setup_tools(tmp_path);commands=[]
     def run(arguments,cwd,timeout):
         commands.append(arguments)
+        settings=configparser.ConfigParser(interpolation=None)
+        settings.read(cwd/'robot.ini')
+        staging=Path(settings['WinOLPC_Util']['Output'])
+        assert staging.is_dir() and staging.is_relative_to(cwd)
+        assert staging!=Path(arguments[1]).parent and staging!=Path(arguments[2]).parent
+        assert Path(settings['WinOLPC_Util']['Path'])==tmp_path/'profile'
         if Path(arguments[0]).name=='maketp.exe': (cwd/'MAIN.TP').write_bytes(b'Synthetic compiled TP')
         else: (cwd/'readback.LS').write_bytes(original)
         return {'returncode':0,'timed_out':False,'output_truncated':False},b'Synthetic compiler log\n'
@@ -31,12 +41,33 @@ def test_isolated_compile_readback_hash_review_preserves_sources_and_never_deplo
     destination=tmp_path/'validation'
     report=native_validation.validate_offline(path,destination,**options)
     assert report['status']=='offline_checks_passed' and not report['deployment_prepared']
+    assert report['compiler_invoked'] and report['printer_invoked']
+    assert all(row['sha256'] for row in report['toolchain']['components'])
     assert path.read_bytes()==original and (destination/'MAIN.LS').read_bytes()==original
     assert all('/p' not in arguments and '/ver' in arguments and '/config' in arguments for arguments in commands)
     checked=native_validation.review_validation(destination,'MAIN.LS','validation.json',compiled_path='MAIN.TP',readback_path='readback.LS')
     assert checked['preserved_checks_pass'] and not checked['compiler_execution_authenticated']
     (destination/'MAIN.TP').write_bytes(b'Changed')
     assert not native_validation.review_validation(destination,'MAIN.LS','validation.json',compiled_path='MAIN.TP',readback_path='readback.LS')['preserved_checks_pass']
+
+
+@pytest.mark.parametrize('missing',['asc2bint.dll','bin2asct.dll'])
+def test_missing_native_translator_keeps_actionable_report_without_invoking_tools(tmp_path,monkeypatch,missing):
+    path=listing(tmp_path);options=setup_tools(tmp_path)
+    (tmp_path/'profile'/missing).unlink()
+    def unexpected_run(*args,**kwargs):
+        pytest.fail('An incomplete native toolchain must not be invoked')
+    monkeypatch.setattr(native_validation,'_run',unexpected_run)
+    destination=tmp_path/'unavailable'
+    report=native_validation.validate_offline(path,destination,**options)
+    assert report['status']=='toolchain_unavailable'
+    assert not report['compiler_invoked'] and not report['printer_invoked']
+    assert report['compile_returncode'] is None and report['print_returncode'] is None
+    assert report['toolchain']['missing_components']==[str(tmp_path/'profile'/missing)]
+    assert missing in (destination/'compile.log').read_text()
+    assert json.loads((destination/'validation.json').read_text())['status']=='toolchain_unavailable'
+    assert path.read_bytes()==(destination/'MAIN.LS').read_bytes()
+    assert not report['controller_contacted'] and not report['controller_written']
 
 
 @pytest.mark.parametrize('result,output',[(1,b'Error: synthetic compile diagnostic'),(0,b'Success without binary')])

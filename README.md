@@ -158,7 +158,8 @@ see [program diagnostics](docs/PROGRAM_DIAGNOSTICS.md).
 The same guide covers semantic comparisons, dependency packages and isolated
 MakeTP/PrintTP validation. Use `python -B -m fanuc_workbench.program_tools --help`
 for the offline CLI; native compiler success and controller acceptance remain
-separate checks.
+separate checks. Native jobs check the selected profile's translator components
+and retain an actionable report when the toolchain is incomplete.
 The desktop exposes these tools at **Search / Analysis → Program diagnostics**,
 including opt-in triggered captures from existing native reads. The optional
 reloadable `workbench.programs` 1.1.0 release adds six read analyses through the

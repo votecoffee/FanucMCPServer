@@ -131,6 +131,16 @@ rebinds Robot/Support/Output paths into a new isolated job directory. Version an
 configuration must agree. It does not run SetRobot, change installed tools or
 load/select/run a controller program.
 
+The configuration's `Path` selects the WinOLPC profile directory; relative values
+resolve beside the original configuration. The job checks and hashes its
+`asc2bint.dll` (MakeTP) and `bin2asct.dll` (PrintTP) components. Missing components
+produce a preserved `toolchain_unavailable` report and diagnostic log without
+invoking either tool. Launcher executables alone do not establish a complete
+toolchain. Install or select a compatible complete profile before retrying.
+WinOLPC's staging output uses a separate `compiler-output/` directory inside the
+job, so its internal file copies cannot collide with the preserved inputs or
+requested TP/LS outputs.
+
 The job preserves source, original/effective INIs, context hashes, compiler and
 printer hashes, merged stdout/stderr logs, diagnostics, TP output and printed LS
 readback when available. Both tool stages must exit successfully with nonempty

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixed offline compiler jobs to keep WinOLPC staging output separate from
+  preserved inputs and final readback. Added selected-profile translator checks,
+  component hashes and actionable reports when the native toolchain is incomplete.
 - Added the Program diagnostics GUI and opt-in triggered native capture bundles
   with exact LS revisions read after triggers, timestamps, hashes and explicit
   partial/error/gap evidence. Added optional offline-report checks before GUI

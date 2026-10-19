@@ -68,6 +68,17 @@ def _snapshot_context(source,destination):
     return manifest
 
 
+def _inspect_toolchain(profile):
+    components=[]
+    for name in ('asc2bint.dll','bin2asct.dll'):
+        path=profile/name
+        present=path.is_file()
+        components.append({'path':str(path),'present':present,
+            'sha256':hashlib.sha256(_read(path,64*1024*1024)).hexdigest() if present else None})
+    return {'profile_path':str(profile),'components':components,
+            'missing_components':[row['path'] for row in components if not row['present']]}
+
+
 def validate_offline(source,destination,*,maketp,printtp,configuration,robot_context,version,timeout=30):
     if not isinstance(version,str) or not re.fullmatch(r'V\d{1,2}\.\d{2}-\d{1,3}',version): raise ValueError('Select an explicit installed WinOLPC core version')
     if type(timeout) not in (int,float) or not 1<=timeout<=60: raise ValueError('Use compiler timeout 1..60 seconds')
@@ -85,6 +96,11 @@ def validate_offline(source,destination,*,maketp,printtp,configuration,robot_con
     if settings.sections()!=['WinOLPC_Util'] or set(settings['WinOLPC_Util'])!={'Robot','Version','Path','Support','Output'}:
         raise ValueError('Use an explicit WinOLPC_Util Robot/Version/Path/Support/Output configuration')
     if settings['WinOLPC_Util']['Version'].upper()!=version.upper(): raise ValueError('Selected core and configuration versions differ')
+    profile_text=settings['WinOLPC_Util']['Path'].strip()
+    if not profile_text: raise ValueError('Select an explicit WinOLPC profile directory in the configuration Path')
+    profile=Path(profile_text)
+    profile=(profile if profile.is_absolute() else configuration.resolve().parent/profile).resolve()
+    toolchain=_inspect_toolchain(profile)
     support=robot_context/'support'
     if not support.is_dir(): raise ValueError('Robot context needs its support directory')
     compiler_hash=hashlib.sha256(_read(maketp,64*1024*1024)).hexdigest()
@@ -94,10 +110,13 @@ def validate_offline(source,destination,*,maketp,printtp,configuration,robot_con
     destination.mkdir(parents=False,exist_ok=False)
     context_manifest=_snapshot_context(robot_context,destination/'context')
     context=destination/'context'
+    staging=destination/'compiler-output'
+    staging.mkdir()
     mapped='\\'+str(context.drive).rstrip(':').lower()+'\\'+str(context.relative_to(context.anchor)) if context.drive else str(context)
     settings['WinOLPC_Util']['Robot']=mapped
+    settings['WinOLPC_Util']['Path']=str(profile)
     settings['WinOLPC_Util']['Support']=str(context/'support')
-    settings['WinOLPC_Util']['Output']=str(destination)
+    settings['WinOLPC_Util']['Output']=str(staging)
     output=io.StringIO();settings.write(output);effective_config=output.getvalue().encode('utf-8')
     name=identity['program']
     inputs={name+'.LS':raw,'robot.ini':effective_config,'source_robot.ini':config}
@@ -109,27 +128,36 @@ def validate_offline(source,destination,*,maketp,printtp,configuration,robot_con
         'context_manifest_sha256':hashlib.sha256(json.dumps(context_manifest,sort_keys=True).encode()).hexdigest(),
         'context_files':len(context_manifest),'context_capture_is_atomic':False,
         'compiler_sha256':compiler_hash,'printer_sha256':printer_hash,'core_version':version,
+        'toolchain':toolchain,'compiler_invoked':False,'printer_invoked':False,
         'source_file':name+'.LS','compiled_file':name+'.TP','readback_file':'readback.LS',
         'compile_returncode':None,'print_returncode':None,'compiled_sha256':None,'readback_sha256':None,
         'status':'compile_failed','controller_contacted':False,'controller_written':False,'deployment_prepared':False}
     try:
-        state,log=_run([str(maketp),str(destination/(name+'.LS')),str(destination/(name+'.TP')),'/config',str(destination/'robot.ini'),'/ver',version],destination,timeout)
-        (destination/'compile.log').write_bytes(log);report['compile']=state;report['compile_returncode']=state['returncode']
-        report['compile_diagnostics']=log.decode('utf-8',errors='replace').splitlines()[:200]
-        compiled=destination/(name+'.TP')
-        if state['returncode']==0 and not state['timed_out'] and not state['output_truncated'] and compiled.is_file():
-            tp=_read(compiled,4*1024*1024)
-            if not tp: raise ValueError('Compiler produced an empty TP file')
-            report['compiled_sha256']=hashlib.sha256(tp).hexdigest();report['status']='compiled_without_matching_readback'
-            state,log=_run([str(printtp),str(destination/(name+'.TP')),str(destination/'readback.LS'),'/config',str(destination/'robot.ini'),'/ver',version],destination,timeout)
-            (destination/'print.log').write_bytes(log);report['print']=state;report['print_returncode']=state['returncode']
-            report['print_diagnostics']=log.decode('utf-8',errors='replace').splitlines()[:200]
-            readback=destination/'readback.LS'
-            if state['returncode']==0 and not state['timed_out'] and not state['output_truncated'] and readback.is_file():
-                actual=_read(readback,1024*1024)
-                report['readback_sha256']=hashlib.sha256(actual).hexdigest()
-                report['listing_comparison']=compare_native_listing(raw,actual)
-                if actual and report['listing_comparison']['matches']: report['status']='offline_checks_passed'
+        if toolchain['missing_components']:
+            report['status']='toolchain_unavailable'
+            report['compile_diagnostics']=['Selected WinOLPC profile is missing native translator components:',
+                *toolchain['missing_components'],'Install or select a compatible complete WinOLPC toolchain; no tools were invoked.']
+            (destination/'compile.log').write_text('\n'.join(report['compile_diagnostics'])+'\n',encoding='utf-8')
+        else:
+            report['compiler_invoked']=True
+            state,log=_run([str(maketp),str(destination/(name+'.LS')),str(destination/(name+'.TP')),'/config',str(destination/'robot.ini'),'/ver',version],destination,timeout)
+            (destination/'compile.log').write_bytes(log);report['compile']=state;report['compile_returncode']=state['returncode']
+            report['compile_diagnostics']=log.decode('utf-8',errors='replace').splitlines()[:200]
+            compiled=destination/(name+'.TP')
+            if state['returncode']==0 and not state['timed_out'] and not state['output_truncated'] and compiled.is_file():
+                tp=_read(compiled,4*1024*1024)
+                if not tp: raise ValueError('Compiler produced an empty TP file')
+                report['compiled_sha256']=hashlib.sha256(tp).hexdigest();report['status']='compiled_without_matching_readback'
+                report['printer_invoked']=True
+                state,log=_run([str(printtp),str(destination/(name+'.TP')),str(destination/'readback.LS'),'/config',str(destination/'robot.ini'),'/ver',version],destination,timeout)
+                (destination/'print.log').write_bytes(log);report['print']=state;report['print_returncode']=state['returncode']
+                report['print_diagnostics']=log.decode('utf-8',errors='replace').splitlines()[:200]
+                readback=destination/'readback.LS'
+                if state['returncode']==0 and not state['timed_out'] and not state['output_truncated'] and readback.is_file():
+                    actual=_read(readback,1024*1024)
+                    report['readback_sha256']=hashlib.sha256(actual).hexdigest()
+                    report['listing_comparison']=compare_native_listing(raw,actual)
+                    if actual and report['listing_comparison']['matches']: report['status']='offline_checks_passed'
         if _read(source,1024*1024)!=raw or _read(configuration,1024*1024)!=config:
             raise ValueError('Original source or configuration changed during validation')
         if (destination/(name+'.LS')).read_bytes()!=raw or (destination/'robot.ini').read_bytes()!=effective_config:
