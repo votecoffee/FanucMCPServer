@@ -129,6 +129,12 @@ class NativeControllerTab(QWidget):
         self.button(row, 'Choose LS program…', self.choose_source)
         self.button(row, 'Validate and prepare deployment', self.prepare_program)
         layout.addLayout(row)
+        row=QHBoxLayout();self.offline_report=QLineEdit();self.offline_report.setPlaceholderText('Optional preserved validation.json checked before preparing deployment')
+        self.offline_report.textChanged.connect(self.invalidate_edited_plan);row.addWidget(self.offline_report,1)
+        def choose_report():
+            path,_=QFileDialog.getOpenFileName(self,'Offline compiler validation report','','JSON (*.json)')
+            if path:self.offline_report.setText(path)
+        self.button(row,'Offline compiler report…',choose_report);layout.addLayout(row)
         note = QLabel('Review the source, current controller program and exact proposal before loading. '
                       'Deployment loads/compiles and checks TP/LS readback. It never selects or runs the program.')
         note.setWordWrap(True)
@@ -163,7 +169,7 @@ class NativeControllerTab(QWidget):
             self.failed(str(exc))
 
     def set_busy(self, busy):
-        for control in [*self.controls, self.config_path, self.robot, self.target, self.source, self.change]:
+        for control in [*self.controls, self.config_path, self.robot, self.target, self.source, self.change, self.offline_report]:
             control.setEnabled(not busy)
         self.approve.setEnabled(not busy and self.plan is not None)
         self.cancel.setEnabled(not busy and self.plan is not None)
@@ -247,16 +253,28 @@ class NativeControllerTab(QWidget):
         try:
             robot = self.selected()
             expressions = [line.strip() for line in self.expressions.toPlainText().splitlines() if line.strip()]
+            diagnostics=getattr(getattr(self.owner,'search',None),'program_diagnostics',None)
+            session=diagnostics.capture_session if diagnostics else None
             def work():
-                return self.bridge.native.sample(robot, expressions), self.bridge.native.status(robot)
+                data,status=self.bridge.native.sample(robot, expressions),self.bridge.native.status(robot)
+                error=None
+                if session and session.armed:
+                    try:
+                        from fanuc_workbench.services.diagnostic_capture import native_source_id
+                        session.observe_native(data,status,native_source_id(self.bridge,robot),lambda name:self.bridge.native.read_program(robot,name))
+                    except Exception as exc:session.armed=False;error=str(exc)
+                return data,status,error
             def show(result):
-                data, status = result
+                data,status,error=result
                 rows = {**data['values'], **{key: {'unavailable': value} for key, value in data['errors'].items()}}
                 self.values.setRowCount(len(rows))
                 for index, (name, value) in enumerate(rows.items()):
                     self.values.setItem(index, 0, QTableWidgetItem(name))
                     self.values.setItem(index, 1, QTableWidgetItem(json.dumps(value)))
                 self.status.setPlainText(pretty(status))
+                if diagnostics and diagnostics.capture_session is session:
+                    diagnostics.refresh_capture()
+                    if error:diagnostics.capture_label.setText('Capture stopped: '+error)
             self.run(work, show)
         except Exception as exc:
             self.failed(str(exc))
@@ -326,11 +344,22 @@ class NativeControllerTab(QWidget):
             with Path(self.source.text()).open('rb') as stream:
                 data = stream.read(1024*1024+1)
             info = validate_source(data)
+            offline=None
+            if self.offline_report.text().strip():
+                from fanuc_workbench.extensions.programs_v1_1_0.diagnostics import read_json
+                from fanuc_workbench.services.native_validation import review_validation
+                path=Path(self.offline_report.text()).resolve();report,_=read_json(path.parent,path.name)
+                offline=review_validation(path.parent,report['source_file'],path.name,
+                    compiled_path=report.get('compiled_file'),readback_path=report.get('readback_file'))
+                if not offline['preserved_checks_pass'] or offline['source_sha256']!=info['source_sha256']:
+                    raise ValueError('Offline compiler evidence failed or belongs to a different source revision. Inspect its diagnostics before preparing deployment.')
             self.clear_plan()
             def work():
                 captured = self.bridge.native.read_program(robot, info['program'])
                 staged = self.bridge.stage_file(info['program']+'.LS', base64.b64encode(data).decode(), hashlib.sha256(data).hexdigest())
-                return self.bridge.native.prepare_program(robot, staged['source_file'], captured['sha256'])
+                plan=self.bridge.native.prepare_program(robot, staged['source_file'], captured['sha256'])
+                if offline is not None:plan['offline_validation']=offline
+                return plan
             self.run(work, self.prepared)
         except Exception as exc:
             self.failed(str(exc))
@@ -376,6 +405,8 @@ class NativeControllerTab(QWidget):
     def shutdown(self):
         self.timer.stop()
         self.auto.setChecked(False)
+        diagnostics=getattr(getattr(self.owner,'search',None),'program_diagnostics',None)
+        if diagnostics:diagnostics.disarm_capture()
         if self.bridge:
             self.bridge.close()
             self.bridge = None

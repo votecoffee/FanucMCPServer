@@ -68,3 +68,34 @@ def test_indirect_calls_missing_positions_and_unresolved_jumps_block_completenes
     assert {row['resolution'] for row in report['items']}=={'unresolved_indirect','missing_inventory','missing_position','unresolved_runtime_frame_tool_state'}
     assert report['issue_count'] and not report['explicit_dependencies_accounted_for']
     with pytest.raises(ValueError): dependency_review(tmp_path,['MAIN.LS'],entry_programs=[])
+
+
+def test_dynamic_and_conditional_frame_tool_dependencies_remain_explicit(tmp_path):
+    listing(tmp_path,body='1: UFRAME_NUM=R[1] ;\n2: IF DI[1]=ON,UTOOL_NUM=2 ;\n3: R[2]=UTOOL_NUM ;')
+    report=dependency_review(tmp_path,['MAIN.LS'],entry_programs=['MAIN'],view='missing')
+    assert any(row['resolution']=='unresolved_frame_tool_index' for row in report['items'])
+    assert {'UTOOL[2]','UTOOL_NUM'}<={row['token'] for row in report['items']}
+
+
+def test_program_identity_and_unknown_sections_are_never_silently_equal(tmp_path):
+    pair(tmp_path,'1: END ;','1: END ;')
+    path=tmp_path/'after.LS';path.write_text(path.read_text().replace('/PROG MAIN','/PROG OTHER').replace('/MN','/APPL\nUNKNOWN=1;\n/MN'))
+    assert set(categories(tmp_path))=={'program_identity','unclassified_sections'}
+
+
+@pytest.mark.parametrize('mode',['semantic','dependencies'])
+def test_changed_source_between_reads_is_refused(tmp_path,monkeypatch,mode):
+    from fanuc_workbench.extensions.programs_v1_1_0 import review
+    pair(tmp_path,'1: R[1]=1 ;','1: R[1]=2 ;')
+    original=review.base._read;changed=False
+    def read(root,relative,remaining):
+        nonlocal changed
+        result=original(root,relative,remaining)
+        if not changed:
+            changed=True
+            path=root/relative;path.write_bytes(path.read_bytes()+b'\n! Synthetic concurrent revision')
+        return result
+    monkeypatch.setattr(review.base,'_read',read)
+    with pytest.raises(ValueError,match='revision changed'):
+        if mode=='semantic':semantic_compare(tmp_path,'before.LS','after.LS')
+        else:dependency_review(tmp_path,['before.LS'],entry_programs=['MAIN'])

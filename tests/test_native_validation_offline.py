@@ -94,3 +94,11 @@ def test_incomplete_package_requires_explicit_choice_and_remains_review_only(tmp
     assert not destination.exists()
     result=build_change_package(tmp_path,['MAIN.LS'],destination,entry_programs=['MAIN'],allow_incomplete=True)
     assert result['status']=='incomplete_review_only'
+
+
+def test_package_retains_all_requirements_beyond_a_report_page(tmp_path):
+    listing(tmp_path,body='\n'.join(f'{index}: R[1]={index} ;' for index in range(1,121)))
+    inventory(tmp_path,['R[1]'])
+    build_change_package(tmp_path,['MAIN.LS'],tmp_path/'package',entry_programs=['MAIN'],inventory_path='inventory.json')
+    report=json.loads((tmp_path/'package/package.json').read_text())['review']
+    assert len(report['items'])==120 and report['next_offset'] is None

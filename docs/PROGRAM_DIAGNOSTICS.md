@@ -162,3 +162,74 @@ python -B -m fanuc_workbench.program_tools compile C:/RobotBackups/Test/MAIN.LS 
 
 Keep actual configurations, robot data, output jobs and acceptance reports outside
 the public checkout or in its ignored `.local/` directory.
+
+## Desktop
+
+Open **Search / Analysis → Program diagnostics** and select explicit LS files in
+the active workspace. Choose an analysis, the relevant preserved observations/
+comparison/inventory/report files and a row offset. **Analyze** uses the same
+services as Python and the CLI. Reports can be exported locally. Creating a
+reviewed package requires resolved dependencies; the GUI does not override an
+incomplete result. The **Native offline compiler** page accepts explicit compiler,
+configuration, robot-context and version selections and creates a new local job.
+
+On **Triggered native capture**, enter an exact task name from Native Controller
+status, optional verified numeric status-code mappings such as
+`{"<running-code>": "RUNNING", "<paused-code>": "PAUSED"}`, selected signal names
+and pre/post counts. Codes vary by provider/controller; they are never guessed.
+Load the native policy/target, then arm capture. Use the existing Native Controller
+read or explicit automatic refresh controls to acquire samples. Arming itself
+starts neither a connection nor polling. Changing the native target stops capture.
+
+An alarm flag rising triggers without asserting which history entries are active.
+Unavailable alarm reads do not trigger. When a trigger has a known task program,
+the existing native/file read service captures LS and preserves its hash and read
+time. It does not load or execute that program. Failed program reads retain the
+capture with an explicit revision error. Pre-trigger revisions remain unknown
+unless observed; an LS read after the trigger never authenticates earlier samples.
+The WAIT evaluator also rejects revision reads too far from the task observation.
+
+**Disarm** retains data. **Save captured bundle** stops collection and creates a
+new directory containing capture windows, retained observations, exact native LS
+revisions and a hash manifest. Missing pre-history and unfinished post-windows
+remain explicit. Retained observation indices and gap markers prevent replay
+across omitted periods from inventing signal transitions. Native rows are limited
+to 15 KiB before revision annotations; reduce watches if a row exceeds the bound.
+The session has the recorder's 2000-observation/20-capture limits and is never
+automatically restored or rearmed on launch.
+
+The **Native Controller → Deploy Program** page accepts an optional preserved
+offline compiler report. When supplied, it checks the source revision, TP hash and
+printed LS comparison before any deployment preparation read. Failed/mismatched
+evidence blocks preparation. Existing core policy, approval and fresh deployment
+preflight/readback still apply; a report never authorizes a controller write.
+
+## Reloadable MCP feature
+
+The optional `workbench.programs` **1.1.0** release preserves the 1.0 dependency
+operation unchanged and adds six read operations:
+
+| Operation suffix | Arguments in addition to `artifact_id` |
+| --- | --- |
+| `trace` | `paths`; optional `view`, `offset`, `limit` |
+| `explain_wait` | `path`, `observation_path`; optional `observation_index`, `max_age_seconds` |
+| `triggered_captures` | `paths`, `observation_path`; optional window/trigger/signal/view/page settings |
+| `semantic_compare` | `before_path`, `after_path`; optional page settings |
+| `dependency_review` | `paths`, `entry_programs`; optional `inventory_path`, `view`, page settings |
+| `review_validation` | `source_path`, `report_path`; optional `compiled_path`, `readback_path` |
+
+Stage `install-builtin program-logic` with the current operator CLI, then call
+`reload_extensions` in the existing host session. With an older CLI, stage this
+self-contained release directly:
+
+```powershell
+python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/programs_v1_1_0
+```
+
+Describe `workbench.programs.<suffix>` and use `run_read_operation` with its exact
+revision. All paths are explicitly selected inside a preserved artifact; host
+file-set/hash checks precede dispatch. Operations have bounded pagination and
+never run a compiler or contact a controller. Compilation and live acquisition
+remain in the operator's local CLI/GUI/shared services. The permanent 48 MCP tool
+schemas stay unchanged. Stage the preserved `extensions/programs` release (or
+`install-builtin programs`) and reload to roll back to version 1.0.0.

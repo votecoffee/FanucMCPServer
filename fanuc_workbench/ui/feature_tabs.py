@@ -238,6 +238,8 @@ class SearchAnalysisTab(QWidget):
     def __init__(self,owner):
         super().__init__(); self.owner=owner; self.refs=[]
         l=QVBoxLayout(self); sub=QTabWidget(); l.addWidget(sub); sub.addTab(self._search_ui(),'Global Search / X-Ref'); sub.addTab(self._deps_ui(),'Dependencies / Unused'); sub.addTab(self._usage_ui(),'Register Usage'); sub.addTab(self._flow_ui(),'Program Flow')
+        from fanuc_workbench.ui.program_diagnostics import ProgramDiagnosticsPanel
+        self.program_diagnostics=ProgramDiagnosticsPanel(owner);sub.addTab(self.program_diagnostics,'Program diagnostics')
 
     def _search_ui(self):
         w=QWidget(); l=QVBoxLayout(w); row=QHBoxLayout(); self.q=QLineEdit(); self.q.setPlaceholderText('R[101], PR[42], DO[23], UFRAME3, CALL PICK…'); self.q.textChanged.connect(self.filter); row.addWidget(self.q,1); b=QPushButton('Re-index'); b.clicked.connect(self.sync_workspace); row.addWidget(b); l.addLayout(row)
@@ -253,6 +255,7 @@ class SearchAnalysisTab(QWidget):
     def _flow_ui(self):
         w=QWidget(); l=QVBoxLayout(w); self.flow_prog=QComboBox(); self.flow_prog.currentIndexChanged.connect(self.refresh_flow); l.addWidget(self.flow_prog); self.flow=QTableWidget(0,3); self.flow.setHorizontalHeaderLabels(['Line','Type','Instruction']); self.flow.horizontalHeader().setSectionResizeMode(2,QHeaderView.Stretch); l.addWidget(self.flow); return w
     def sync_workspace(self):
+        self.program_diagnostics.sync_workspace()
         ws=self.owner.workspace; self.refs=build_xref(ws) if ws else []; self.filter(); self.dep_tree.clear(); self.unused.setRowCount(0); self.usage.setRowCount(0); self.flow_prog.blockSignals(True); self.flow_prog.clear()
         if not ws: self.flow_prog.blockSignals(False); return
         graph=program_dependencies(ws)

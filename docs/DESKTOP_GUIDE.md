@@ -177,6 +177,14 @@ print(len(saved.samples), saved.trend_breaks)
 metadata_and_history = saved.document()  # defensive copy
 ```
 
+## Program diagnostics
+
+Program tracing, sampled WAIT diagnosis, triggered native captures, semantic
+comparison, dependency packages and offline compiler jobs are available under
+**Search / Analysis → Program diagnostics**. See the
+[program diagnostics guide](PROGRAM_DIAGNOSTICS.md#desktop) for inputs and evidence
+boundaries. Trigger arming starts no polling or controller connection.
+
 ## Fleet / Scheduler
 
 The **Run** checkbox controls both **Back up checked now** and scheduled backups.

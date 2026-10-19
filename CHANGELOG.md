@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added the Program diagnostics GUI and opt-in triggered native capture bundles
+  with exact LS revisions read after triggers, timestamps, hashes and explicit
+  partial/error/gap evidence. Added optional offline-report checks before GUI
+  deployment preparation and a self-contained programs 1.1.0 feature with six
+  reloadable read analyses. Preserved the original release and 48 MCP schemas.
 - Added categorized semantic LS comparisons, transitive explicit dependency
   inventories, hash-bound local change packages and an offline program-tools CLI.
   Added isolated MakeTP/PrintTP jobs with copied robot contexts, explicit versions,

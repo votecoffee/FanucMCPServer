@@ -69,13 +69,13 @@ def read_json(root, relative):
 
 
 def validate_observation(row):
-    if not isinstance(row,dict) or set(row)-{'timestamp','source_id','task','sample','alarms','alarms_complete'}:
+    if not isinstance(row,dict) or set(row)-{'timestamp','source_id','task','sample','alarms','alarms_complete','alarm_active_flag','alarm_history','gap_before'}:
         raise ValueError('Unsupported observation fields')
     if type(row.get('timestamp')) not in (int,float) or not math.isfinite(row['timestamp']): raise ValueError('Finite observation timestamp required')
     if not isinstance(row.get('source_id'),str) or not 1<=len(row['source_id'])<=128: raise ValueError('Explicit observation source_id required')
     task=row.get('task')
     if task is not None:
-        if not isinstance(task,dict) or set(task)-{'name','program','line','state','program_sha256','status_code'}: raise ValueError('Unsupported task fields')
+        if not isinstance(task,dict) or set(task)-{'name','program','line','state','program_sha256','status_code','revision_capture_timestamp','revision_binding'}: raise ValueError('Unsupported task fields')
         if not isinstance(task.get('program'),str) or not re.fullmatch(r'[A-Za-z0-9_]{1,64}',task['program']): raise ValueError('Explicit task program required')
         if type(task.get('line')) is not int or task['line']<1: raise ValueError('Explicit positive TP line required')
         if not isinstance(task.get('state'),str): raise ValueError('Explicit task state required')
@@ -92,6 +92,9 @@ def validate_observation(row):
     if 'alarms' in row and (not isinstance(row['alarms'],list) or len(row['alarms'])>100 or any(not isinstance(alarm,str) for alarm in row['alarms'])):
         raise ValueError('Alarms must be up to 100 explicit active alarm strings')
     if 'alarms_complete' in row and type(row['alarms_complete']) is not bool: raise ValueError('Invalid alarm completeness flag')
+    for field in ('alarm_active_flag','gap_before'):
+        if field in row and type(row[field]) is not bool: raise ValueError('Invalid observation flag')
+    if 'alarm_history' in row and (not isinstance(row['alarm_history'],list) or len(row['alarm_history'])>100 or any(not isinstance(item,str) for item in row['alarm_history'])): raise ValueError('Invalid alarm history')
     return deepcopy(row)
 
 
@@ -131,13 +134,17 @@ class Condition:
         token=self.take()
         if token in ('ON','TRUE'): return True,token
         if token in ('OFF','FALSE'): return False,token
-        if re.fullmatch(r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)',token): return float(token),token
+        if re.fullmatch(r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)',token):
+            number=float(token)
+            if not math.isfinite(number):raise ValueError('Unsupported nonfinite condition constant')
+            return number,token
         if not re.fullmatch(r'(?:R|DI|DO|GI|GO|AI|AO|RI|RO|UI|UO|F)\[\d+\]',token): raise ValueError('Unsupported condition operand')
         values={canonical(key):value for key,value in self.sample.get('values',{}).items()}
         errors={canonical(key) for key in self.sample.get('errors',{})}
         value=None if token in errors else values.get(token)
         if token.split('[')[0] in IO_TYPES and isinstance(value,str) and value.upper() in ('ON','OFF'):
             value=value.upper()=='ON'
+        elif isinstance(value,str) and re.fullmatch(r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)',value):value=float(value)
         if type(value) not in (int,float,bool) or not math.isfinite(value): value=None
         return value,token
 
@@ -190,9 +197,14 @@ def explain_wait(root,path,observation,*,max_age_seconds=5):
     result={'status':'unresolved','reasons':[],'condition':None,'satisfied':None,'atoms':[],
             'source':listing['file'],'observation_timestamp':row['timestamp'],'source_id':row['source_id'],
             'alarms':row.get('alarms',[]),'alarms_complete':row.get('alarms_complete',False),
+            'alarm_history':row.get('alarm_history',[]),'task_revision_binding':task.get('revision_binding','supplied') if task else None,
             'blocking_cause_verified':False,'capture_is_atomic':False,'controller_contacted':False}
     if not task or task['program'].upper()!=listing['file']['program']: result['reasons'].append('task_program_mismatch_or_missing')
     if not task or task.get('program_sha256')!=listing['file']['source_sha256']: result['reasons'].append('listing_revision_unverified_or_mismatched')
+    if task and task.get('revision_binding')=='native_ls_read_after_trigger':
+        captured=task.get('revision_capture_timestamp')
+        if type(captured) not in (int,float) or not math.isfinite(captured) or abs(captured-row['timestamp'])>max_age_seconds:
+            result['reasons'].append('listing_revision_capture_not_near_observation')
     if not sample or not 0<=row['timestamp']-sample['timestamp']<=max_age_seconds: result['reasons'].append('sample_missing_stale_or_future')
     nodes=[node for node in listing['nodes'] if task and node['tp_line_number']==task['line']]
     if len(nodes)!=1: result['reasons'].append('task_line_missing_or_ambiguous')
@@ -228,14 +240,19 @@ class TriggeredRecorder:
         if self.received>=2000: raise ValueError('Triggered recorder reached 2000 observations')
         previous=self.previous
         if previous and (row['source_id']!=previous['source_id'] or row['timestamp']<previous['timestamp']): raise ValueError('Observation source changed or clock moved backwards')
+        if row.get('gap_before'):
+            previous=None;self.history.clear()
         for capture in self.captures:
             if capture['post_remaining']:
                 capture['observations'].append(row);capture['post_remaining']-=1
+                if row.get('gap_before'):capture['observation_gap']=True
         events=[]
         if previous:
             if 'alarm' in self.triggers and previous.get('alarms_complete') and row.get('alarms_complete'):
                 new=set(row.get('alarms',[]))-set(previous.get('alarms',[]))
                 if new: events.append({'kind':'alarm','new':sorted(new)})
+            if 'alarm' in self.triggers and previous.get('alarm_active_flag') is False and row.get('alarm_active_flag') is True:
+                events.append({'kind':'alarm','cause':'active_alarm_flag_rising','active_codes_verified':False})
             oldtask,newtask=previous.get('task') or {},row.get('task') or {}
             if oldtask and newtask and oldtask.get('name')==newtask.get('name'):
                 if 'task_pause' in self.triggers and oldtask['state'].upper()=='RUNNING' and newtask['state'].upper()=='PAUSED': events.append({'kind':'task_pause'})

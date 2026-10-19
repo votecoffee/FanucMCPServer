@@ -53,10 +53,22 @@ def test_control_flow_and_select_branches_report_unknown_jump_targets(tmp_path):
     edges=report['items']
     assert any(row['from_tp_line']==1 and row['to_tp_line']==4 and row['branch']=='condition_false' for row in edges)
     assert any(row['from_tp_line']==3 and row['to_tp_line']==6 for row in edges)
-    assert any(row['from_tp_line']==6 and row['to_tp_line']==9 and row['branch']=='jump' for row in edges)
+    assert any(row['from_tp_line']==6 and row['to_tp_line']==9 and row['branch'].startswith('select_case') for row in edges)
     assert sum(row['resolution']=='unresolved_label' for row in edges)==2
     assert any(row['from_tp_line']==10 and row['to_tp_line']==10 for row in edges)
     assert not report['control_flow_complete']
+
+
+def test_select_continuations_keep_all_case_targets_and_one_tp_instruction(tmp_path):
+    listing(tmp_path,body='''1: SELECT R[1]=1,JMP LBL[10],
+ : =2,JMP LBL[20],
+ : ELSE,JMP LBL[R[2]] ;
+2: LBL[10] ;
+3: LBL[20] ;''')
+    report=trace_logic(tmp_path,['MAIN.LS'],view='instructions')
+    assert report['total']==3 and len(report['items'][0]['select_cases'])==3
+    edges=trace_logic(tmp_path,['MAIN.LS'],view='edges')['items']
+    assert len([edge for edge in edges if edge['from_tp_line']==1 and edge['branch'].startswith('select_case')])==3
 
 
 @pytest.mark.parametrize('expression,expected',[

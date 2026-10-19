@@ -9,7 +9,7 @@ import re
 
 from . import base
 from .diagnostics import read_json, selected_bytes
-from .logic import canonical, inspect_selection, references, report_page, IO_TYPES
+from .logic import canonical, inspect_selection, references, report_page, IO_TYPES,mask
 
 TOKEN=re.compile(r'''"(?:""|[^"\r\n])*"|'(?:''|[^'\r\n])*'|[A-Za-z_$][A-Za-z0-9_$]*|(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?|[^\s]''')
 GENERATED=re.compile(r'^\s*(OWNER|PROG_SIZE|PROGRAM_SIZE|CREATE|MODIFIED|FILE_NAME|LINE_COUNT|MEMORY_SIZE)\s*=',re.I)
@@ -88,6 +88,7 @@ def semantic_compare(root,before_path,after_path,*,offset=0,limit=100):
     changes=[]
     def change(category,location,old,new):
         changes.append({'category':category,'location':location,'before':_preview(old),'after':_preview(new)})
+    if left['file']['program']!=right['file']['program']:change('program_identity','/PROG',left['file']['program'],right['file']['program'])
     # SequenceMatcher needs hashable instruction identities.
     matcher=SequenceMatcher(a=[tuple(row['instruction']) for row in a],b=[tuple(row['instruction']) for row in b],autojunk=False)
     for operation,i,j,k,l in matcher.get_opcodes():
@@ -96,9 +97,10 @@ def semantic_compare(root,before_path,after_path,*,offset=0,limit=100):
             new=b[k+step] if k+step<l else {}
             for category in ('instruction','speed','termination','offsets','frames_tools','comments'):
                 if old.get(category)!=new.get(category): change(category,f'instruction {i+step+1} -> {k+step+1}',old.get(category),new.get(category))
-    for section in ('comments','program_comment','positions','attributes','generated_metadata'):
+    for section in ('comments','program_comment','positions','attributes','generated_metadata','unclassified_sections'):
         def selected(listing):
-            lines,_=base._read(Path(root).resolve(),listing['file']['path'],base.MAX_FILE_BYTES)
+            lines,current=base._read(Path(root).resolve(),listing['file']['path'],base.MAX_FILE_BYTES)
+            if current['source_sha256']!=listing['file']['source_sha256']:raise ValueError('Listing revision changed during semantic review')
             if section=='comments':
                 return [code_and_comments(re.sub(r'^\s*\d+\s*:\s*','',line))[1] for line in lines
                         if line.lstrip().startswith('!') or re.match(r'\s*\d+\s*:\s*!',line)]
@@ -111,6 +113,13 @@ def semantic_compare(root,before_path,after_path,*,offset=0,limit=100):
                 if remaining: result['unparsed']=remaining
                 return result
             if section=='program_comment': return [tokens(line) for line in lines if re.match(r'\s*COMMENT\s*=',line,re.I)]
+            if section=='unclassified_sections':
+                result=[];active=False
+                for line in lines:
+                    if line.lstrip().startswith('/'):
+                        active=line.strip().upper() not in ('/MN','/POS','/ATTR','/END') and not line.lstrip().upper().startswith('/PROG ')
+                    if active:result.append(tokens(line))
+                return result
             if section=='generated_metadata': return [tokens(line) for line in lines if GENERATED.match(line)]
             active=False;result=[]
             for line in lines:
@@ -137,7 +146,7 @@ def semantic_compare(root,before_path,after_path,*,offset=0,limit=100):
         position_parser_complete=False)
 
 
-def dependency_review(root,paths,*,entry_programs,inventory_path=None,view='requirements',offset=0,limit=100):
+def dependency_review(root,paths,*,entry_programs,inventory_path=None,view='requirements',offset=0,limit=100,_all=False):
     base._options(paths,entry_programs,'programs',offset,limit)
     if not entry_programs: raise ValueError('Dependency review requires explicit entry programs')
     listings=inspect_selection(root,paths)
@@ -167,33 +176,43 @@ def dependency_review(root,paths,*,entry_programs,inventory_path=None,view='requ
                 for token in ('UFRAME_NUM','UTOOL_NUM'):
                     need('frame_tool_state',token,file['path'],node['tp_line_number'],
                          'inventory_supplied' if token in resources else 'unresolved_runtime_frame_tool_state')
-            action=base._mask(node['action'])
-            call=base._reference(action) if action else None
-            if call:
-                kind,target,target_kind=call
-                found=definitions.get(target,[])
-                valid=len(found)==1 and not found[0]['issues']
-                resolution='selected' if valid else 'unresolved_indirect' if target_kind!='direct' else 'ambiguous' if len(found)>1 else 'missing_or_unparsed_program'
-                need('program',target or node['action'],file['path'],node['tp_line_number'],resolution)
-                if valid: pending.append(target)
-            frame=re.match(r'\s*(UFRAME_NUM|UTOOL_NUM)\s*=\s*(\d+)\s*$',node['code'],re.I)
-            if frame:
-                token=('UFRAME' if frame[1].upper()=='UFRAME_NUM' else 'UTOOL')+'['+frame[2]+']'
-                need('frame_tool',token,file['path'],node['tp_line_number'],'inventory_supplied' if token in resources else 'missing_inventory')
+            for branch in node.get('select_cases') or [{'action':node['action']}]:
+                action=base._mask(branch['action'])
+                call=base._reference(action) if action else None
+                if call:
+                    kind,target,target_kind=call
+                    found=definitions.get(target,[])
+                    valid=len(found)==1 and not found[0]['issues']
+                    resolution='selected' if valid else 'unresolved_indirect' if target_kind!='direct' else 'ambiguous' if len(found)>1 else 'missing_or_unparsed_program'
+                    need('program',target or branch['action'],file['path'],node['tp_line_number'],resolution)
+                    if valid: pending.append(target)
+                frame=re.match(r'\s*(UFRAME_NUM|UTOOL_NUM)\s*=\s*(\d+)\s*$',branch['action'],re.I)
+                if frame:
+                    token=('UFRAME' if frame[1].upper()=='UFRAME_NUM' else 'UTOOL')+'['+frame[2]+']'
+                    need('frame_tool',token,file['path'],node['tp_line_number'],'inventory_supplied' if token in resources else 'missing_inventory')
+                elif re.match(r'\s*(UFRAME_NUM|UTOOL_NUM)\s*=',branch['action'],re.I):
+                    need('frame_tool',branch['action'],file['path'],node['tp_line_number'],'unresolved_frame_tool_index')
         position_ids=set()
-        lines,_=base._read(Path(root).resolve(),file['path'],base.MAX_FILE_BYTES)
-        position_section=False
-        for line in lines:
-            if line.strip().upper()=='/POS': position_section=True;continue
-            if not position_section: continue
-            match=re.match(r'\s*P\[(\d+)(?::[^\]]*)?\]',line,re.I)
-            if match: position_ids.add('P['+str(int(match[1]))+']')
-            for match in re.finditer(r'\b(UF|UT)\s*:\s*(\d+)',line,re.I):
+        lines,current=base._read(Path(root).resolve(),file['path'],base.MAX_FILE_BYTES)
+        if current['source_sha256']!=file['source_sha256']:raise ValueError('Listing revision changed during dependency review')
+        pos_start=next((index for index,line in enumerate(lines) if line.strip().upper()=='/POS'),len(lines))
+        pos_body='\n'.join(lines[pos_start+1:])
+        for block in re.finditer(r'(?ms)^\s*P\[(\d+)(?::[^\]]*)?\]\s*\{.*?\}\s*;',pos_body):
+            if not re.search(r'\bGP\d+\s*:',block[0],re.I):
+                issues.append({'path':file['path'],'code':'position_group_unparsed','position':block[1]});continue
+            position_ids.add('P['+str(int(block[1]))+']')
+            unquoted=mask(block[0])
+            frame_fields=list(re.finditer(r'\b(UF|UT)\s*:\s*(\d+)',unquoted,re.I))
+            if {match[1].upper() for match in frame_fields}!={'UF','UT'}:
+                issues.append({'path':file['path'],'code':'position_frame_tool_unparsed','position':block[1]})
+            for match in frame_fields:
                 token=('UFRAME' if match[1].upper()=='UF' else 'UTOOL')+'['+match[2]+']'
                 need('frame_tool',token,file['path'],None,'inventory_supplied' if token in resources else 'missing_inventory')
         for access in listing['accesses']:
             kind,token=access['kind'],access['token']
-            if kind in ('UFRAME_NUM','UTOOL_NUM'): continue
+            if kind in ('UFRAME_NUM','UTOOL_NUM'):
+                if access['access']=='read':need('frame_tool_state',token,access['path'],access['tp_line_number'],'inventory_supplied' if token in resources else 'missing_inventory')
+                continue
             resource=token.split('.')[0]
             if access['indirect']: resolution='unresolved_indirect'
             elif kind=='P': resolution='defined_in_listing' if resource in position_ids else 'missing_position'
@@ -205,8 +224,10 @@ def dependency_review(root,paths,*,entry_programs,inventory_path=None,view='requ
     missing=[row for row in requirements if row['resolution'] not in ('selected','defined_in_listing','mapping_supplied','inventory_supplied')]
     selected={'requirements':requirements,'missing':missing,'issues':issues}.get(view)
     if selected is None: raise ValueError('Choose requirements, missing or issues view')
-    return report_page(selected,view=view,offset=offset,limit=limit,entry_programs=entry_programs,
+    result=report_page(selected,view=view,offset=offset,limit=limit,entry_programs=entry_programs,
         program_files=[listing['file'] for listing in listings if listing['file']['program'] in reachable],
         inventory_path=inventory_path,inventory_sha256=inventory_hash,missing_count=len(missing),issue_count=len(issues),
         requirement_count=len(requirements),explicit_dependencies_accounted_for=not missing and not issues,
         physical_compatibility_verified=False,inventory_claims_verified=False)
+    if _all:result.update(items=selected,offset=0,next_offset=None,issues=issues)
+    return result

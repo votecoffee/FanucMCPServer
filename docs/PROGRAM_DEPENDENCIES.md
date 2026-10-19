@@ -1,5 +1,10 @@
 # Selected LS program dependencies
 
+Version 1.1.0 adds [logic tracing and program diagnostics](PROGRAM_DIAGNOSTICS.md)
+while preserving the 1.0.0 dependency operation and release unchanged. The
+`programs` built-in below remains the original release; `program-logic` selects
+the newer diagnostics release.
+
 The optional `workbench.programs` 1.0.0 feature inspects selected saved LS files
 for call/run references and static reachability from explicitly supplied entry
 programs. It retains dynamic targets, missing selected definitions, ambiguity and

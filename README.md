@@ -159,6 +159,10 @@ The same guide covers semantic comparisons, dependency packages and isolated
 MakeTP/PrintTP validation. Use `python -B -m fanuc_workbench.program_tools --help`
 for the offline CLI; native compiler success and controller acceptance remain
 separate checks.
+The desktop exposes these tools at **Search / Analysis → Program diagnostics**,
+including opt-in triggered captures from existing native reads. The optional
+reloadable `workbench.programs` 1.1.0 release adds six read analyses through the
+operation catalog while retaining the 48 permanent MCP tools and original release.
 
 ## Capabilities and limits
 
@@ -166,7 +170,7 @@ separate checks.
 | --- | --- |
 | Files and backups | FTP/SFTP listing, exact file/log capture, file-based backup progress, manifests, comparisons and reviewed per-file recovery |
 | Offline engineering | LS inspection, lint, cross references, R/PR/frame/comment evidence, mastering/DCS comparisons and documentation packages |
-| Program dependencies | Optional reloadable selected-LS call/run inspection, unresolved targets and static reachability from explicit entry programs |
+| Program analysis | Reloadable LS tracing, sampled WAIT diagnosis, semantic comparisons, dependency review and local change packages |
 | PLC mapping | Local CSV/L5X tag, alias and UDT-member import, searchable catalog, reviewed I/O-reference suggestions and saved workspace mappings |
 | Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation, troubleshooting snapshots, offline summaries, evidence bundles and sampled request/ack analysis |
 | Native controller API | R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR value changes and LS deployment |

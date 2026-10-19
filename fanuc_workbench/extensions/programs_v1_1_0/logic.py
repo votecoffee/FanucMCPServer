@@ -97,7 +97,7 @@ def references(code):
 
 
 def _statement(raw):
-    match = re.fullmatch(r'\s*(\d{1,6})\s*:\s*(.*)', raw)
+    match = re.fullmatch(r'\s*(\d{1,6})\s*:\s*(.*)', raw,re.S)
     if match is None:
         raise ValueError('numbered_statement_required')
     code = mask(match[2]).strip()
@@ -146,6 +146,22 @@ def _assignment(code):
     return None
 
 
+def select_cases(code):
+    parts=[];remaining=code[7:].strip()
+    while remaining:
+        head,tail=split_action(remaining);parts.append(head);remaining=tail
+    if len(parts)%2 or not parts: return []
+    first=re.fullmatch(r'(.+?)\s*=\s*(.+)',parts[0])
+    if not first:return []
+    selector=first[1];cases=[]
+    for index in range(0,len(parts),2):
+        condition=parts[index]
+        if index and condition.startswith('='): condition=selector+condition
+        elif index and condition.upper()!='ELSE': return []
+        cases.append({'condition':None if condition.upper()=='ELSE' else condition,'action':parts[index+1]})
+    return cases
+
+
 def parse_listing(lines, file):
     nodes, issues = [], []
     headers = [base._HEADER.fullmatch(line) for line in lines if re.match(r'\s*/PROG\b', line, FLAGS)]
@@ -159,8 +175,21 @@ def parse_listing(lines, file):
     if not mn:
         return {'file':{**file,'program':name}, 'nodes':nodes,'accesses':[], 'edges':[], 'issues':issues}
     accesses, seen, selector = [], set(), None
-    for physical in range(mn[0]+1,len(lines)):
-        raw = lines[physical]
+    records=[];physical=mn[0]+1
+    while physical<len(lines):
+        raw=lines[physical];start=physical
+        if raw.lstrip().startswith('/'):
+            records.append((physical,raw));break
+        if re.match(r'\s*\d+\s*:\s*SELECT\b',raw,FLAGS):
+            while physical+1<len(lines) and re.match(r'\s*:',lines[physical+1]):
+                try:
+                    if mask(raw).rstrip().endswith(';'):break
+                except ValueError:break
+                physical+=1
+                raw+=' '+re.sub(r'^\s*:\s*','',lines[physical])
+                if physical-start>16 or len(raw)>8192: raise ValueError('SELECT continuation exceeds statement bound')
+        records.append((start,raw));physical+=1
+    for physical,raw in records:
         if raw.lstrip().startswith('/'):
             if raw.strip().upper() not in ('/POS','/END'):
                 issues.append({'path':file['path'],'line_number':physical+1,'code':'unsupported_mn_boundary'})
@@ -184,6 +213,9 @@ def parse_listing(lines, file):
         seen.add(tp)
         node = {'path':file['path'],'program':name,'line_number':physical+1,'tp_line_number':tp,
                 'kind':kind,'code':code,'source':raw,'condition':condition,'action':action}
+        if kind=='SELECT':
+            node['select_cases']=select_cases(code)
+            if not node['select_cases']:issues.append({'path':file['path'],'line_number':physical+1,'code':'unsupported_select_cases'})
         nodes.append(node)
         # Conditions read; only the explicit action's LHS writes. Nested index refs always read.
         target = _assignment(action) if kind in ('ASSIGNMENT','IF','SELECT','SELECT_CASE','SELECT_ELSE') else None
@@ -220,13 +252,15 @@ def parse_listing(lines, file):
         kind = node['kind']
         if kind in ('END','ABORT'): continue
         action = node['action']
-        jump = re.search(r'\bJMP\s+LBL\s*\[(.*?)\]',action,FLAGS)
-        if jump:
+        jumps=[(re.search(r'\bJMP\s+LBL\s*\[(.*?)\]',case['action'],FLAGS),'select_case_'+str(at)) for at,case in enumerate(node.get('select_cases',[]))]
+        if not jumps:jumps=[(re.search(r'\bJMP\s+LBL\s*\[(.*?)\]',action,FLAGS),'jump')]
+        for jump,branch in jumps:
+            if not jump:continue
             target = int(jump[1]) if jump[1].strip().isdigit() else None
             choices = labels.get(target,[])
-            edge(node, choices[0] if len(choices)==1 else None, 'jump',
+            edge(node, choices[0] if len(choices)==1 else None, branch,
                  'resolved' if len(choices)==1 else 'unresolved_label')
-            if kind=='JMP': continue
+        if kind=='JMP':continue
         if kind=='IF_THEN' and index in pairs:
             alternate,end = pairs[index]
             after = (alternate+1) if alternate is not None else end+1
