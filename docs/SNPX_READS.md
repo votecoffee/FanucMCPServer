@@ -123,6 +123,11 @@ R/PR values or decodes them as floats/positions. Verify mapping ownership and
 meaning separately before interpreting data. Zero words are not proof of a valid
 assignment. Automatic typed mapping and reviewed mapping setup remain future work.
 
+The optional [offline decoder extension](SNPX_DECODING.md) can interpret preserved
+capture bytes as explicit integer/float layouts. It adds no controller access and
+keeps assignments and provenance unverified. Install/reload it through the
+existing feature catalog without changing MCP tool schemas.
+
 ## Protocol and evidence
 
 Each capture opens one TCP connection, sends INIT and the `0x4f/0x01` session

@@ -10,7 +10,7 @@ from fanuc_workbench.bridge.extension_release import install_release, load_regis
 
 
 def install_builtin(root: Path, name: str):
-    if name not in {'analysis', 'vqlog'}:
+    if name not in {'analysis', 'vqlog', 'snpx'}:
         raise ValueError("Unknown bundled feature")
     bundled = Path(__file__).resolve().parents[1] / 'extensions'
     # Keep the standard analyses when staging into a brand-new registry.
@@ -27,7 +27,7 @@ def main():
     install.add_argument("source", type=Path)
     install.add_argument("--python", type=Path, help="Separate local feature interpreter with its own dependencies")
     builtin = commands.add_parser('install-builtin', help='Stage a bundled feature without activating code')
-    builtin.add_argument('name', choices=['analysis', 'vqlog'])
+    builtin.add_argument('name', choices=['analysis', 'vqlog', 'snpx'])
     args = parser.parse_args()
     root = BridgeConfig.load(args.config.resolve()).state_dir / "extensions"
     if args.command == "install":

@@ -95,6 +95,12 @@ The bundled optional [VQLOG feature](VQLOG_ANALYSIS.md) can be staged with
 `reload_extensions`. It adds `workbench.vqlog.analyze` to the operation catalog
 without changing the 48 permanent tools. It is self-contained and read-only.
 
+The optional [offline SNPX decoder](SNPX_DECODING.md) stages with
+`install-builtin snpx`. It adds `workbench.snpx.decode_words` for captured raw
+words, with explicit byte/word order and integer/float types. It never connects
+to a controller or verifies assignment meaning. A compatible older CLI can stage
+its release directory with the existing `install` command, then reload normally.
+
 `install ... --python C:/RobotTools/FeatureVenv/Scripts/python.exe` selects an
 independent interpreter for that release's dependencies. Install dependencies
 into that dedicated environment before staging; neither staging nor reload runs

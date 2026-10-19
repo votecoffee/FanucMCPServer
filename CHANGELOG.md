@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added a self-contained reloadable `workbench.snpx.decode_words` offline feature
+  for captured 16/32/64-bit integers and IEEE floats, with explicit per-field
+  byte/word order, bounded arrays, source hashes and unavailable/nonfinite errors.
+  Mapping/provenance remain unverified; 64-bit integers use decimal strings.
+  `install-builtin snpx` stages it without adding MCP tool schemas.
 - Extended experimental SNPX sampling to allowlisted GI/GO/AI/AO ports, with
   mandatory per-target signed/unsigned 16-bit decoding, retained sample format
   metadata and no engineering-unit scaling. Existing digital reads and the

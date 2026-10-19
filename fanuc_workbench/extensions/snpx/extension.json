@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "id": "workbench.snpx",
+  "version": "1.0.0",
+  "host_api": 1,
+  "entrypoint": "feature.py",
+  "files": {
+    "feature.py": "b188e840e8c3f58b5b299aa04c07de46c007242004c30d09e6edb9dfb50dc390",
+    "LICENSE.txt": "9fdbc8c41abf794f69c3488f463798e06338bf90ebefbe2daee329d217c83d44"
+  },
+  "operations": [
+    {
+      "id": "workbench.snpx.decode_words",
+      "description": "Decode preserved SNPX raw words with explicit integer/float, byte and word order; mappings stay unverified",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,63}$"
+                },
+                "word_offset": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 127
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "u16",
+                    "i16",
+                    "u32",
+                    "i32",
+                    "f32",
+                    "u64",
+                    "i64",
+                    "f64"
+                  ]
+                },
+                "byte_order": {
+                  "type": "string",
+                  "enum": [
+                    "little",
+                    "big"
+                  ]
+                },
+                "word_order": {
+                  "type": "string",
+                  "enum": [
+                    "low_first",
+                    "high_first"
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 128
+                }
+              },
+              "required": [
+                "name",
+                "word_offset",
+                "type",
+                "byte_order",
+                "word_order"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "artifact_id",
+          "path",
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "capture",
+          "argument": "artifact_id",
+          "kind": "any",
+          "file_argument": "path"
+        }
+      ]
+    }
+  ]
+}
