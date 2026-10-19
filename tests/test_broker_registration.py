@@ -117,13 +117,16 @@ def test_setup_auto_records_route_and_never_fails_over(tmp_path, monkeypatch, av
     monkeypatch.setattr(setup, "register_plugin", lambda *args: calls.append("plugin"))
     monkeypatch.setattr(setup, "register_broker", lambda *args: calls.append("broker") or {})
     monkeypatch.setattr(setup.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps({"tool_count": 48, "configured_robots": []})))
-    monkeypatch.setattr(sys, "argv", ["setup.py", "--runtime-dir", str(runtime), "--config", str(config), "--register", "auto"])
+    profile = tmp_path / "new-codex-profile"
+    monkeypatch.setattr(sys, "argv", ["setup.py", "--runtime-dir", str(runtime), "--config", str(config),
+                                     "--register", "auto", "--codex-home", str(profile)])
     if expected == "error":
         before = (runtime / "installation.json").read_bytes()
         with pytest.raises(ValueError, match="prior integration preserved"): setup.main()
         assert calls == [] and (runtime / "installation.json").read_bytes() == before
     else:
         setup.main()
+        assert profile.is_dir()
         assert calls[-1] == expected
         assert json.loads((runtime / "installation.json").read_text())["registration"] == expected
         if expected == "broker": assert calls.index("idle") < calls.index("runtime")

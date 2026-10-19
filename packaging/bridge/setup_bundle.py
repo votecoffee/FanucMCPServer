@@ -235,7 +235,9 @@ def main():
         if not codex:
             raise ValueError("Codex CLI was not found; choose --register none to install only the runtime")
         if args.codex_home:
-            environment["CODEX_HOME"] = str(args.codex_home.resolve())
+            profile_dir = args.codex_home.resolve()
+            profile_dir.mkdir(parents=True, exist_ok=True)
+            environment["CODEX_HOME"] = str(profile_dir)
         plugins = []
         if args.register in {"auto", "broker"}:
             plugins = installed_plugins(codex, environment)
