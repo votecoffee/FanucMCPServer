@@ -208,6 +208,11 @@ Failed files and unavailable companions appear in the final counts and manifest;
 
 ## Create a robot access policy
 
+To edit an existing policy, open **Settings > Safeguards and policies…**. The
+[safeguards editor](SAFEGUARDS_GUI.md) covers all supported robot access settings,
+limits, approval method and optional broker permissions, with exact-change
+review and retained originals. Built-in integrity checks remain mandatory.
+
 Use **Settings > Create robot policy**, **Settings > MCP access > New policy**,
 or **Native Controller > New policy**. The form starts with the selected connection
 profile and read-only access. Enter a robot ID, connection details, read roots and

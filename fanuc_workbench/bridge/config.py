@@ -89,6 +89,14 @@ class BridgeConfig:
     def load(cls, path: Path) -> "BridgeConfig":
         path = path.resolve()
         data = json.loads(path.read_text(encoding="utf-8"))
+        return cls.from_document(data, path)
+
+    @classmethod
+    def from_document(cls, data: dict, path: Path) -> "BridgeConfig":
+        """Validate an operator's draft without writing files or opening a robot."""
+        path = path.resolve()
+        if not isinstance(data, dict) or not isinstance(data.get("robots", {}), dict):
+            raise ValueError("Policy and robots must be JSON objects")
         if type(data.get("allow_writes", False)) is not bool:
             raise ValueError("allow_writes must be a JSON boolean")
         robots = {}

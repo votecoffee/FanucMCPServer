@@ -20,3 +20,4 @@ __pycache__/
 *.py[cod]
 
 *.egg-info/
+.fanuc-policy-history/

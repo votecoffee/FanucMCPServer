@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added a complete GUI editor for robot access policies and optional broker
+  permissions/settings, including online-write targets, approval mode, plan
+  expiry, transfer/concurrency limits and HTTP/SNPX read scopes. Added validated
+  review, stale-file protection, original-policy backups and stopped-broker
+  administrative locking. Existing sessions retain their loaded permissions.
+
 - Validated broker initialization and complete normalized registrations before
   accepting an existing route, including tool classification policy. Extended
   actual-broker fixtures to cover backup jobs, worker reloads and stale revisions.

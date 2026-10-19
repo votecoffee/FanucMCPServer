@@ -41,6 +41,7 @@ def build(source: Path, output: Path):
                    check=True, env=environment)
     docs = output / "docs"
     docs.mkdir()
+    shutil.copyfile(source / "docs" / "SAFEGUARDS_GUI.md", docs / "SAFEGUARDS_GUI.md")
     shutil.copyfile(source / "docs" / "UNIVERSAL_BROKER.md", docs / "UNIVERSAL_BROKER.md")
     for name in ("DESKTOP_GUIDE.md", "ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md", "CONTROLLER_INTERFACES.md", "HTTP_READS.md", "SNPX_READS.md", "SNPX_DECODING.md", "SNPX_EVIDENCE.md", "SNPX_IO_EVIDENCE.md", "RECORDING_ANALYSIS.md", "RECORDING_EVIDENCE.md", "RECORDING_HANDSHAKE.md", "VQLOG_ANALYSIS.md", "ALARM_ANALYSIS.md", "ALARM_COMPARISON.md", "PROGRAM_DEPENDENCIES.md", "PROGRAM_DIAGNOSTICS.md", "REQUEST_CONCURRENCY.md", "COMMUNITY_INTEGRATIONS.md"):
         shutil.copyfile(source / "docs" / name, docs / name)

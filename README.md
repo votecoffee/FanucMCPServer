@@ -135,6 +135,12 @@ Use **Help → Open desktop log folder** for local startup/error diagnostics and
 
 ### Controller access mode
 
+Use **Settings → Safeguards and policies…** for the full
+[chat-permissions editor](docs/SAFEGUARDS_GUI.md): online-write permission,
+per-robot targets/read scope, approval method, expiry, limits and optional broker
+permissions. Changes require a validated review, retain the original policy and
+do not alter running sessions or contact a controller.
+
 Open **Settings → MCP access…**, select the MCP server's local robot policy,
 and load it. **Read-only controller access** is checked by default. Save the
 desired mode, then reconnect the MCP server using that file. Existing sessions

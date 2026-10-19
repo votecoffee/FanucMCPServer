@@ -34,6 +34,7 @@ from fanuc_workbench.ui.feature_tabs import (
 from fanuc_workbench.ui.advanced_tabs import LiveMonitorTab, FleetTab, CommissioningTab, IntegrationTab, RoboGuideTab
 from fanuc_workbench.ui.native_tab import NativeControllerTab
 from fanuc_workbench.ui.mcp_access_dialog import McpAccessDialog
+from fanuc_workbench.ui.safeguards_dialog import SafeguardsDialog
 from fanuc_workbench.ui.layout_state import DesktopLayout
 
 
@@ -80,6 +81,9 @@ class MainWindow(QMainWindow):
         self.mcp_access_action = QAction('MCP access…', self)
         self.mcp_access_action.triggered.connect(self.edit_mcp_access)
         self.settings_menu.addAction(self.mcp_access_action)
+        safeguards = QAction('Safeguards and policies…', self)
+        safeguards.triggered.connect(self.edit_safeguards)
+        self.settings_menu.addAction(safeguards)
         create=QAction('Create robot policy…',self);create.triggered.connect(self.create_robot_policy);self.settings_menu.addAction(create)
         self.settings_menu.addSeparator()
         self.reset_layout_action = QAction('Reset desktop layout', self)
@@ -128,6 +132,19 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 'MCP access policy saved. Reconnect MCP servers using that file; '
                 'reload the Native Controller policy separately to apply the mode.')
+
+    def edit_safeguards(self):
+        path = self.native_tab.config_path.text() or getattr(self, '_mcp_access_path', '')
+        preferences = self.settings.preferences()
+        dialog = SafeguardsDialog(path, preferences.get('broker_runtime_path', ''), self)
+        dialog.exec()
+        if dialog.saved_policy_path:
+            self._mcp_access_path = dialog.saved_policy_path
+            self.native_tab.config_path.setText(dialog.saved_policy_path)
+            self.settings.update_preferences(robot_policy_path=dialog.saved_policy_path)
+            self.statusBar().showMessage('Policy saved. Reconnect MCP servers or explicitly reload the Native Controller policy to apply it.')
+        if getattr(dialog, 'loaded_broker_runtime_path', ''):
+            self.settings.update_preferences(broker_runtime_path=dialog.loaded_broker_runtime_path)
 
     def _build_backup(self):
         w=QWidget(); l=QVBoxLayout(w); f=QFormLayout(); self.profile_label=QLabel('No robot configured'); self.dest=QLineEdit(str(Path.home()/'FanucBackups')); row=QWidget(); h=QHBoxLayout(row); h.setContentsMargins(0,0,0,0); h.addWidget(self.dest); b=QPushButton('Browse…'); b.clicked.connect(self.choose_backup_destination); h.addWidget(b)

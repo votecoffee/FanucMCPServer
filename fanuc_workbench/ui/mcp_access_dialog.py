@@ -30,6 +30,9 @@ class McpAccessDialog(QDialog):
         create = QPushButton('New policy…')
         create.clicked.connect(self.create_policy)
         row.addWidget(create)
+        advanced = QPushButton('All safeguards…')
+        advanced.clicked.connect(self.edit_safeguards)
+        row.addWidget(advanced)
         layout.addLayout(row)
         self.read_only = QCheckBox("Read-only controller access")
         self.read_only.setChecked(True)
@@ -79,6 +82,14 @@ class McpAccessDialog(QDialog):
         dialog = PolicyDialog(getattr(self.parent(), 'current_profile', None), self)
         if dialog.exec():
             self.config_path.setText(str(dialog.settings.path))
+            self.load_policy()
+
+    def edit_safeguards(self):
+        from fanuc_workbench.ui.safeguards_dialog import SafeguardsDialog
+        dialog = SafeguardsDialog(self.config_path.text(), parent=self)
+        dialog.exec()
+        if dialog.saved_policy_path:
+            self.config_path.setText(dialog.saved_policy_path)
             self.load_policy()
 
     def load_policy(self):
