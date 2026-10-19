@@ -65,6 +65,8 @@ class RobotBridge:
         self.comments = CommentChanges(self)
         from fanuc_workbench.bridge.native import NativeChanges
         self.native = NativeChanges(self)
+        from fanuc_workbench.bridge.snpx import SnpxReads
+        self.snpx = SnpxReads(self)
         from fanuc_workbench.bridge.extension_host import ExtensionHost
         self.extensions = ExtensionHost(self)
 
@@ -271,6 +273,8 @@ class RobotBridge:
              "port": access.profile.port, "timeout": access.profile.timeout,
              "transport": access.profile.transport, "roots": access.profile.roots,
              "http_read_url": access.http_read_url, "http_read_files": list(access.http_read_files),
+             "snpx_read": asdict(access.snpx_read) if access.snpx_read else None,
+             "sample_provider": access.sample_provider,
              "writable_files": list(access.writable_files), "comment_targets": list(access.comment_targets),
              "creatable_files": list(access.creatable_files),
              "native_provider": access.native_provider, "native_register_targets": list(access.native_register_targets),

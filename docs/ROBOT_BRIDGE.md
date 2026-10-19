@@ -212,6 +212,14 @@ not establish commissioning approval, launch ROBOGUIDE, or load a controller.
 
 ## Samples and recordings
 
+Optional experimental SNPX reads use an exact `snpx_read` policy. Set
+`sample_provider: "snpx"` to sample allowed DI/DO/RI/RO/UI/UO targets through
+`sample_robot` and watches. Raw assigned `%R` words are available separately as
+`core.snpx.read_words` through the operation catalog; their assignment meaning is
+unverified and they are never labeled as robot R/PR values. This provider has
+no writes or assignment commands and does not fall back to files. See
+[SNPX reads](SNPX_READS.md) for policy, evidence and controller-acceptance limits.
+
 sample_robot reads needed NUMREG.VA, POSREG.VA and IOSTATE.DG files for 1-100
 expressions by default. R, PR, common I/O and flags are supported when readable
 evidence exists. PR[group,index] selects multigroup records. When explicitly

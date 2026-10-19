@@ -65,7 +65,11 @@ class WorkbenchOperations:
         return {"runtime": {"gui_imported": any(name == "PySide6" or name.startswith("PySide6.") for name in sys.modules)},
                 "analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],
                 "live_reads": ["R", "PR", "DI", "DO", "GI", "GO", "AI", "AO", "RI", "RO", "UI", "UO", "F"],
-                "sampling_provider": "controller-generated files or explicitly configured native FRRobot API; verify per-operation availability",
+                "sampling_provider": "auto: native FRRobot if enabled, otherwise files; explicit snpx: digital I/O only",
+                "snpx_reads": {"enabled": bool(self.bridge._access(robot_id).snpx_read) if robot_id else "per configured robot",
+                               "operations": ["core.snpx.read_words"], "sample_provider": "explicit snpx setting",
+                               "scope": "exact digital I/O and raw %R spans; no assignment setup or variable decoding",
+                               "controller_acceptance": "pending", "writes": "unsupported"},
                 "http_reads": {"policy": "optional same-host origin and exact MD text-file allowlist",
                                "scope": "read_file, collect_logs and file-based samples; no listing, backup or write fallback",
                                "redirects": "refused", "environment_proxies": "disabled"},
@@ -326,6 +330,8 @@ class WorkbenchOperations:
                 raise ValueError("Live samples must be at least two seconds apart")
             self._last_sample[robot_id] = time.monotonic()
             atomic_json(self._sample_clock(robot_id), {"monotonic": self._last_sample[robot_id]})
+            if access.sample_provider == "snpx":
+                return self.bridge.snpx.sample(robot_id, [spec.expression for spec in specs], checkpoint=checkpoint)
             if access.native_provider == "frrobot":
                 if checkpoint:
                     checkpoint()

@@ -126,7 +126,7 @@ def test_same_mcp_session_loads_vqlog_without_new_tools_or_controller_access(tmp
                 assert not result.isError, result
                 return json.loads(result.content[0].text)
 
-            assert (await call('list_operations', {}))['total'] == 32
+            assert (await call('list_operations', {}))['total'] == 33
             imported = await call('import_workspace', {'source_folder': 'fixture'})
             install_builtin(tmp_path / 'state/extensions', 'vqlog')
             reloaded = await call('reload_extensions', {})

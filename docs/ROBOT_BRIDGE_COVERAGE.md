@@ -7,6 +7,7 @@ reported through `capabilities`.
 | Existing area | Chat/API access | Boundary |
 | --- | --- | --- |
 | Native controller data | R/PR/I/O, current position, tasks, alarms and program metadata through FRRobot TCP API | Configured provider; sequential captures; per-section availability errors |
+| Experimental SNPX | Exact digital I/O samples and raw `%R` words through the existing catalog | Explicit read allowlists; hashed wire evidence; no assignments/writes or typed R/PR decoding; controller acceptance pending |
 | Native changes | Reviewed R/PR values and LS loading/compilation through core plans | Exact target policy; native readback; PR tolerance explicit; no program execution |
 | Feature extensions | Stable MCP catalog, exact-revision read/proposal calls and atomic worker reload; all 20 workspace analyses delegated | Trusted local hash-pinned releases, no arbitrary native write classes; failed reload preserves active features and plans |
 | Controller, FTP/SFTP | Listing, exact retrieval, reviewed application-file replacement and TXT/CSV storage creation | Creation outside MD: with separate exact allowlist; no native load/run acceptance |
@@ -21,7 +22,7 @@ reported through `capabilities`.
 | Lint and cross references | Lint, dependencies, unused programs, register usage, LS validation and flow | Structural evidence; no compiler |
 | Option inventory | Matches and unknown status | Does not authenticate installed options |
 | EtherNet/IP | Adapter/scanner evidence | No configuration write |
-| Monitoring | Samples, watch jobs, trend/timeline/cycle exports and profiles | Two-second minimum; source files and availability errors retained |
+| Monitoring | Samples, watch jobs, trend/timeline/cycle exports and profiles | Two-second minimum; file/native/SNPX provider evidence and availability errors retained |
 | Handshake | Mapping authoring and recording analysis | New local workspace versions; timestamp evidence |
 | Snapshots | Capture and compare | Offline troubleshooting evidence |
 | Commissioning | Checklist versions, baseline packages and comparisons | User-authored evidence; no acceptance approval |

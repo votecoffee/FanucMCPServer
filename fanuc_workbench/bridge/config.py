@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fanuc_workbench.core.models import RobotProfile
+from fanuc_workbench.services.snpx import SnpxReadPolicy
 
 
 def remote_path(value: str) -> str:
@@ -51,6 +52,8 @@ class RobotAccess:
     http_read_files: tuple[str, ...] = ()
     http_read_username: str = ""
     http_read_password_env: str | None = None
+    snpx_read: SnpxReadPolicy | None = None
+    sample_provider: str = "auto"
 
     def connection_profile(self) -> RobotProfile:
         # Resolve secrets only at connection time; never return them through tools.
@@ -167,9 +170,15 @@ class BridgeConfig:
                 register_target(target)
             for name in native_programs:
                 program_name(name)
+            snpx_read = SnpxReadPolicy.load(item.get("snpx_read"))
+            sample_provider = item.get("sample_provider", "auto")
+            if not isinstance(sample_provider, str) or sample_provider not in {"auto", "snpx"}:
+                raise ValueError("sample_provider must be auto or snpx")
+            if sample_provider == "snpx" and (snpx_read is None or not snpx_read.io_targets):
+                raise ValueError("SNPX sampling requires an explicit SNPX digital I/O allowlist")
             robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable, comment_url, targets,
                 creatable, maximum_comment, comment_encoding, native_provider, tuple(native_targets), tuple(native_programs),
-                http_url, http_files, http_user, http_env)
+                http_url, http_files, http_user, http_env, snpx_read, sample_provider)
 
         def local_dir(key: str) -> Path:
             value = Path(data[key])

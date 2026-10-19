@@ -2,11 +2,16 @@
 
 ## Unreleased
 
+- Added experimental opt-in SNPX digital I/O sampling and catalog-based raw
+  assigned-word reads with exact read policy, bounded framing/deadlines, audited
+  hash-manifested wire evidence and no automatic fallback. Assignment meaning is
+  explicitly unverified; no write/CLRASG/SETASG API is provided. Retained the
+  adapted Apache-2.0 protocol license. Controller acceptance remains pending.
 - Added an optional self-contained `workbench.vqlog` feature with ten event
   formats, source hashes, filters/pagination, retained unknown/malformed rows and
   explicit tick/clock limits. `install-builtin vqlog` stages it for same-session
   reload without adding MCP tool schemas. Retained upstream MIT notices and
-  documented the controller-mapping boundary for a future SNPX provider.
+  documented the controller-mapping boundary for SNPX integration.
 - Added optional same-host HTTP(S) reads of exact allowlisted MD text files for
   reads, logs and file samples. Preserved byte hashes, bounded requests, separate
   optional credentials, redirect/HTML rejection and origin-bound receipts;

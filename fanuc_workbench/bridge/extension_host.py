@@ -51,6 +51,14 @@ def core_operations():
         operations[name] = {"id": name, "description": description, "effect": effect, "revision": "core.native@1",
             "input_schema": {"type": "object", "properties": properties, "required": required, "additionalProperties": False},
             "output_schema": {"type": "object"}, "extension_id": "core"}
+    operations["core.snpx.read_words"] = {"id": "core.snpx.read_words", "description":
+        "Capture exact-allowlisted raw SNPX %R words; assignment meaning is unverified; no mapping changes",
+        "effect": "read", "revision": "core.snpx@1", "extension_id": "core",
+        "input_schema": {"type": "object", "properties": {"robot_id": {"type": "string"},
+            "address": {"type": "integer", "minimum": 1, "maximum": 65535},
+            "count": {"type": "integer", "minimum": 1, "maximum": 128}},
+            "required": ["robot_id", "address"], "additionalProperties": False},
+        "output_schema": {"type": "object"}}
     return operations
 
 
@@ -252,7 +260,8 @@ class ExtensionHost:
             handlers = {"core.controller.status": self.bridge.native.status,
                 "core.controller.sample": self.bridge.native.sample, "core.controller.reconnect": self.bridge.native.reconnect,
                 "core.controller.programs": self.bridge.native.programs, "core.registers.read": self.bridge.native.read_register,
-                "core.programs.inspect": self.bridge.native.read_program}
+                "core.programs.inspect": self.bridge.native.read_program,
+                "core.snpx.read_words": self.bridge.snpx.read_words}
             return {"operation_id": operation_id, "revision": revision, "result": handlers[operation_id](**arguments)}
         with self._lease(operation_id, revision) as (_, descriptor, worker):
             if descriptor["effect"] != "read":

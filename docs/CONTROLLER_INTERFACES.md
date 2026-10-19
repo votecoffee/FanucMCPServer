@@ -14,6 +14,7 @@ desktop automation is used for these controller operations.
 | Optional exact-file reads, logs and file-based samples | HTTP(S) generated-file retrieval under `/MD/` with an explicit origin and file allowlist | Disabled by default; same-host origins, bounded bytes and optional separate Basic credentials. No directory listing, backup or write fallback. See [HTTP reads](HTTP_READS.md). |
 | Optional live description/comment changes | HTTP(S) to the controller's `/karel/ComSet` service, followed by fresh file-listing readback | Requires the controller's ComSet service and suitable HTTP/KAREL access settings. Disabled by default; exact origin/targets, byte policy and approval are required. This is a write even though the endpoint uses HTTP GET. |
 | Optional native R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR changes | FANUC Robot Object (`FRRobot.FRCRobot`) through locally installed COM software, which communicates with the controller over TCP/IP | Requires compatible licensed PC software and controller PC Interface support. COM is the local vendor data API, not window control. Vendor software manages the native connection; the app does not implement a raw socket-messaging server. |
+| Experimental digital I/O samples and raw assigned words | SNPX/HMI over TCP, normally 60008 | Explicit read policy; no vendor PC binaries, write API or mapping setup. Word meanings are unverified; controller compatibility/coexistence acceptance remains pending. See [SNPX reads](SNPX_READS.md). |
 | Reviewed LS program deployment | Selected FTP/SFTP transport to `md:NAME.LS`, with the controller's ASCII loader; native API preflight/catalog checks and TP/LS capture for verification | Requires the native provider as well as compatible controller ASCII loading support. A successful transfer alone does not prove compilation. No program selection or execution occurs. |
 
 The web server is therefore **not required for ordinary file/log retrieval or
@@ -22,7 +23,7 @@ path and, when explicitly enabled, the allowlisted HTTP file reader. Optional
 native reads use the vendor API even in read-only mode.
 
 This project does not install a custom KAREL program or use User Socket
-Messaging, SNPX, EtherNet/IP or OPC UA as its controller transport. Inspecting
+Messaging, EtherNet/IP or OPC UA as its controller transport. Inspecting
 EtherNet/IP evidence in a backup does not create an EtherNet/IP connection.
 
 ## Licensed options
@@ -55,8 +56,14 @@ Requirements depend on the chosen feature and exact controller/software package:
   on the target controller. Verify HTTP/KAREL security and option availability
   against its FANUC manuals; no universal licensing requirement is asserted for
   ComSet across controller generations. No custom KAREL application is supplied.
+- **SNPX/HMI:** requires a compatible enabled controller service and any licensed
+  controller options required by its software package. The standard-library client
+  does not require Robot Object/PCDK on the PC. Check the target's FANUC manuals
+  and entitlements; this experimental implementation has no controller acceptance.
 
-The project is MIT licensed. FANUC software/options retain their own licenses
+Original project code is MIT licensed; adapted components retain the licenses in
+[third-party notices](../fanuc_workbench/licenses/THIRD_PARTY_NOTICES.md).
+FANUC software/options retain their own licenses
 and are not redistributed. An offline option-text match is evidence only, not
 proof of installed entitlements or working controller services.
 
