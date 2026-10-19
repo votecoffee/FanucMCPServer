@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "id": "workbench.recording",
+  "version": "1.0.0",
+  "host_api": 1,
+  "entrypoint": "feature.py",
+  "files": {
+    "feature.py": "a1044650454d59abecb2f081d8f50a8d7d69d66fe489d2a5765a1499cd29bf4c",
+    "LICENSE.txt": "9fdbc8c41abf794f69c3488f463798e06338bf90ebefbe2daee329d217c83d44"
+  },
+  "operations": [
+    {
+      "id": "workbench.recording.summarize",
+      "description": "Summarize saved watch availability, observed changes, numeric ranges and timestamp gaps offline",
+      "effect": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "signal": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "gap_threshold_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 86400
+          }
+        },
+        "required": [
+          "artifact_id",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "contexts": [
+        {
+          "name": "recording",
+          "argument": "artifact_id",
+          "kind": "any",
+          "file_argument": "path"
+        }
+      ]
+    }
+  ]
+}

@@ -109,6 +109,13 @@ independent interpreter for that release's dependencies. Install dependencies
 into that dedicated environment before staging; neither staging nor reload runs
 pip. This keeps feature dependency updates out of the host environment.
 
+The optional [watch recording feature](RECORDING_ANALYSIS.md) stages with
+`install-builtin recording`. It adds `workbench.recording.summarize` for saved
+sample availability, numeric ranges, observed changes and timestamp summaries.
+It distinguishes adjacent changes from differences after missing data and does
+not resolve the recording's sample artifact references. It uses only the standard
+library and can also be staged as a release directory on a host API 1 runtime.
+
 Use `fanuc_workbench/extensions/analysis/extension.json` as a complete manifest
 example. A small read-only handler looks like:
 

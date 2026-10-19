@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added the self-contained MIT `workbench.recording` 1.0.0 feature for offline
+  watch availability, numeric ranges, gap-aware change counts, bounded timestamp
+  summaries, source hashes and signal pagination. Sample reference contents and
+  recording completion remain unverified. Compatible hosts reload it through the
+  existing operation catalog without changing the 48 permanent MCP tools.
 - Added `workbench.snpx` 1.2.0 with offline `inspect_evidence`: capture/wire hash
   binding, handshake/reply diagnostics, bounded frame checks, raw-word payload
   correlation and explicit limits for I/O binding, timing and physical identity.

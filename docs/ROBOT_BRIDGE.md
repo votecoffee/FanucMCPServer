@@ -243,6 +243,11 @@ analyze_recording supports cycle_profile, handshake with explicit mapping, and
 alarm_correlation with a workspace and compatible timestamps. compare_recordings
 compares cycle durations. Correlation does not synchronize clocks or prove causation.
 
+The optional `workbench.recording.summarize` catalog operation adds offline
+sample availability, numeric ranges, gap-aware change counts and timestamp
+summaries. It reads the saved recording without another controller read. Sample
+artifact IDs remain unverified references; see [recording analysis](RECORDING_ANALYSIS.md).
+
 ## Reviewed changes and recovery
 
 Enable writes locally and add exact application paths to writable_files, then

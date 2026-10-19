@@ -22,7 +22,7 @@ reported through `capabilities`.
 | Lint and cross references | Lint, dependencies, unused programs, register usage, LS validation and flow | Structural evidence; no compiler |
 | Option inventory | Matches and unknown status | Does not authenticate installed options |
 | EtherNet/IP | Adapter/scanner evidence | No configuration write |
-| Monitoring | Samples, watch jobs, trend/timeline/cycle exports and profiles | Two-second minimum; file/native/SNPX provider evidence and availability errors retained |
+| Monitoring | Samples, watch jobs, trend/timeline/cycle exports, profiles and optional offline recording summaries | Two-second minimum; file/native/SNPX evidence retained; summaries distinguish missing data and do not verify sample references |
 | Handshake | Mapping authoring and recording analysis | New local workspace versions; timestamp evidence |
 | Snapshots | Capture and compare | Offline troubleshooting evidence |
 | Commissioning | Checklist versions, baseline packages and comparisons | User-authored evidence; no acceptance approval |
