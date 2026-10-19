@@ -157,7 +157,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 | Extensions | 48 stable MCP tools, a versioned operation catalog and reloadable feature workers, including 20 workspace analyses |
 | Visual Line Tracking | Optional reloadable VQLOG event analysis, filters, timelines and explicit tick-period assumptions |
 | Alarm logs | Optional reloadable text alarm records, recurrence and two-log code/text comparison with explicit clocks and retained unrecognized lines |
-| Desktop workflows | Remembered robot selection, saved adjustable columns/panes/tabs, fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |
+| Desktop workflows | Remembered robot selection, saved adjustable columns/panes/tabs with layout reset, fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |
 
 MCP writes default to disabled and require exact target policy, preserved originals,
 reviewed proposals and readback. The example configuration requests client

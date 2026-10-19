@@ -88,8 +88,10 @@ def test_column_widths_split_sizes_and_tab_visibility_order_survive_reopen(deskt
     window.tabs.tabBar().moveTab(window.tabs.indexOf(window.live_tab), 0)
     window.tabs.setTabVisible(window.tabs.indexOf(window.backup_tab), False)
     window.data.pr.setColumnWidth(7, 420)
+    window.search.dependency_split.setSizes([800, 300])
     app.processEvents()
     ratio = window.live_tab.splitter.sizes()[0] / sum(window.live_tab.splitter.sizes())
+    dependency_ratio = window.search.dependency_split.sizes()[0] / sum(window.search.dependency_split.sizes())
     window.close()
     reopened = main_window.MainWindow()
     reopened.show()
@@ -101,11 +103,47 @@ def test_column_widths_split_sizes_and_tab_visibility_order_survive_reopen(deskt
     assert reopened.data.pr.columnWidth(7) == 420
     sizes = reopened.live_tab.splitter.sizes()
     assert abs(sizes[0] / sum(sizes) - ratio) < .02
+    dependency_sizes = reopened.search.dependency_split.sizes()
+    assert abs(dependency_sizes[0] / sum(dependency_sizes) - dependency_ratio) < .02
     for table, _ in reopened.desktop_layout.tables.values():
         header = table.horizontalHeader() if isinstance(table, QTableView) else table.header()
         assert all(header.sectionResizeMode(i) == QHeaderView.Interactive for i in range(header.count()))
     assert len(reopened.desktop_layout.splitters) >= 10
     reopened.close()
+
+
+def test_reset_restores_layout_without_changing_profiles_policy_or_staged_cells(desktop):
+    app, store = desktop
+    profile = RobotProfile('Remembered', '192.0.2.1')
+    store.save_profiles([profile]); store.remember_profile(profile, connected=True)
+    store.update_preferences(robot_policy_path='private-policy.json')
+    window = main_window.MainWindow()
+    original_order = [window.tabs.widget(i).objectName() for i in range(window.tabs.count())]
+    assert window.live_tab.watch.columnWidth(2) == 520
+    window.live_tab.watch.item(0, 1).setText('Staged alias')
+    window.live_tab.watch.setColumnWidth(2, 890)
+    window.tabs.tabBar().moveTab(window.tabs.indexOf(window.live_tab), 0)
+    window.tabs.setTabVisible(window.tabs.indexOf(window.backup_tab), False)
+    window.live_tab.recorders.setTabVisible(1, False)
+    window.desktop_layout.save()
+    # Capture defaults before applying saved preferences on the next launch.
+    window.close()
+    reopened = main_window.MainWindow()
+    assert reopened.live_tab.watch.columnWidth(2) == 890
+    reopened.live_tab.watch.item(0, 1).setText('Staged alias')
+    reopened.reset_layout_action.trigger()
+    assert reopened.live_tab.watch.columnWidth(2) == 520
+    assert reopened.live_tab.watch.item(0, 1).text() == 'Staged alias'
+    assert [reopened.tabs.widget(i).objectName() for i in range(reopened.tabs.count())] == original_order
+    for tabs in reopened.desktop_layout.tabs.values():
+        assert all(tabs.isTabVisible(i) for i in range(tabs.count()))
+    assert store.preferences()['robot_policy_path'] == 'private-policy.json'
+    assert store.preferred_profile(store.load_profiles()).host == profile.host
+    reopened.close()
+    final = main_window.MainWindow()
+    assert final.live_tab.watch.columnWidth(2) == 520
+    assert all(final.tabs.isTabVisible(i) for i in range(final.tabs.count()))
+    final.close()
 
 
 def test_tab_menu_can_recover_hidden_tabs_and_keeps_one_visible(desktop):

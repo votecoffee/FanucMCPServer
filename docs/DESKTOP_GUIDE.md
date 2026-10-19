@@ -60,11 +60,19 @@ Drag any table column boundary to change its width. Columns use interactive
 resizing; their widths are restored on the next launch. Drag the divider between
 stacked content panes to allocate more room to either pane, including the watch
 table on **Live / Recorder**. Pane sizes are restored too.
+The side-by-side dependency tree and unused-program list in **Search / Analysis**
+also have a draggable divider whose position is remembered.
 
 Drag tab headers to reorder them. Each tab bar's **Tabs** menu can hide/show
 individual pages or show all pages. At least one page stays visible. Tab order,
 visibility and the selected page are saved. Hiding a page does not stop an active
 recording, scheduled job or controller operation.
+
+Use **Settings > Reset desktop layout** to restore default column widths, balance
+the panes, show every tab and restore the original tab order and selection. The
+reset applies immediately and is saved for the next launch. It keeps the current
+widgets and staged edits in place. Live / Recorder's default value column is
+520 pixels wide; you can resize it to suit your watch values.
 
 Desktop preferences live in the OS application configuration directory alongside
 `profiles.json`, in `desktop.json`. They contain layout and profile-selection

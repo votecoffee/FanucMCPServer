@@ -87,6 +87,7 @@ class DesktopLayout(QObject):
     def __init__(self, owner):
         super().__init__(owner)
         self.owner, self.tables, self.splitters, self.tabs = owner, {}, {}, {}
+        self.default_widths, self.default_tabs = {}, {}
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.setInterval(250)
@@ -106,7 +107,8 @@ class DesktopLayout(QObject):
                 header = table.horizontalHeader() if isinstance(table, QTableView) else table.header()
                 count = header.count()
                 labels = [str(table.model().headerData(i, Qt.Horizontal) or '') for i in range(count)]
-                widths = [max(120, min(350, header.sectionSize(i))) for i in range(count)]
+                widths = [max(120, min(5000, header.sectionSize(i))) for i in range(count)]
+                self.default_widths[key] = list(widths)
                 stored = saved.get('tables', {}).get(key, {}) if isinstance(saved.get('tables'), dict) else {}
                 if isinstance(stored, dict) and stored.get('labels') == labels:
                     candidate = stored.get('widths')
@@ -133,6 +135,10 @@ class DesktopLayout(QObject):
             for index in range(tabs.count()):
                 if not tabs.widget(index).objectName():
                     tabs.widget(index).setObjectName(tabs.tabText(index))
+            self.default_tabs[key] = {
+                'order': [tabs.widget(i).objectName() for i in range(tabs.count())],
+                'current': tabs.currentWidget().objectName() if tabs.currentWidget() else None,
+            }
             state = saved.get('tabs', {}).get(key, {}) if isinstance(saved.get('tabs'), dict) else {}
             if isinstance(state, dict):
                 order = state.get('order', [])
@@ -156,6 +162,29 @@ class DesktopLayout(QObject):
     def changed(self, *_):
         self.timer.start()
 
+    def reset(self):
+        """Restore view defaults without rebuilding widgets or losing staged edits."""
+        self.timer.stop()
+        for key, (table, _) in self.tables.items():
+            header = table.horizontalHeader() if isinstance(table, QTableView) else table.header()
+            header.setSectionResizeMode(QHeaderView.Interactive)
+            for column, width in enumerate(self.default_widths[key]):
+                header.resizeSection(column, width)
+        for splitter in self.splitters.values():
+            splitter.setSizes([1000] * splitter.count())
+        for key, tabs in self.tabs.items():
+            defaults = self.default_tabs[key]
+            for destination, name in enumerate(defaults['order']):
+                current = next((i for i in range(tabs.count()) if tabs.widget(i).objectName() == name), None)
+                if current is not None:
+                    tabs.tabBar().moveTab(current, destination)
+            for index in range(tabs.count()):
+                tabs.setTabVisible(index, True)
+                if tabs.widget(index).objectName() == defaults['current']:
+                    tabs.setCurrentIndex(index)
+        if self.save():
+            self.owner.statusBar().showMessage('Desktop layout reset: default columns, balanced panes and all tabs visible.')
+
     def save(self):
         self.timer.stop()
         tables = {}
@@ -171,3 +200,5 @@ class DesktopLayout(QObject):
             self.owner.settings.update_preferences(layout=state)
         except OSError:
             self.owner.statusBar().showMessage('Could not save desktop layout preferences.')
+            return False
+        return True

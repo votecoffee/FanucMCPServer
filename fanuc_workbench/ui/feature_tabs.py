@@ -243,7 +243,11 @@ class SearchAnalysisTab(QWidget):
         w=QWidget(); l=QVBoxLayout(w); row=QHBoxLayout(); self.q=QLineEdit(); self.q.setPlaceholderText('R[101], PR[42], DO[23], UFRAME3, CALL PICK…'); self.q.textChanged.connect(self.filter); row.addWidget(self.q,1); b=QPushButton('Re-index'); b.clicked.connect(self.sync_workspace); row.addWidget(b); l.addLayout(row)
         self.search_table=QTableWidget(0,6); self.search_table.setHorizontalHeaderLabels(['Token','Access','Program','Line','File','Context']); self.search_table.horizontalHeader().setSectionResizeMode(5,QHeaderView.Stretch); self.search_table.horizontalHeader().setSectionResizeMode(4,QHeaderView.Stretch); l.addWidget(self.search_table); return w
     def _deps_ui(self):
-        w=QWidget(); l=QHBoxLayout(w); self.dep_tree=QTreeWidget(); self.dep_tree.setHeaderLabels(['Program / Calls']); l.addWidget(self.dep_tree,2); self.unused=QTableWidget(0,1); self.unused.setHorizontalHeaderLabels(['Possibly unused program']); self.unused.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch); l.addWidget(self.unused,1); return w
+        w=QWidget(); l=QHBoxLayout(w)
+        self.dependency_split=QSplitter(Qt.Horizontal);self.dependency_split.setChildrenCollapsible(False)
+        self.dep_tree=QTreeWidget();self.dep_tree.setHeaderLabels(['Program / Calls']);self.dependency_split.addWidget(self.dep_tree)
+        self.unused=QTableWidget(0,1);self.unused.setHorizontalHeaderLabels(['Possibly unused program']);self.unused.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch);self.dependency_split.addWidget(self.unused)
+        self.dependency_split.setStretchFactor(0,2);self.dependency_split.setStretchFactor(1,1);l.addWidget(self.dependency_split);return w
     def _usage_ui(self):
         w=QWidget(); l=QVBoxLayout(w); self.usage=QTableWidget(0,4); self.usage.setHorizontalHeaderLabels(['Item','Reads','Writes','Other Uses']); self.usage.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch); l.addWidget(self.usage); return w
     def _flow_ui(self):

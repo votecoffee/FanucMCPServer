@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added desktop layout reset and a saved horizontal dependency-view divider.
+  Preserved intended wide default columns, including Live / Recorder's 520-pixel
+  value column, instead of shrinking them during layout setup.
 - Added local rotating desktop startup/error logs, visible failure reporting for
   console-free launches, and Help menu entries for logs and version/settings
   details. Corrected the Python module version to match desktop package 2.1.0.
