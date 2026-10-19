@@ -142,6 +142,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 | Files and backups | FTP/SFTP listing, exact file/log capture, file-based backup progress, manifests, comparisons and reviewed per-file recovery |
 | Offline engineering | LS inspection, lint, cross references, R/PR/frame/comment evidence, mastering/DCS comparisons and documentation packages |
 | Program dependencies | Optional reloadable selected-LS call/run inspection, unresolved targets and static reachability from explicit entry programs |
+| PLC mapping | Local CSV/L5X tag, alias and UDT-member import, searchable catalog, reviewed I/O-reference suggestions and saved workspace mappings |
 | Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation, troubleshooting snapshots, offline summaries, evidence bundles and sampled request/ack analysis |
 | Native controller API | R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR value changes and LS deployment |
 | Experimental SNPX | Optional digital/group/analog I/O samples with explicit word decoding and raw assigned-word reads over TCP; controller compatibility remains unverified |
@@ -176,7 +177,7 @@ it requires a compatible controller service/options and never changes assignment
 
 ## Documentation
 
-- [Desktop connections, layouts and recorder display](docs/DESKTOP_GUIDE.md)
+- [Desktop connections, layouts, PLC imports and policy creation](docs/DESKTOP_GUIDE.md)
 - [MCP setup, tools and Python API](docs/ROBOT_BRIDGE.md)
 - [Headless plugin installation and upgrades](docs/ROBOT_PLUGIN_SETUP.md)
 - [Native controller configuration and verification limits](docs/ROBOT_NATIVE_API.md)

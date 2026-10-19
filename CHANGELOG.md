@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added CSV/L5X PLC tag import with scopes, aliases, UDT/member comments, catalog
+  filtering, manual I/O assignment and reviewed explicit-reference suggestions.
+  Original exports remain intact; assignments are staged until the local map is saved.
 - Added a GUI policy authoring form with read-only defaults, exact write targets,
   offline validation, JSON review, exclusive file creation and remembered policy
   paths. Creating a policy never connects or elevates a loaded controller session.

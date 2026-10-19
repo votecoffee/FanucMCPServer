@@ -394,10 +394,13 @@ class DataTab(QWidget):
 class IOTab(QWidget):
     def __init__(self,owner):
         super().__init__(); self.owner=owner; self.rows=[]; self.refs=[]
-        l=QVBoxLayout(self); info=QLabel('I/O browser with program cross-references and an explicit PLC-tag documentation column. The app does not guess PLC addresses; paste/import your actual tags, then export the mapping.'); info.setWordWrap(True); l.addWidget(info)
+        l=QVBoxLayout(self); info=QLabel('Import PLC tag CSV/L5X exports in the PLC Tags tab below. Select an I/O row and a PLC tag to assign it, or review explicit I/O-reference suggestions. Save the mapping locally after review.'); info.setWordWrap(True); l.addWidget(info)
         self.table=PasteTableWidget(0,8); self.table.setHorizontalHeaderLabels(['I/O','Description','Value','Rack','Slot','Start','PLC Tag','Source']); self.table.horizontalHeader().setSectionResizeMode(1,QHeaderView.Stretch); self.table.horizontalHeader().setSectionResizeMode(6,QHeaderView.Stretch); self.table.itemSelectionChanged.connect(self.used); l.addWidget(self.table,2)
         row=QHBoxLayout(); b=QPushButton('Save PLC tag map'); b.clicked.connect(self.save_map); row.addWidget(b); b=QPushButton('Export CSV…'); b.clicked.connect(self.export_csv); row.addWidget(b); row.addStretch(); l.addLayout(row)
-        l.addWidget(QLabel('Where selected I/O is used')); self.used_table=QTableWidget(0,4); self.used_table.setHorizontalHeaderLabels(['Program','Line','Access','Context']); self.used_table.horizontalHeader().setSectionResizeMode(3,QHeaderView.Stretch); l.addWidget(self.used_table,1)
+        self.details=QTabWidget();l.addWidget(self.details,1)
+        used=QWidget();used_layout=QVBoxLayout(used);used_layout.addWidget(QLabel('Where selected I/O is used'));self.used_table=QTableWidget(0,4); self.used_table.setHorizontalHeaderLabels(['Program','Line','Access','Context']); self.used_table.horizontalHeader().setSectionResizeMode(3,QHeaderView.Stretch);used_layout.addWidget(self.used_table);self.details.addTab(used,'Program cross-references')
+        from fanuc_workbench.ui.plc_catalog import PlcCatalog
+        self.plc_catalog=PlcCatalog(self);self.details.addTab(self.plc_catalog,'PLC Tags / Import')
     def sync_workspace(self):
         self.rows=[]; self.refs=[]; self.table.setRowCount(0); ws=self.owner.workspace
         if not ws:return

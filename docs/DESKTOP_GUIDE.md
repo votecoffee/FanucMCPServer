@@ -67,3 +67,44 @@ Creating a policy makes no controller connection and changes no loaded session.
 Select the file in MCP setup and reconnect that server, or click **Load** in
 Native Controller when ready. The selected policy path and native robot selection
 are remembered locally; the app does not automatically load/connect at launch.
+
+## I/O / PLC Map import
+
+Open **I/O / PLC Map > PLC Tags / Import** and click **Import PLC tags (CSV / L5X)**.
+The import reads the selected export locally and leaves its bytes unchanged.
+It loads a searchable catalog; it does not connect to a PLC or change either
+controller. For a binary PLC project, export its tags as CSV or its source as
+L5X using the engineering application first.
+
+CSV supports a `Name`, `Tag`, `Tag Name` or `PLC Tag` header, optional scope,
+description, data type and alias target columns, and an optional explicit
+`Robot I/O` column. Comma, semicolon and tab delimiters are recognized. Rockwell
+`TYPE,SCOPE,NAME,...` tag/alias/comment rows and the app's exported I/O map CSV
+are supported. Program-scoped tags retain `Program:<scope>.` qualification.
+
+L5X loads controller/program tags, explicit alias targets, UDT member definitions
+and per-instance member comments. Arrays are listed without expanding indices;
+recursive/deep UDT expansion is bounded and reported. The catalog uses available
+declarative tag metadata; it does not derive physical robot bit routing from PLC
+logic or module sizes. Exported aliases remain visible for mapping review.
+
+Select the desired robot I/O row in the upper table, select a PLC tag below, and
+click **Assign selected tag to selected I/O**. The qualified tag is staged in the
+upper grid. For multiple mappings, **Review suggested mappings** uses explicit
+I/O tokens such as `DI[1]` in imported descriptions/comments or the CSV Robot I/O
+column. Missing/ambiguous targets stay unapplied. Existing assignments are kept
+unless **Include replacements** is checked in the full preview.
+
+Filtering also scopes suggestions. Use `tag:Robot1.` to match a qualified tag-name
+prefix, or `scope:Cell` to select a program scope. Plain text searches tags,
+descriptions and aliases, which can include multiple references to the same I/O.
+Only 500 matching catalog rows are displayed at once; refine the filter for a
+large export. The suggestion review covers all matches, including rows beyond
+the displayed page, and shows every proposed assignment.
+
+Click **Save PLC tag map** to save staged grid assignments to the local workspace.
+The CSV/L5X source and controller are unchanged. The original export's SHA-256 is
+available on the import status tooltip. Import bounds are 32 MiB, 20000 tag/member
+entries, and bounded XML/CSV depth, rows and fields. DTD/entity declarations and
+malformed/conflicting definitions are refused. The imported catalog remains in
+memory for the current session; saved workspace mappings persist across sessions.
