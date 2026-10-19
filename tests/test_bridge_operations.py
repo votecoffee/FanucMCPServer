@@ -415,8 +415,14 @@ finally: bridge.close()
             assert not prepared.is_error
             plan = json.loads(prepared.content[0].text)
             args = {"plan_id": plan["plan_id"], "approved_sha256": plan["proposed_sha256"]}
-            denied = await session.call_tool(commit_tool, args)
-            assert denied.is_error and not uploaded.exists()
+            if client_supports_confirmation:
+                denied = await session.call_tool(commit_tool, args)
+                assert denied.is_error
+            else:
+                from mcp.shared.exceptions import MCPError
+                with pytest.raises(MCPError, match="Elicitation not supported"):
+                    await session.call_tool(commit_tool, args)
+            assert not uploaded.exists()
             if client_supports_confirmation:
                 accepted = await session.call_tool(commit_tool, args)
                 assert not accepted.is_error and uploaded.exists()
