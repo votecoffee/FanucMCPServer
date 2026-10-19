@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `workbench.snpx` 1.3.0 with offline named I/O payload checks under an
+  explicit supplied read order, exact signed/unsigned formats, shared-address
+  diagnostics, partial/unavailable handling and source snapshots read once.
+  Preserved earlier releases, existing operation schemas and component licenses.
 - Added `workbench.recording` 1.1.0 with portable bundle hash/path checks,
   recording/sample equality, native value projection, retained SNPX wire
   inspection, explicit unknown/unavailable evidence and paginated reports.

@@ -106,6 +106,9 @@ protocol check remains explicit. Unknown providers with retained wire data also
 prevent the aggregate trace check from passing. Named I/O values are not bound
 to individual wire payloads: `io_value_binding_checked` and `mapping_verified`
 remain false. Matching a recording row to `sample.json` does not close that gap.
+The separate [SNPX I/O inspector](SNPX_IO_EVIDENCE.md) can compare those copied
+files under an explicit caller-supplied read order and saved format assumptions;
+it still cannot authenticate order, formats or physical mapping.
 
 `bundle_hashes_verified` describes consistency against the supplied bundle
 manifest. `source_manifest_claim_verified` is false: the portable analyzer cannot

@@ -60,5 +60,9 @@ alongside the MIT license for the original decoder/comparison code.
 The `extensions/recording_v1_1_0` release retains that wire inspector and decoder
 for portable recording bundle analysis. Its `APACHE-2.0.txt` and `NOTICE.txt`
 preserve the same attribution; original recording/bundle code remains MIT.
+The `extensions/snpx_v1_3_0` release adds fixed-port I/O payload comparisons
+under supplied ordering and format assumptions. `wire.py` and `io_evidence.py`
+retain the same Apache-2.0 protocol attribution, license and notice. The previous
+releases remain intact.
 It does not use the upstream high-level `connect()` method, which also clears
 assignments. It does not incorporate RMI, Stream Motion or proprietary binaries.

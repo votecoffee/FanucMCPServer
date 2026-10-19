@@ -131,6 +131,8 @@ Version 1.1.0 also compares matching configured endpoints/spans with exact
 integer deltas, optional float tolerances and retained raw-word changes.
 Version 1.2.0 adds [saved-wire inspection](SNPX_EVIDENCE.md) for handshake,
 reply, hash-binding and raw-word consistency diagnostics without a new read.
+Version 1.3.0 adds [named I/O payload comparison](SNPX_IO_EVIDENCE.md) with explicit
+caller-supplied read order and saved signed/unsigned format assumptions.
 
 ## Protocol and evidence
 

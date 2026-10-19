@@ -18,11 +18,11 @@ remain unchanged. An older host with the extension interface can stage the
 self-contained release directory through its existing CLI:
 
 ```powershell
-python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/snpx_v1_2_0
+python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/snpx_v1_3_0
 ```
 
-Releases 1.0.0 and 1.1.0 remain preserved for rollback. Their source directories
-are `extensions/snpx` and `extensions/snpx_v1_1_0` under `fanuc_workbench`.
+Releases 1.0.0, 1.1.0 and 1.2.0 remain preserved for rollback. Their source directories
+are `extensions/snpx`, `extensions/snpx_v1_1_0` and `extensions/snpx_v1_2_0` under `fanuc_workbench`.
 Select a preserved directory with `install`, reload, and describe operations
 again to obtain their exact selected revisions. Changing the selected feature
 does not restart the MCP host. See [reloadable features](ROBOT_EXTENSIONS.md).
@@ -83,6 +83,9 @@ and exact raw payload agree with one accepted register read. Contradictory word
 arrays or availability metadata are reported. Named I/O sample values are not
 correlated to individual reads: `word_payload_matches_wire` is null and
 `io_value_binding_checked` is false. Protocol checks still apply to their trace.
+Version 1.3.0 adds a separate [named I/O payload comparison](SNPX_IO_EVIDENCE.md)
+operation requiring caller-supplied read order and saved format metadata. The
+original frame inspector's result and limits remain unchanged.
 
 Root `issues` describe capture/trace consistency; `exchange_issue_counts`
 summarizes frame/state issues across all exchanges. Pagination affects only
