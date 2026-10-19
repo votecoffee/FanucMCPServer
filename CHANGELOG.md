@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Required successful offline validation status before GUI deployment preparation,
+  including when a failed report contains matching source, TP and readback hashes.
 - Included the program diagnostics guide in offline plugin bundles.
 - Fixed offline compiler jobs to keep WinOLPC staging output separate from
   preserved inputs and final readback. Added selected-profile translator checks,

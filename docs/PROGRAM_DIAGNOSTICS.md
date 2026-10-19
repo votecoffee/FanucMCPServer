@@ -211,7 +211,9 @@ automatically restored or rearmed on launch.
 The **Native Controller → Deploy Program** page accepts an optional preserved
 offline compiler report. When supplied, it checks the source revision, TP hash and
 printed LS comparison before any deployment preparation read. Failed/mismatched
-evidence blocks preparation. Existing core policy, approval and fresh deployment
+evidence blocks preparation. The report must have `offline_checks_passed` status;
+matching hashes do not override a failed validation, including failures detected
+after compilation and readback. Existing core policy, approval and fresh deployment
 preflight/readback still apply; a report never authorizes a controller write.
 
 ## Reloadable MCP feature

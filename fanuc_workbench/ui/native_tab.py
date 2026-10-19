@@ -351,7 +351,8 @@ class NativeControllerTab(QWidget):
                 path=Path(self.offline_report.text()).resolve();report,_=read_json(path.parent,path.name)
                 offline=review_validation(path.parent,report['source_file'],path.name,
                     compiled_path=report.get('compiled_file'),readback_path=report.get('readback_file'))
-                if not offline['preserved_checks_pass'] or offline['source_sha256']!=info['source_sha256']:
+                if (offline['reported_status']!='offline_checks_passed' or not offline['preserved_checks_pass']
+                    or offline['source_sha256']!=info['source_sha256']):
                     raise ValueError('Offline compiler evidence failed or belongs to a different source revision. Inspect its diagnostics before preparing deployment.')
             self.clear_plan()
             def work():
