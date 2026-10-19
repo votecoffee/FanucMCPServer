@@ -248,6 +248,11 @@ sample availability, numeric ranges, gap-aware change counts and timestamp
 summaries. It reads the saved recording without another controller read. Sample
 artifact IDs remain unverified references; see [recording analysis](RECORDING_ANALYSIS.md).
 
+`core.recordings.bundle_evidence` creates a bounded, hash-checked local copy of a
+recording and selected sample artifacts for offline review. It resolves references
+through the host's artifact store without contacting a controller. See
+[recording evidence bundles](RECORDING_EVIDENCE.md) for limits and host compatibility.
+
 ## Reviewed changes and recovery
 
 Enable writes locally and add exact application paths to writable_files, then

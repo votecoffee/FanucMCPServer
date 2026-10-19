@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `core.recordings.bundle_evidence` to copy selected recording/sample
+  evidence locally with source manifest checks, exact hashes, paging, copy-time
+  verification and bounded resource use. The catalog operation requires an
+  updated host runtime; the 48 permanent MCP tools stay unchanged.
 - Added the self-contained MIT `workbench.recording` 1.0.0 feature for offline
   watch availability, numeric ranges, gap-aware change counts, bounded timestamp
   summaries, source hashes and signal pagination. Sample reference contents and

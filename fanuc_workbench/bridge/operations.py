@@ -522,6 +522,10 @@ class WorkbenchOperations:
         b = self.analyze_recording(after)["profile_seconds"]
         return page(compare_cycle_profiles(a, b))
 
+    def bundle_recording(self, artifact_id: str, sample_offset: int = 0, sample_limit: int = 20) -> dict:
+        from fanuc_workbench.bridge.recording_bundle import bundle_recording
+        return bundle_recording(self.bridge, artifact_id, sample_offset, sample_limit)
+
     @staticmethod
     def transform_pose(pose: list[float], old_frame: list[float], new_frame: list[float]) -> dict:
         from fanuc_workbench.services.transforms import transform_pose_between_frames

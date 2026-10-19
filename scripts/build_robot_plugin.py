@@ -41,7 +41,7 @@ def build(source: Path, output: Path):
                    check=True, env=environment)
     docs = output / "docs"
     docs.mkdir()
-    for name in ("ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md", "CONTROLLER_INTERFACES.md", "HTTP_READS.md", "SNPX_READS.md", "SNPX_DECODING.md", "SNPX_EVIDENCE.md", "RECORDING_ANALYSIS.md", "VQLOG_ANALYSIS.md", "COMMUNITY_INTEGRATIONS.md"):
+    for name in ("ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md", "CONTROLLER_INTERFACES.md", "HTTP_READS.md", "SNPX_READS.md", "SNPX_DECODING.md", "SNPX_EVIDENCE.md", "RECORDING_ANALYSIS.md", "RECORDING_EVIDENCE.md", "VQLOG_ANALYSIS.md", "COMMUNITY_INTEGRATIONS.md"):
         shutil.copyfile(source / "docs" / name, docs / name)
     shutil.copytree(source / "fanuc_workbench" / "licenses", output / "fanuc_workbench" / "licenses")
     shutil.copyfile(source / "LICENSE", output / "LICENSE")

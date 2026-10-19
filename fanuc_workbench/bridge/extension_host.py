@@ -59,6 +59,14 @@ def core_operations():
             "count": {"type": "integer", "minimum": 1, "maximum": 128}},
             "required": ["robot_id", "address"], "additionalProperties": False},
         "output_schema": {"type": "object"}}
+    operations['core.recordings.bundle_evidence'] = {
+        'id': 'core.recordings.bundle_evidence', 'description':
+            'Bundle a saved recording and selected hash-verified sample artifacts locally; no controller access',
+        'effect': 'read', 'revision': 'core.recordings@1', 'extension_id': 'core',
+        'input_schema': {'type': 'object', 'properties': {
+            'artifact_id': {'type': 'string'}, 'sample_offset': {'type': 'integer', 'minimum': 0},
+            'sample_limit': {'type': 'integer', 'minimum': 1, 'maximum': 100}},
+            'required': ['artifact_id'], 'additionalProperties': False}, 'output_schema': {'type': 'object'}}
     return operations
 
 
@@ -261,7 +269,8 @@ class ExtensionHost:
                 "core.controller.sample": self.bridge.native.sample, "core.controller.reconnect": self.bridge.native.reconnect,
                 "core.controller.programs": self.bridge.native.programs, "core.registers.read": self.bridge.native.read_register,
                 "core.programs.inspect": self.bridge.native.read_program,
-                "core.snpx.read_words": self.bridge.snpx.read_words}
+                "core.snpx.read_words": self.bridge.snpx.read_words,
+                "core.recordings.bundle_evidence": self.bridge.operations.bundle_recording}
             return {"operation_id": operation_id, "revision": revision, "result": handlers[operation_id](**arguments)}
         with self._lease(operation_id, revision) as (_, descriptor, worker):
             if descriptor["effect"] != "read":
