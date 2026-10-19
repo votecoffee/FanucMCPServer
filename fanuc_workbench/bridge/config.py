@@ -70,6 +70,11 @@ class BridgeConfig:
     max_backup_files: int = 5000
     max_backup_bytes: int = 512 * 1024 * 1024
 
+    @property
+    def read_only(self) -> bool:
+        """Whether controller writes are disabled; local artifacts remain writable."""
+        return not self.allow_writes
+
     @classmethod
     def load(cls, path: Path) -> "BridgeConfig":
         path = path.resolve()

@@ -199,7 +199,8 @@ class NativeControllerTab(QWidget):
     def update_policy(self):
         if self.bridge and self.robot.currentData():
             access = self.bridge.config.robots[self.robot.currentData()]
-            self.policy.setText(f'{access.profile.host} | Native provider: {access.native_provider} | '
+            mode = 'Read-only' if self.bridge.config.read_only else 'Reviewed writes enabled'
+            self.policy.setText(f'{access.profile.host} | Access: {mode} | Native provider: {access.native_provider} | '
                 f'Writable registers: {", ".join(access.native_register_targets) or "none"} | '
                 f'Program targets: {", ".join(access.native_programs) or "none"}')
 

@@ -47,6 +47,11 @@ the native adapter connects to that profile's host using the installed vendor
 API. The app requires pywin32 and compatible FANUC Robot Object licensing.
 FANUC libraries are not redistributed.
 
+The policy summary shows the loaded read-only/reviewed-write mode. Change the
+saved mode through **Settings → MCP access…**, then load the policy again here;
+separate MCP connections must reconnect to apply the saved setting. Read-only
+blocks native changes while retaining native reads when the provider is enabled.
+
 Native fields on each configured robot are:
 
 ```json

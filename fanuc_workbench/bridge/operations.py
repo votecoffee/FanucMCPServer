@@ -90,6 +90,10 @@ class WorkbenchOperations:
                                           "atomic_no_clobber": False, "approval": "prepared change and configured client confirmation"},
                 "live_comments": "ComSet with configured service origin, exact comment targets and listing readback; disabled by default",
                 "approval_mode": self.bridge.config.approval_mode,
+                "controller_access": {"read_only": self.bridge.config.read_only,
+                                      "allow_writes": self.bridge.config.allow_writes,
+                                      "scope": "controller writes; local backups, analysis and staged edits remain available",
+                                      "apply_setting": "reconnect this MCP server after editing its local policy"},
                 "native_controller_operations": {**{name: "unsupported" for name in (
                     "program_start_stop", "motion",
                     "frame_write", "io_forcing", "controller_mode_interlock", "dcs_write", "mastering_write")},

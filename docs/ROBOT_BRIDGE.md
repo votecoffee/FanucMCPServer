@@ -55,7 +55,25 @@ secret management. Passwords do not belong in JSON, command arguments or chats.
 SFTP defaults to port 22 and requires a verified host key. Unknown-host trust
 overrides are refused. The existing FTP transport is unencrypted.
 
-Writes default to disabled. The example now selects approval_mode equal to
+Controller writes default to disabled (`allow_writes: false`). In the desktop
+application, use **Settings → MCP access…** to select and load the same policy
+file used by the MCP server, change **Read-only controller access**, and save.
+Checked means `allow_writes: false`; unchecked means `allow_writes: true`.
+The dialog changes only that field and refuses to overwrite a policy changed
+since it was loaded. It makes no controller connection and changes no target
+allowlists or approval settings. Reconnect each MCP server using the policy to
+apply the mode. Existing sessions keep their previous policy; endpoint reload
+does not apply this change. The Native Controller tab must load its policy again
+separately. Legacy desktop upload/restore tools retain their own confirmations.
+
+Read-only means no controller file replacement/creation, ComSet description
+changes, native R/PR writes or program deployment. It still permits controller
+reads and local backups, reports, analyses and staged edits. The `capabilities`
+result includes `controller_access.read_only`; doctor reports `read_only` and
+`writes_enabled` for the loaded configuration. Chat has no access-mode setter.
+Even with writes enabled, exact targets, prepared plans and approval still apply.
+
+The example selects approval_mode equal to
 elicitation. This asks the MCP client to confirm the exact target and reviewed
 change hash. Decline, cancellation or unsupported elicitation prevents the write.
 A model-supplied hash alone is insufficient. The SDK protocol path is tested;

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added **Settings → MCP access…** with a default read-only controller checkbox
+  backed by `allow_writes`, stale-file protection and explicit reconnect guidance.
+  Capabilities, doctor and the Native Controller policy summary expose the loaded
+  access mode. Enabling reviewed writes retains target and approval policy.
 - Renamed the project and repository to FanucMCPServer. New installs use the
   `fanuc-mcp-server` desktop/shared-service distribution and
   `fanuc-mcp-server-bridge` headless distribution. Legacy Python imports and

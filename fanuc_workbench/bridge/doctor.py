@@ -34,7 +34,8 @@ async def diagnose(config: Path, probe: str | None = None) -> dict:
         names = [tool.name for tool in tools.tools]
         result = {"status": "ok", "python": sys.version.split()[0], "mcp": importlib.metadata.version("mcp"),
                   "tool_count": len(names), "tools": names, "configured_robots": sorted(loaded.robots),
-                  "writes_enabled": loaded.allow_writes, "approval_mode": loaded.approval_mode,
+                  "writes_enabled": loaded.allow_writes, "read_only": loaded.read_only,
+                  "approval_mode": loaded.approval_mode,
                   "controller_contacted": probe is not None, "gui_imported": runtime["gui_imported"],
                   "caller_gui_imported": any(x.startswith("PySide6") for x in sys.modules),
                   "client_confirmation_ui": "verify separately in your chat client"}

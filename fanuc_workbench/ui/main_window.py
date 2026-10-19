@@ -27,6 +27,7 @@ from fanuc_workbench.ui.feature_tabs import (
 )
 from fanuc_workbench.ui.advanced_tabs import LiveMonitorTab, FleetTab, CommissioningTab, IntegrationTab, RoboGuideTab
 from fanuc_workbench.ui.native_tab import NativeControllerTab
+from fanuc_workbench.ui.mcp_access_dialog import McpAccessDialog
 
 
 class MainWindow(QMainWindow):
@@ -64,6 +65,19 @@ class MainWindow(QMainWindow):
     def _menu(self):
         robot=self.menuBar().addMenu('Robot'); a=QAction('Connection…',self); a.triggered.connect(self.edit_connection); robot.addAction(a); a=QAction('Test connection',self); a.triggered.connect(self.test_connection); robot.addAction(a)
         ws=self.menuBar().addMenu('Workspace'); a=QAction('Open backup/workspace…',self); a.triggered.connect(self.choose_workspace); ws.addAction(a); a=QAction('Refresh all views',self); a.triggered.connect(self.refresh_workspace); ws.addAction(a)
+        self.settings_menu = self.menuBar().addMenu('Settings')
+        self.mcp_access_action = QAction('MCP access…', self)
+        self.mcp_access_action.triggered.connect(self.edit_mcp_access)
+        self.settings_menu.addAction(self.mcp_access_action)
+
+    def edit_mcp_access(self):
+        path = self.native_tab.config_path.text() or getattr(self, '_mcp_access_path', '')
+        dialog = McpAccessDialog(path, self)
+        if dialog.exec():
+            self._mcp_access_path = str(dialog.settings.path)
+            self.statusBar().showMessage(
+                'MCP access policy saved. Reconnect MCP servers using that file; '
+                'reload the Native Controller policy separately to apply the mode.')
 
     def _build_backup(self):
         w=QWidget(); l=QVBoxLayout(w); f=QFormLayout(); self.profile_label=QLabel('No robot configured'); self.dest=QLineEdit(str(Path.home()/'FanucBackups')); row=QWidget(); h=QHBoxLayout(row); h.setContentsMargins(0,0,0,0); h.addWidget(self.dest); b=QPushButton('Browse…'); b.clicked.connect(self.choose_backup_destination); h.addWidget(b)
