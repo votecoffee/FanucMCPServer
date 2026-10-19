@@ -35,3 +35,21 @@ The Python adaptation preserves unknown/malformed rows, uses null for wildcard
 IDs, corrects skip-field extraction, bounds input/output and exposes tick period
 as an unverified analysis parameter. It does not silently replace missing values
 or assume clock wraparound.
+
+## fanuc_ucl
+
+- Source: [valstad-shipworks/fanuc_ucl](https://github.com/valstad-shipworks/fanuc_ucl)
+- Pinned commit: `ce5b12ddc5b567d3f9cacf0d19e09e59ec89be4b`
+- Upstream files adapted: `src/hmi/proto/wire.rs`, `src/hmi/proto/ports.rs`
+  and the session handshake in `src/hmi/mod.rs`.
+- Adaptation: the bounded synchronous Python SNPX reader in
+  `fanuc_workbench/services/snpx.py`.
+- Copyright 2026 Bowan Foryt
+- License: [Apache License 2.0](fanuc-ucl-Apache-2.0.txt).
+  No separate upstream NOTICE file was present at the pinned revision.
+
+The adaptation implements session setup and memory reads, omits the upstream
+assignment-clearing command, exposes no write/command API, validates exact
+read policy and framing, bounds capture duration and preserves wire evidence.
+It does not use the upstream high-level `connect()` method, which also clears
+assignments. It does not incorporate RMI, Stream Motion or proprietary binaries.
