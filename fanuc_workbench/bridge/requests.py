@@ -44,7 +44,7 @@ class RequestDispatcher:
         self.workers, self.pending, self.robot_wait_seconds = workers, pending, robot_wait_seconds
         self.configuration_supplier = configuration_supplier
         self.lock = threading.RLock()
-        self.close_lock = threading.Lock()
+        self.close_lock = threading.RLock()
         self.local = threading.local()
         self.closed = False
         self.active = {}
@@ -151,7 +151,8 @@ class RequestDispatcher:
                 if self.closed:
                     return
                 self.closed = True
-                for _, future in self.active.values():
-                    future.cancel()
+                futures = [future for _, future in self.active.values()]
+            for future in futures:
+                future.cancel()
             for pool in self.pools.values():
                 pool.shutdown(wait=True, cancel_futures=False)

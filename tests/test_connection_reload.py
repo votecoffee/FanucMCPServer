@@ -44,6 +44,18 @@ def change_endpoint(path, original):
     return updated
 
 
+@pytest.mark.parametrize('field,value',[
+    ('max_concurrent_requests',2),('max_pending_requests',3),('robot_lock_timeout_seconds',.5),
+])
+def test_capacity_changes_require_host_reconnect(reload_case,field,value):
+    bridge,_,path,document,contacted=reload_case
+    original=bridge.config
+    document[field]=value;path.write_text(json.dumps(document))
+    with pytest.raises(ValueError,match='restart'):
+        bridge.reload_connections()
+    assert bridge.config is original and not contacted
+
+
 def test_refresh_uses_only_bound_file_and_invalidates_old_target_plans(reload_case):
     bridge, robot, path, document, contacted = reload_case
     upload = bridge.prepare_upload('r1', 'md:MAIN.LS', 'MAIN.LS', digest(ORIGINAL))

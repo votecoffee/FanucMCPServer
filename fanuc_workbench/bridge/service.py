@@ -58,7 +58,8 @@ class RobotBridge:
         self._connection_lock = threading.RLock()
         self._connection_condition = threading.Condition(self._connection_lock)
         self._operation_context = threading.local()
-        self._close_lock = threading.Lock()
+        self._close_lock = threading.RLock()
+        self._close_owner = None
         self._closing = self._closed = False
         self._active_robot_operations = 0
         config.state_dir.mkdir(parents=True, exist_ok=True)
@@ -87,17 +88,21 @@ class RobotBridge:
         if self.requests.current_request_id or getattr(self._operation_context, 'depth', 0):
             raise RuntimeError("Close the bridge outside an active request or controller operation")
         with self._close_lock:
-            if self._closed:
+            if self._closed or self._close_owner == threading.get_ident():
                 return
-            with self._connection_condition:
-                self._closing = True
-            self.requests.close()
-            self.operations.jobs.close()
-            with self._connection_condition:
-                self._connection_condition.wait_for(lambda: self._active_robot_operations == 0)
-            self.native.close()
-            self.extensions.close()
-            self._closed = True
+            self._close_owner = threading.get_ident()
+            try:
+                with self._connection_condition:
+                    self._closing = True
+                self.requests.close()
+                self.operations.jobs.close()
+                with self._connection_condition:
+                    self._connection_condition.wait_for(lambda: self._active_robot_operations == 0)
+                self.native.close()
+                self.extensions.close()
+                self._closed = True
+            finally:
+                self._close_owner = None
 
     def __enter__(self):
         return self

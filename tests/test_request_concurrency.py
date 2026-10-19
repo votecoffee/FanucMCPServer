@@ -1,8 +1,9 @@
 import asyncio
-from concurrent.futures import CancelledError
+from concurrent.futures import CancelledError, ThreadPoolExecutor
 import contextvars
 import json
 import threading
+import time
 
 import pytest
 
@@ -134,3 +135,68 @@ def test_request_settings_are_preserved_by_config_load(tmp_path):
         'max_pending_requests':3,'robot_lock_timeout_seconds':.5}))
     config=BridgeConfig.load(path)
     assert (config.max_concurrent_requests,config.max_pending_requests,config.robot_lock_timeout_seconds)==(2,3,.5)
+
+
+def test_request_status_is_available_when_normal_pool_is_full(tmp_path):
+    bridge=RobotBridge(BridgeConfig(tmp_path/'state',tmp_path/'edits',max_concurrent_requests=1,max_pending_requests=0))
+    entered,release=threading.Event(),threading.Event()
+    def blocked():
+        entered.set();assert release.wait(5)
+    future=bridge.requests.submit(blocked)
+    async def scenario():
+        server=create_server(bridge)
+        await asyncio.wait_for(server.call_tool('describe_operation',{'operation_id':'core.requests.status'}),1)
+        await asyncio.wait_for(server.call_tool('run_read_operation',{
+            'operation_id':'core.requests.status','revision':'core.requests@1','arguments':{}}),1)
+        assert not bridge.extensions.status()['loaded']
+    try:
+        assert entered.wait(2)
+        asyncio.run(scenario())
+    finally:
+        release.set();future.result(timeout=3);bridge.close()
+
+
+def test_concurrent_dispatcher_close_callers_both_wait_for_running_work():
+    dispatcher=RequestDispatcher(workers=1)
+    entered,release=threading.Event(),threading.Event()
+    def blocked():
+        entered.set();assert release.wait(5)
+    future=dispatcher.submit(blocked)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        try:
+            assert entered.wait(2)
+            first=pool.submit(dispatcher.close)
+            # Observing the closed flag means the first close has entered its drain.
+            deadline=time.monotonic()+2
+            while not dispatcher.status()['closed']:
+                assert not first.done() and time.monotonic()<deadline
+                threading.Event().wait(.001)
+            second=pool.submit(dispatcher.close)
+            assert not first.done() and not second.done()
+        finally:
+            release.set()
+        future.result(timeout=3);first.result(timeout=3);second.result(timeout=3)
+
+
+def test_shutdown_callbacks_can_reenter_close_without_deadlocking(tmp_path):
+    bridge=RobotBridge(BridgeConfig(tmp_path/'state',tmp_path/'edits',max_concurrent_requests=1))
+    entered,release,callback_done=threading.Event(),threading.Event(),threading.Event()
+    def blocked():
+        entered.set();assert release.wait(5)
+    running=bridge.requests.submit(blocked)
+    assert entered.wait(2)
+    queued=bridge.requests.submit(lambda:pytest.fail('Cancelled callable ran'))
+    def callback(_):
+        bridge.requests.close()
+        bridge.close()
+        callback_done.set()
+    queued.add_done_callback(callback)
+    closer=threading.Thread(target=bridge.close,daemon=True)
+    closer.start()
+    try:
+        assert callback_done.wait(2)
+    finally:
+        release.set();closer.join(timeout=3)
+    assert not closer.is_alive()
+    running.result(timeout=2)
+    assert queued.cancelled() and bridge.requests.status()['closed']

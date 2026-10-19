@@ -1,5 +1,6 @@
 import json
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 
 import pytest
@@ -194,3 +195,62 @@ def test_native_provider_creation_is_parallel_for_distinct_controllers(controlle
     bridge.native.factory=factory
     futures=[bridge.requests.submit(bridge.native.status,name) for name in ('r1','r2')]
     assert {future.result(timeout=5)['robot_id'] for future in futures}=={'r1','r2'}
+
+
+def test_concurrent_close_waits_for_direct_api_reads_before_closing_clients(controllers,monkeypatch):
+    bridge,robots,_,_=controllers
+    entered,release,read_finished,closing=(threading.Event() for _ in range(4))
+    original=robots['r1'].download_bounded
+    def blocked(*args):
+        entered.set();assert release.wait(5)
+        original(*args);read_finished.set()
+    monkeypatch.setattr(robots['r1'],'download_bounded',blocked)
+    original_close=bridge.requests.close
+    def close_requests():
+        closing.set();original_close()
+    monkeypatch.setattr(bridge.requests,'close',close_requests)
+    def close_native():
+        assert read_finished.is_set(), 'Client closed before a direct read finished'
+    monkeypatch.setattr(bridge.native,'close',close_native)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        reading=pool.submit(bridge.read_file,'r1','md:MAIN.LS')
+        try:
+            assert entered.wait(2)
+            first=pool.submit(bridge.close)
+            assert closing.wait(2)
+            second=pool.submit(bridge.close)
+            with pytest.raises(RequestCancelled):bridge.read_file('r2','md:MAIN.LS')
+            assert not first.done() and not second.done()
+        finally:
+            release.set()
+        assert reading.result(timeout=3)['sha256']==digest(ORIGINAL)
+        first.result(timeout=3);second.result(timeout=3)
+
+
+def test_queued_request_is_not_retargeted_when_endpoints_reload(tmp_path):
+    policy=tmp_path/'policy.json'
+    document={'state_dir':'state','source_dir':'edits','max_concurrent_requests':1,'max_pending_requests':1,
+        'robots':{'r1':{'profile':{'host':'192.0.2.1'}}}}
+    policy.write_text(json.dumps(document))
+    contacted=[]
+    def backend(profile):
+        contacted.append(profile.host);return MemoryRobot()
+    entered,release=threading.Event(),threading.Event()
+    def offline_work():
+        entered.set();assert release.wait(5)
+    with RobotBridge.from_config(policy,backend) as bridge:
+        first=bridge.requests.submit(offline_work)
+        try:
+            assert entered.wait(2)
+            queued=bridge.requests.submit(bridge.read_file,'r1','md:MAIN.LS')
+            document['robots']['r1']['profile']['host']='192.0.2.2'
+            policy.write_text(json.dumps(document))
+            assert bridge.reload_connections()['status']=='reloaded'
+        finally:
+            release.set()
+        first.result(timeout=3)
+        with pytest.raises(ValueError,match='changed while this request was queued'):
+            queued.result(timeout=3)
+        assert not contacted
+        assert bridge.requests.submit(bridge.read_file,'r1','md:MAIN.LS').result(timeout=3)['sha256']==digest(ORIGINAL)
+        assert contacted==['192.0.2.2']
