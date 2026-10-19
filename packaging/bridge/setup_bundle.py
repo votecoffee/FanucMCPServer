@@ -127,6 +127,12 @@ def find_broker(plugins, environment, explicit=None):
     match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version)
     if not match or not (0, 8, 0) <= tuple(map(int, match.groups())) < (1, 0, 0):
         raise ValueError("This installer supports Universal Tools >=0.8.0,<1.0.0")
+    # An existing settings file is not sufficient evidence of initialization.
+    # Validate through the broker's own contract without starting its daemon or
+    # printing the local bearer token.
+    subprocess.run([str(python), "-B", "-c",
+        "import sys; from pathlib import Path; from universal_tools.models import load_settings; load_settings(Path(sys.argv[1]))",
+        str(state)], check=True, env=environment, capture_output=True, text=True, timeout=15)
     return {"python": str(python), "state": str(state), "version": version}
 
 
@@ -177,6 +183,19 @@ def require_idle_broker(broker, environment):
         raise ValueError("FANUC broker work or recovery is recorded; reconcile it before installation")
 
 
+def normalized_broker_manifests(broker, environment, *paths):
+    """Validate the complete registrations, including broker-owned defaults."""
+    result = subprocess.run([broker["python"], "-B", "-c",
+        "import json, sys; from pathlib import Path; from universal_tools.models import load_manifest; "
+        "print(json.dumps([load_manifest(Path(path)).model_dump(mode='json') for path in sys.argv[1:]]))",
+        *(str(path) for path in paths)], check=True, env=environment,
+        capture_output=True, text=True, timeout=15)
+    rows = json.loads(result.stdout)
+    if not isinstance(rows, list) or len(rows) != len(paths) or any(not isinstance(row, dict) for row in rows):
+        raise ValueError("Unexpected broker registration validation result")
+    return rows
+
+
 def register_broker(root, runtime, python, config, broker, environment, installation, allow_writes):
     require_idle_broker(broker, environment)
     descriptor = runtime / "broker-service.json"
@@ -185,13 +204,11 @@ def register_broker(root, runtime, python, config, broker, environment, installa
     if allow_writes:
         command.append("--allow-writes")
     subprocess.run(command, check=True, env=environment, timeout=60)
-    proposed = json.loads(descriptor.read_text(encoding="utf-8"))
     existing = Path(broker["state"]) / "services" / "fanuc-mcp-server.json"
     if existing.exists():
         # Do not replace registration/policy or reset a session/recovery barrier.
-        # Pydantic-normalized descriptors can contain optional defaults.
-        current = json.loads(existing.read_text(encoding="utf-8"))
-        if current.get("enabled") is False or any(current.get(key) != value for key, value in proposed.items()):
+        proposed, current = normalized_broker_manifests(broker, environment, descriptor, existing)
+        if current != proposed:
             raise ValueError("A different FANUC broker registration exists; reconcile active work and intentionally update it with the broker CLI")
     profile = Path(environment.get("CODEX_HOME", Path.home() / ".codex")).resolve()
     skill = install_broker_skill(root, profile, installation)

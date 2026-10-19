@@ -23,8 +23,9 @@ py -3.14 -B C:/RobotTools/FanucPluginBundle/setup.py --runtime-dir C:/RobotTools
 
 `--codex-home` selects an isolated profile. Detection uses its actual installed
 and enabled plugin inventory and local server policy, then validates the broker
-runtime pointer and version. A folder name alone is insufficient. For a
-distribution without a local source pointer, supply
+runtime pointer and version. A folder name alone is insufficient. Setup validates
+broker settings through the broker's own parser without starting its daemon or
+exposing its token. For a distribution without a local source pointer, supply
 `--broker-runtime C:/RobotTools/UniversalTools/runtime.json`. Supported broker
 versions are `>=0.8.0,<1.0.0`, using registration/catalog schema 1. Project or
 managed policy can impose additional restrictions; verify the intended host.
@@ -36,6 +37,10 @@ skills and active/recovery contexts are not overwritten. Missing prerequisites
 on an existing broker installation fail without runtime failover. Explicit route
 selection does not uninstall or disable another integration. Finish and reconcile
 active work before changing routes; use one connection throughout a workflow.
+
+Existing registrations are compared using the broker's complete normalized
+schema, including defaults and tool classifications. A matching executable
+alone does not establish equivalent policy; malformed registrations are refused.
 
 Broker installation copies the route-aware `fanuc-robot` skill into the selected
 profile's `skills` folder, so skipping the standalone plugin retains the FANUC
@@ -113,8 +118,9 @@ revisions have different meanings.
 
 Offline tests cover route selection, policy preservation, skill ownership,
 schema compatibility and metadata discovery. Optional actual-broker tests use
-synthetic controller transports for retained preparation, approval, readback and
-competing frontends. Set `FANUC_TEST_BROKER_SOURCE` to a compatible broker checkout
+synthetic controller transports for retained preparation, approval, readback,
+backup jobs, worker reloads, stale revisions and competing frontends. Set
+`FANUC_TEST_BROKER_SOURCE` to a compatible broker checkout
 and run `tests/test_broker_interop.py`; this is not a runtime dependency.
 
 Fresh-chat skill selection and confirmation UI need separate host/profile

@@ -44,7 +44,7 @@ def test_broker_detection_uses_enabled_profile_and_runtime(tmp_path, monkeypatch
         assert setup.find_broker([row], {"CODEX_HOME": str(tmp_path)})["state"] == str(state)
     else:
         with pytest.raises(ValueError): setup.find_broker([row], {"CODEX_HOME": str(tmp_path)})
-    assert all(command[-1] == "--version" for command in calls)
+    assert all(command[-1] == "--version" or ("-c" in command and command[-1] == str(state)) for command in calls)
 
 
 def test_broker_skill_upgrade_preserves_edits(tmp_path):
@@ -64,13 +64,15 @@ def test_broker_skill_upgrade_preserves_edits(tmp_path):
     assert target.read_text() == "local edits"
 
 
-@pytest.mark.parametrize("blocked", ["different", "disabled", "recovery"])
+@pytest.mark.parametrize("blocked", ["different", "disabled", "recovery", "classification"])
 def test_existing_registration_and_recovery_are_not_overwritten(tmp_path, monkeypatch, blocked):
     setup = load_setup()
     state = tmp_path / "state"; (state / "services").mkdir(parents=True)
     runtime = tmp_path / "runtime"; runtime.mkdir()
     service = state / "services/fanuc-mcp-server.json"
-    current = {"id": "fanuc-mcp-server", "enabled": blocked != "disabled", "allow_writes": True}
+    current = {"id": "fanuc-mcp-server", "enabled": blocked != "disabled", "allow_writes": blocked != "classification"}
+    if blocked == "classification":
+        current["read_only_tools"] = ["prepare_upload"]
     service.write_text(json.dumps(current))
     before = service.read_bytes()
     calls = []
@@ -79,10 +81,13 @@ def test_existing_registration_and_recovery_are_not_overwritten(tmp_path, monkey
         if command[-1] == "contexts":
             return SimpleNamespace(stdout=json.dumps({"contexts": [{"service_id": "fanuc-mcp-server", "state": "lost"}] if blocked == "recovery" else []}))
         if "--manifest" in command:
-            (runtime / "broker-service.json").write_text(json.dumps({"id": "fanuc-mcp-server", "allow_writes": False}))
+            (runtime / "broker-service.json").write_text(json.dumps({"id": "fanuc-mcp-server", "enabled": True,
+                                                                    "allow_writes": False}))
         return SimpleNamespace()
     monkeypatch.setattr(setup.subprocess, "run", run)
-    with pytest.raises(ValueError):
+    monkeypatch.setattr(setup, "normalized_broker_manifests", lambda broker, environment, *paths:
+        [json.loads(path.read_text()) for path in paths])
+    with pytest.raises(ValueError, match="broker work or recovery" if blocked == "recovery" else "different FANUC broker registration"):
         setup.register_broker(tmp_path, runtime, tmp_path / "python", tmp_path / "config", {"python": "broker", "state": str(state)}, {}, {}, False)
     assert service.read_bytes() == before and not any("register" in command for command in calls)
 
@@ -148,3 +153,21 @@ def test_active_broker_blocks_runtime_only_upgrade_before_file_changes(tmp_path,
     monkeypatch.setattr(sys, "argv", ["setup.py", "--runtime-dir", str(runtime)])
     with pytest.raises(ValueError, match="active fixture"): setup.main()
     assert marker.read_bytes() == before
+
+
+def test_incomplete_broker_initialization_is_not_ready(tmp_path, monkeypatch):
+    import subprocess
+    setup = load_setup()
+    source = tmp_path / "plugin"; source.mkdir()
+    state = tmp_path / "state"; state.mkdir()
+    (state / "settings.json").write_text("{}")
+    python = tmp_path / "python.exe"; python.write_bytes(b"fixture")
+    (source / "runtime.json").write_text(json.dumps({"python": str(python), "state": str(state)}))
+    row = {"name": "universal-tools", "version": "0.11.1", "installed": True, "enabled": True,
+           "source": {"source": "local", "path": str(source)}}
+    def run(command, **kwargs):
+        if command[-1] == "--version": return SimpleNamespace(stdout="0.11.1")
+        raise subprocess.CalledProcessError(1, command)
+    monkeypatch.setattr(setup.subprocess, "run", run)
+    with pytest.raises(subprocess.CalledProcessError):
+        setup.find_broker([row], {"CODEX_HOME": str(tmp_path)})

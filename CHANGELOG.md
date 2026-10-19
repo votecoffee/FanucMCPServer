@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Validated broker initialization and complete normalized registrations before
+  accepting an existing route, including tool classification policy. Extended
+  actual-broker fixtures to cover backup jobs, worker reloads and stale revisions.
+
 - Retained the standalone Codex plugin and added an optional Universal Tools
   adapter with discovery-only feature metadata and exclusive retained sessions.
   Added automatic fresh-install routing, explicit broker/standalone overrides,
