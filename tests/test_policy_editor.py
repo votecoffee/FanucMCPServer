@@ -1,6 +1,7 @@
 import copy
 from dataclasses import fields
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -32,6 +33,17 @@ def test_controls_cover_every_runtime_policy_field():
         item.name for item in fields(RobotAccess)} - {"profile", "snpx_read"}
     assert {item.key for item in SNPX_FIELDS} == {item.name for item in fields(SnpxReadPolicy)}
     compile(_BROKER_CODE, "policy broker helper", "exec")
+
+
+@pytest.mark.parametrize("error", [OSError("private runtime error"), subprocess.TimeoutExpired("private command", 20)])
+def test_broker_runtime_failure_becomes_a_bounded_gui_error(tmp_path, monkeypatch, error):
+    from fanuc_workbench.bridge.policy_editor import BrokerRuntime, _broker_call
+    def fail(*args, **kwargs):
+        raise error
+    monkeypatch.setattr(subprocess, "run", fail)
+    with pytest.raises(ValueError, match="within its deadline") as caught:
+        _broker_call(BrokerRuntime(tmp_path / "python", tmp_path), "broker", {})
+    assert "private" not in str(caught.value)
 
 
 def test_review_save_preserves_unknown_settings_and_exact_original(editor_policy):

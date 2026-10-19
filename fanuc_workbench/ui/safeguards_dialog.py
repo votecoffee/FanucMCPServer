@@ -97,7 +97,7 @@ class PolicyPane(QWidget):
         try:
             self.snapshot = load_policy(Path(self.config_path.text()), self.kind, self.broker)
             self.draft = self.snapshot.document
-            self.errors.clear(); self.raw_inputs.clear()
+            self.errors.clear(); self.raw_inputs.clear(); self.snpx_cache.clear()
             self.build_forms()
             self.tabs.setEnabled(True); self.review_button.setEnabled(True)
             self.status.setText(f"Loaded {self.snapshot.path}. Changes are local until saved and explicitly applied to a new session.")
@@ -118,6 +118,10 @@ class PolicyPane(QWidget):
         for key in path[:-1]: target = target.setdefault(key, {})
         if remove: target.pop(path[-1], None)
         else: target[path[-1]] = value
+        if path[-2:] == ("profile", "transport") and "port" not in target:
+            port = self.widgets.get(path[:-1] + ("port",))
+            if port is not None:
+                port.blockSignals(True); port.setValue(22 if value == "sftp" else 21); port.blockSignals(False)
         self.changed()
 
     def changed(self):
@@ -136,13 +140,16 @@ class PolicyPane(QWidget):
     def add_fields(self, form, fields, prefix=()):
         for spec in fields:
             path = prefix + (spec.key,)
-            value = self.value(path, spec.default)
+            default = spec.default
+            if spec.key == "port" and prefix[-1:] == ("profile",):
+                default = 22 if self.value(prefix + ("transport",), "ftp") == "sftp" else 21
+            value = self.value(path, default)
             if spec.kind == "bool":
                 widget = QCheckBox(); widget.setChecked(value)
                 widget.toggled.connect(lambda checked, p=path: self.put(p, checked))
             elif spec.kind in {"int", "float"}:
                 widget = QDoubleSpinBox(); widget.setDecimals(0 if spec.kind == "int" else 3)
-                widget.setRange(spec.minimum, spec.maximum); widget.setValue(value)
+                widget.setRange(spec.minimum, spec.maximum); widget.setValue(float(value))
                 widget.setMaximumWidth(240)
                 widget.valueChanged.connect(lambda number, p=path, k=spec.kind: self.put(p, int(number) if k == "int" else number))
             elif spec.kind == "choice":
@@ -162,7 +169,7 @@ class PolicyPane(QWidget):
                     widget.restrict, widget.edit = restrict, edit
                 else: widget = edit
             else:
-                widget = QLineEdit(value or "")
+                widget = QLineEdit(str(value or ""))
                 if spec.kind == "secret":
                     widget.setEchoMode(QLineEdit.Password); widget.setMaxLength(128)
                 widget.textChanged.connect(lambda text, p=path, k=spec.kind: self.put(p, text, k == "optional" and not text))
@@ -256,6 +263,7 @@ class PolicyPane(QWidget):
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", name) or name in self.draft["robots"]:
             self.status.setText("Use a unique valid robot ID."); return
         self.draft["robots"][name] = self.draft["robots"].pop(old)
+        if old in self.snpx_cache: self.snpx_cache[name] = self.snpx_cache.pop(old)
         for mapping in (self.errors, self.raw_inputs):
             for path in list(mapping):
                 if path[:2] == ("robots", old): mapping[("robots", name) + path[2:]] = mapping.pop(path)
@@ -266,6 +274,7 @@ class PolicyPane(QWidget):
         name = self.robot.currentText()
         if not name: return
         self.draft["robots"].pop(name)
+        self.snpx_cache.pop(name, None)
         for mapping in (self.errors, self.raw_inputs):
             for path in list(mapping):
                 if path[:2] == ("robots", name): mapping.pop(path)

@@ -144,9 +144,12 @@ def _broker_call(runtime, kind, document, action="validate", **kwargs):
         raise ValueError("Select the broker runtime.json before editing its policy")
     environment = {key: value for key, value in os.environ.items() if key not in {"PYTHONPATH", "PYTHONHOME"}}
     environment.update(PYTHONNOUSERSITE="1", PYTHONDONTWRITEBYTECODE="1")
-    result = subprocess.run([str(runtime.python), "-B", "-c", _BROKER_CODE],
-        input=json.dumps({"kind": kind, "document": document, "action": action, "state": str(runtime.state), **kwargs}, allow_nan=False),
-        env=environment, capture_output=True, text=True, timeout=20)
+    try:
+        result = subprocess.run([str(runtime.python), "-B", "-c", _BROKER_CODE],
+            input=json.dumps({"kind": kind, "document": document, "action": action, "state": str(runtime.state), **kwargs}, allow_nan=False),
+            env=environment, capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired):
+        raise ValueError("The selected broker runtime could not validate this policy within its deadline") from None
     if result.returncode:
         # Validation errors can echo credential inputs. Show only the last error
         # category; paths and full documents remain local and are not logged.

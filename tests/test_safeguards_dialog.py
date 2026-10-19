@@ -83,6 +83,42 @@ def test_closing_with_unsaved_changes_allows_cancel_or_discard(editor_policy, mo
     dialog.reject(); assert dialog.result() == QDialog.Rejected
 
 
+def test_reloading_policy_does_not_reuse_another_files_snpx_scope(editor_policy):
+    app = QApplication.instance() or QApplication([])
+    path, original = editor_policy
+    pane = PolicyPane("robot", str(path))
+    pane.snpx_enabled.setChecked(True)
+    pane.widgets[("robots", "r1", "snpx_read", "io_targets")].setPlainText("DI[1]")
+    pane.snpx_enabled.setChecked(False)
+    assert pane.snpx_cache["r1"]["io_targets"] == ["DI[1]"]
+    second = path.with_name("second.local.json")
+    second.write_text(json.dumps(original))
+    pane.config_path.setText(str(second)); pane.load_document()
+    pane.snpx_enabled.setChecked(True)
+    assert pane.draft["robots"]["r1"]["snpx_read"] == {}
+    pane.close()
+
+
+def test_transport_defaults_and_legacy_numeric_fields_match_runtime_without_rewriting(editor_policy):
+    app = QApplication.instance() or QApplication([])
+    path, original = editor_policy
+    original["robots"]["r1"]["profile"].update(transport="sftp", timeout="3.5")
+    path.write_text(json.dumps(original))
+    pane = PolicyPane("robot", str(path))
+    prefix = ("robots", "r1", "profile")
+    assert pane.snapshot is not None, pane.status.text()
+    assert pane.widgets[prefix + ("port",)].value() == 22
+    assert pane.widgets[prefix + ("timeout",)].value() == 3.5
+    assert pane.draft == original  # Displaying effective defaults preserves the saved document.
+    pane.widgets[prefix + ("transport",)].setCurrentText("ftp")
+    assert pane.widgets[prefix + ("port",)].value() == 21
+    assert "port" not in pane.draft["robots"]["r1"]["profile"]
+    pane.widgets[prefix + ("port",)].setValue(2222)
+    pane.widgets[prefix + ("transport",)].setCurrentText("sftp")
+    assert pane.widgets[prefix + ("port",)].value() == 2222
+    pane.close()
+
+
 def test_main_window_opens_safeguards_and_remembers_saved_policy(editor_policy, tmp_path, monkeypatch):
     from fanuc_workbench.core.settings import QStandardPaths
     from fanuc_workbench.ui import main_window
