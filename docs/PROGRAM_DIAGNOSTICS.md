@@ -80,3 +80,85 @@ per observation, 100 pre/post samples each, 20 captures, 100 trigger signals,
 100 explicit active alarm strings per row, nesting 24 and 200,000 JSON separators/
 containers/text tokens. Missing observations do not establish continuous sampling,
 physical timing, causal relationships or controller identity.
+
+## Semantic comparison
+
+`semantic_compare(root, before_path, after_path)` pages categorized changes to
+instructions, positions, speeds, terminations, offsets, frames/tools, comments,
+attributes and generated metadata. TP line renumbering, whitespace and equivalent
+numeric spelling are normalized. String literals remain instruction data.
+Position blocks retain configuration/axes; UF/UT changes are reported separately.
+Unsupported position sections remain unclassified evidence. Comparison is limited
+to 2000 instructions per input and does not establish runtime equivalence.
+
+## Dependency review and packages
+
+`dependency_review(root, paths, entry_programs=["MAIN"], inventory_path=...)`
+follows selected direct subprograms and lists program, R/PR/SR/AR, position,
+frame/tool and I/O requirements. Dynamic calls/indexes, unresolved jumps, missing
+position definitions and unsupported syntax prevent a complete scoped review.
+Motion also requires explicit current UFRAME_NUM/UTOOL_NUM state evidence; a
+static frame assignment alone does not establish the active runtime context.
+
+The explicit inventory uses this shape, with nonempty evidence objects:
+
+```json
+{
+  "format": "fanuc-dependency-inventory", "schema_version": 1,
+  "resources": {"R[1]": {"source": "NUMREG.VA", "index": 1}},
+  "io_mappings": {"DI[1]": {"rack": 0, "slot": 1, "start": 1}}
+}
+```
+
+Inventory entries are supplied evidence, not authenticated controller
+configuration. `view` is `requirements`, `missing` or `issues`. A complete
+explicit selection does not establish physical compatibility or dependency
+completeness across unsupported LS features.
+
+`build_change_package` in `services.program_packages` copies exact reachable
+program bytes and inventory into a new destination, verifies hashes and writes
+`package.json`. Existing destinations are refused. Missing/unresolved requirements
+block creation unless `allow_incomplete=True` is explicitly chosen; that package
+is labeled `incomplete_review_only`. Packages never authorize deployment and still
+require native validation and the existing fresh controller preflight/review.
+
+## Native offline validation
+
+`validate_offline` in `services.native_validation` runs explicit local MakeTP and
+PrintTP executables with an explicit `robot.ini`, robot-context directory and
+WinOLPC core version. It preserves original inputs, copies the robot context and
+rebinds Robot/Support/Output paths into a new isolated job directory. Version and
+configuration must agree. It does not run SetRobot, change installed tools or
+load/select/run a controller program.
+
+The job preserves source, original/effective INIs, context hashes, compiler and
+printer hashes, merged stdout/stderr logs, diagnostics, TP output and printed LS
+readback when available. Both tool stages must exit successfully with nonempty
+outputs; source/readback rows and tokens must match after generated metadata is
+excluded. Readback differences and failures retain their evidence. Exceptions
+after compiler invocation retain a failed validation report. A copied context is
+sequential evidence, not an atomic capture or exact core-build authentication.
+
+Limits: 1 MiB LS/config inputs, 4 MiB TP, 10,000 context files/directories each,
+512 MiB copied context, 1 MiB merged tool output per stage and 1–60 seconds per
+process (default 30). A successful offline report remains separate from controller
+LS/TP readback, native deployment preflight and physical/runtime acceptance.
+`review_validation` checks explicitly selected preserved source/report/TP/readback
+files and their hashes; it never executes a command from a report or authenticates
+the reported compiler execution.
+
+## CLI
+
+Run `python -B -m fanuc_workbench.program_tools --help` for all commands. Examples:
+
+```powershell
+python -B -m fanuc_workbench.program_tools --workspace C:/RobotBackups/Test trace MAIN.LS --view accesses
+python -B -m fanuc_workbench.program_tools --workspace C:/RobotBackups/Test wait MAIN.LS observations.json
+python -B -m fanuc_workbench.program_tools --workspace C:/RobotBackups/Test capture MAIN.LS --observations observations.json --signals DI[1]
+python -B -m fanuc_workbench.program_tools --workspace C:/RobotBackups/Test compare before.LS after.LS
+python -B -m fanuc_workbench.program_tools --workspace C:/RobotBackups/Test dependencies MAIN.LS CHILD.LS --entry MAIN --inventory inventory.json --view missing
+python -B -m fanuc_workbench.program_tools compile C:/RobotBackups/Test/MAIN.LS --destination C:/RobotChecks/Run01 --maketp C:/FanucTools/maketp.exe --printtp C:/FanucTools/printtp.exe --configuration C:/RobotChecks/robot.ini --robot-context C:/RobotChecks/Context --version V8.33-1
+```
+
+Keep actual configurations, robot data, output jobs and acceptance reports outside
+the public checkout or in its ignored `.local/` directory.

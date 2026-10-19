@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added categorized semantic LS comparisons, transitive explicit dependency
+  inventories, hash-bound local change packages and an offline program-tools CLI.
+  Added isolated MakeTP/PrintTP jobs with copied robot contexts, explicit versions,
+  bounded diagnostics and preserved normalized readback checks. No controller
+  load or deployment authorization follows from these local checks.
 - Added shared LS instruction/access tracing, explicit indirect-reference evidence,
   conservative branch edges, revision-bound sampled WAIT evaluation and bounded
   pre/post diagnostic capture models. Unsupported syntax and unavailable/stale

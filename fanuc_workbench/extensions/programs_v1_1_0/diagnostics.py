@@ -79,6 +79,7 @@ def validate_observation(row):
         if not isinstance(task.get('program'),str) or not re.fullmatch(r'[A-Za-z0-9_]{1,64}',task['program']): raise ValueError('Explicit task program required')
         if type(task.get('line')) is not int or task['line']<1: raise ValueError('Explicit positive TP line required')
         if not isinstance(task.get('state'),str): raise ValueError('Explicit task state required')
+        if not isinstance(task.get('name'),str) or not 1<=len(task['name'])<=128: raise ValueError('Explicit task name required')
         if task.get('program_sha256') is not None and (not isinstance(task['program_sha256'],str) or not HASH.fullmatch(task['program_sha256'])): raise ValueError('Invalid listing revision hash')
     sample=row.get('sample')
     if sample is not None:
@@ -195,7 +196,8 @@ def explain_wait(root,path,observation,*,max_age_seconds=5):
     if not sample or not 0<=row['timestamp']-sample['timestamp']<=max_age_seconds: result['reasons'].append('sample_missing_stale_or_future')
     nodes=[node for node in listing['nodes'] if task and node['tp_line_number']==task['line']]
     if len(nodes)!=1: result['reasons'].append('task_line_missing_or_ambiguous')
-    if listing['issues']: result['reasons'].append('listing_has_unresolved_syntax')
+    result['listing_issue_count']=len(listing['issues'])
+    if any(issue['code'] in ('program_sections_unsupported','unsupported_mn_boundary') for issue in listing['issues']): result['reasons'].append('listing_structure_unresolved')
     if result['reasons']: return result
     node=nodes[0];result['instruction']=node;result['condition']=node['condition']
     if node['kind']!='WAIT': result['reasons'].append('reported_instruction_is_not_wait');return result
@@ -237,7 +239,8 @@ class TriggeredRecorder:
             oldtask,newtask=previous.get('task') or {},row.get('task') or {}
             if oldtask and newtask and oldtask.get('name')==newtask.get('name'):
                 if 'task_pause' in self.triggers and oldtask['state'].upper()=='RUNNING' and newtask['state'].upper()=='PAUSED': events.append({'kind':'task_pause'})
-                if 'program_transition' in self.triggers and (oldtask['program'],oldtask.get('program_sha256'))!=(newtask['program'],newtask.get('program_sha256')): events.append({'kind':'program_transition'})
+                revision_changed=oldtask.get('program_sha256') and newtask.get('program_sha256') and oldtask['program_sha256']!=newtask['program_sha256']
+                if 'program_transition' in self.triggers and (oldtask['program']!=newtask['program'] or revision_changed): events.append({'kind':'program_transition'})
             if 'signal_change' in self.triggers:
                 oldsample,newsample=previous.get('sample') or {},row.get('sample') or {}
                 oldvalues={canonical(k):v for k,v in oldsample.get('values',{}).items()}

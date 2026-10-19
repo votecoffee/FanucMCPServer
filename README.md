@@ -155,6 +155,10 @@ Shared offline program services include `trace_logic`, `explain_wait` and
 `TriggeredRecorder` in `fanuc_workbench.services.program_analysis`. They retain
 unresolved references and require explicit observed source/revision metadata;
 see [program diagnostics](docs/PROGRAM_DIAGNOSTICS.md).
+The same guide covers semantic comparisons, dependency packages and isolated
+MakeTP/PrintTP validation. Use `python -B -m fanuc_workbench.program_tools --help`
+for the offline CLI; native compiler success and controller acceptance remain
+separate checks.
 
 ## Capabilities and limits
 

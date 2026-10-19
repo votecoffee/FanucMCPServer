@@ -152,7 +152,8 @@ def parse_listing(lines, file):
     mn = [i for i,line in enumerate(lines) if line.strip().upper() == '/MN']
     ends = [i for i,line in enumerate(lines) if line.strip().upper() == '/END']
     name = headers[0][1].upper() if len(headers)==1 and headers[0] else None
-    valid = bool(name and len(mn)==len(ends)==1 and mn[0]<ends[0])
+    header_index=next((i for i,line in enumerate(lines) if re.match(r'\s*/PROG\b',line,FLAGS)),len(lines))
+    valid = bool(name and len(mn)==len(ends)==1 and header_index<mn[0]<ends[0])
     if not valid:
         issues.append({'path':file['path'], 'line_number':0, 'code':'program_sections_unsupported'})
     if not mn:
@@ -160,7 +161,10 @@ def parse_listing(lines, file):
     accesses, seen, selector = [], set(), None
     for physical in range(mn[0]+1,len(lines)):
         raw = lines[physical]
-        if raw.lstrip().startswith('/'): break
+        if raw.lstrip().startswith('/'):
+            if raw.strip().upper() not in ('/POS','/END'):
+                issues.append({'path':file['path'],'line_number':physical+1,'code':'unsupported_mn_boundary'})
+            break
         if not raw.strip(): continue
         try:
             tp, original, code = _statement(raw)
