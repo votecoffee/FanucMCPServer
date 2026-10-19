@@ -67,6 +67,11 @@ def core_operations():
             'artifact_id': {'type': 'string'}, 'sample_offset': {'type': 'integer', 'minimum': 0},
             'sample_limit': {'type': 'integer', 'minimum': 1, 'maximum': 100}},
             'required': ['artifact_id'], 'additionalProperties': False}, 'output_schema': {'type': 'object'}}
+    operations['core.requests.status'] = {
+        'id': 'core.requests.status', 'description': 'Inspect bounded queued/running requests and recent outcomes; no controller contact',
+        'effect': 'read', 'revision': 'core.requests@1', 'extension_id': 'core',
+        'input_schema': {'type': 'object', 'properties': {}, 'additionalProperties': False},
+        'output_schema': {'type': 'object'}}
     return operations
 
 
@@ -213,9 +218,12 @@ class ExtensionHost:
                     "next_offset": offset + limit if offset + limit < len(rows) else None, **self.status()}
 
     def describe(self, operation_id):
+        core = core_operations().get(operation_id)
+        if core is not None:
+            return copy.deepcopy(core)
         self.ensure()
         with self.lock:
-            row = core_operations().get(operation_id) or self.current.operations.get(operation_id)
+            row = self.current.operations.get(operation_id)
             if row is None:
                 raise ValueError("Unknown operation ID; list the current catalog")
             return copy.deepcopy(row)
@@ -270,7 +278,8 @@ class ExtensionHost:
                 "core.controller.programs": self.bridge.native.programs, "core.registers.read": self.bridge.native.read_register,
                 "core.programs.inspect": self.bridge.native.read_program,
                 "core.snpx.read_words": self.bridge.snpx.read_words,
-                "core.recordings.bundle_evidence": self.bridge.operations.bundle_recording}
+                "core.recordings.bundle_evidence": self.bridge.operations.bundle_recording,
+                "core.requests.status": self.bridge.requests.status}
             return {"operation_id": operation_id, "revision": revision, "result": handlers[operation_id](**arguments)}
         with self._lease(operation_id, revision) as (_, descriptor, worker):
             if descriptor["effect"] != "read":
@@ -296,8 +305,7 @@ class ExtensionHost:
             if revision != core["revision"]:
                 raise ValueError("Core operation revision changed")
             validate_data(core["input_schema"], arguments)
-            with self.bridge._lock:
-                return self._prepare_core(operation_id, arguments)
+            return self._prepare_core(operation_id, arguments)
         with self._lease(operation_id, revision) as (generation, descriptor, worker):
             if descriptor["effect"] != "prepare":
                 raise ValueError("Read operations cannot prepare a controller change")
@@ -321,28 +329,33 @@ class ExtensionHost:
                     context["original"] = {"file": capture["local_path"], "sha256": capture["sha256"]}
             proposal = worker.call(operation_id, arguments, context)
             validate_data(descriptor["output_schema"], proposal, maximum=MAX_MESSAGE)
-            with self.bridge._lock, self.lock:
-                if self.current is not generation or self.bridge.config is not original_config:
-                    raise ValueError("Feature or connections changed while computing the proposal; retrieve and review again")
+            with self.bridge._robot_lock(robot_id):
+                with self.bridge._lock, self.lock:
+                    if self.current is not generation or self.bridge.config is not original_config:
+                        raise ValueError("Feature or connections changed while computing the proposal; retrieve and review again")
+                    if kind in {"file_replace", "file_create"}:
+                        if not isinstance(proposal, dict) or set(proposal) != {"data_base64", "sha256"}:
+                            raise ValueError("File proposals must contain only exact bytes and their SHA-256")
+                        suffix = Path(remote).suffix
+                        staged = self.bridge.stage_file("proposal" + suffix, proposal["data_base64"], proposal["sha256"])
+                    elif not isinstance(proposal, dict) or set(proposal) != {"comment"}:
+                        raise ValueError("Description proposals must contain only the proposed comment")
+                # The controller lease pins connections and prevents generation
+                # replacement while preparation performs its controller reads.
                 if kind in {"file_replace", "file_create"}:
-                    if not isinstance(proposal, dict) or set(proposal) != {"data_base64", "sha256"}:
-                        raise ValueError("File proposals must contain only exact bytes and their SHA-256")
-                    suffix = Path(remote).suffix
-                    staged = self.bridge.stage_file("proposal" + suffix, proposal["data_base64"], proposal["sha256"])
                     if kind == "file_replace":
                         result = self.bridge.prepare_upload(robot_id, remote, staged["source_file"], arguments["expected_sha256"])
                     else:
                         result = self.bridge.prepare_file_create(robot_id, remote, staged["source_file"])
                 else:
-                    if not isinstance(proposal, dict) or set(proposal) != {"comment"}:
-                        raise ValueError("Description proposals must contain only the proposed comment")
                     result = self.bridge.comments.prepare(robot_id, remote, arguments["target"], proposal["comment"], arguments["expected_sha256"])
                 try:
                     self.bridge._audit("extension_proposal_prepared", operation_id=operation_id,
                                        revision=revision, plan_id=result["plan_id"])
                 except Exception:
-                    self.bridge._plans.pop(result["plan_id"], None)
-                    self.bridge.comments.plans.pop(result["plan_id"], None)
+                    with self.bridge._lock:
+                        self.bridge._plans.pop(result["plan_id"], None)
+                        self.bridge.comments.plans.pop(result["plan_id"], None)
                     raise
                 return {**result, "operation_id": operation_id, "operation_revision": revision}
 

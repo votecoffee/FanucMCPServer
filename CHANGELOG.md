@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added bounded concurrent MCP/shared-API requests, a reserved bookkeeping lane,
+  configurable controller-lock waiting and request status through the existing
+  operation catalog. Independent controllers can overlap while each write keeps
+  its lease through preflight/readback. Coordinated audit access across processes
+  and preserved the 48 permanent MCP tool schemas and existing feature releases.
 - Required successful offline validation status before GUI deployment preparation,
   including when a failed report contains matching source, TP and readback hashes.
 - Included the program diagnostics guide in offline plugin bundles.

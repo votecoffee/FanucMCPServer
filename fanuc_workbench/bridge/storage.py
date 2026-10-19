@@ -6,6 +6,7 @@ import json
 import os
 import re
 import threading
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -41,6 +42,10 @@ class RobotBusyError(RuntimeError):
     pass
 
 
+class RequestCancelled(RuntimeError):
+    pass
+
+
 class RobotLocks:
     """Reentrant per-thread and cross-process advisory locks for bridge clients."""
 
@@ -50,7 +55,9 @@ class RobotLocks:
         self.local = threading.local()
 
     @contextmanager
-    def acquire(self, identity: str):
+    def acquire(self, identity: str, *, timeout=0, cancel_event=None):
+        if type(timeout) not in (int, float) or not 0 <= timeout <= 60:
+            raise ValueError("Lock timeout must be between 0 and 60 seconds")
         owned = getattr(self.local, "owned", None)
         if owned is None:
             owned = self.local.owned = set()
@@ -65,15 +72,28 @@ class RobotLocks:
                 stream.write(b"0")
                 stream.flush()
             stream.seek(0)
-            try:
-                if os.name == "nt":
-                    import msvcrt
-                    msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            deadline = time.monotonic() + timeout
+            while True:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RequestCancelled("Request cancelled before controller access")
+                try:
+                    if os.name == "nt":
+                        import msvcrt
+                        msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+                    else:
+                        import fcntl
+                        fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except OSError:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise RobotBusyError("Robot is busy in another bridge operation; inspect running jobs") from None
+                    delay = min(.02, remaining)
+                    if cancel_event is not None:
+                        cancel_event.wait(delay)
+                    else:
+                        time.sleep(delay)
                 else:
-                    import fcntl
-                    fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError:
-                raise RobotBusyError("Robot is busy in another bridge operation; inspect running jobs") from None
+                    break
             owned.add(key)
             try:
                 yield

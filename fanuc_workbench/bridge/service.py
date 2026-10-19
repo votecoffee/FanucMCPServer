@@ -20,7 +20,7 @@ from fanuc_workbench.backends.factory import create_backend
 from fanuc_workbench.bridge.config import BridgeConfig, remote_path, under_root
 from fanuc_workbench.services.controller import ControllerService
 from fanuc_workbench.services.diagnostics import scan_alarm_file
-from fanuc_workbench.bridge.storage import RobotLocks, atomic_json
+from fanuc_workbench.bridge.storage import RequestCancelled, RobotLocks, atomic_json
 
 
 _TEXT = {".LS", ".KL", ".VA", ".DG", ".TXT", ".CSV", ".LOG", ".INI", ".XML", ".JSON"}
@@ -56,9 +56,17 @@ class RobotBridge:
         self._lock = threading.RLock()
         self._audit_lock = threading.RLock()
         self._connection_lock = threading.RLock()
+        self._connection_condition = threading.Condition(self._connection_lock)
+        self._operation_context = threading.local()
+        self._close_lock = threading.Lock()
+        self._closing = self._closed = False
         self._active_robot_operations = 0
         config.state_dir.mkdir(parents=True, exist_ok=True)
         self.robot_locks = RobotLocks(config.state_dir / "robot-locks")
+        self.audit_locks = RobotLocks(config.state_dir / "audit-locks")
+        from fanuc_workbench.bridge.requests import RequestDispatcher
+        self.requests = RequestDispatcher(config.max_concurrent_requests, config.max_pending_requests,
+                                          config.robot_lock_timeout_seconds, configuration_supplier=lambda: self.config)
         from fanuc_workbench.bridge.operations import WorkbenchOperations
         self.operations = WorkbenchOperations(self)
         from fanuc_workbench.bridge.comments import CommentChanges
@@ -76,9 +84,20 @@ class RobotBridge:
         return cls(BridgeConfig.load(path), backend_factory, config_path=path)
 
     def close(self):
-        self.operations.jobs.close()
-        self.native.close()
-        self.extensions.close()
+        if self.requests.current_request_id or getattr(self._operation_context, 'depth', 0):
+            raise RuntimeError("Close the bridge outside an active request or controller operation")
+        with self._close_lock:
+            if self._closed:
+                return
+            with self._connection_condition:
+                self._closing = True
+            self.requests.close()
+            self.operations.jobs.close()
+            with self._connection_condition:
+                self._connection_condition.wait_for(lambda: self._active_robot_operations == 0)
+            self.native.close()
+            self.extensions.close()
+            self._closed = True
 
     def __enter__(self):
         return self
@@ -107,23 +126,35 @@ class RobotBridge:
     def commit_change(self, plan_id: str, approved_sha256: str, *, client_approved=False) -> dict:
         with self._lock:
             if plan_id in self.native.plans:
-                return self.native.commit(plan_id, approved_sha256, client_approved=client_approved)
-            if plan_id in self.comments.plans:
-                return self.comments.commit(plan_id, approved_sha256, client_approved=client_approved)
-            return self.commit_upload(plan_id, approved_sha256, client_approved=client_approved)
+                commit = self.native.commit
+            elif plan_id in self.comments.plans:
+                commit = self.comments.commit
+            else:
+                commit = self.commit_upload
+        return commit(plan_id, approved_sha256, client_approved=client_approved)
 
     @contextmanager
-    def _robot_lock(self, robot_id: str):
+    def _robot_lock(self, robot_id: str, *, timeout=None, cancel_event=None):
         # Pin this operation's endpoint until its final controller access.
-        with self._connection_lock:
+        with self._connection_condition:
+            depth = getattr(self._operation_context, 'depth', 0)
+            if self._closing and not depth:
+                raise RequestCancelled("Bridge is closing; no new controller operation started")
+            expected = self.requests.current_configuration
+            if expected is not None and expected is not self.config:
+                raise ValueError("Connection settings changed while this request was queued; inspect settings and submit a fresh request")
             host = self._access(robot_id).profile.host.casefold()
             self._active_robot_operations += 1
+            self._operation_context.depth = depth + 1
         try:
-            with self.robot_locks.acquire(host):
+            with self.robot_locks.acquire(host, timeout=self.requests.lock_timeout if timeout is None else timeout,
+                                          cancel_event=self.requests.cancel_event if cancel_event is None else cancel_event):
                 yield
         finally:
-            with self._connection_lock:
+            with self._connection_condition:
+                self._operation_context.depth = depth
                 self._active_robot_operations -= 1
+                self._connection_condition.notify_all()
 
     @staticmethod
     def _connection_policy(config: BridgeConfig):
@@ -240,7 +271,9 @@ class RobotBridge:
 
     def _audit(self, action: str, **fields) -> None:
         record = {"at": datetime.now(timezone.utc).isoformat(), "action": action, **fields}
-        with self._audit_lock, (self.config.state_dir / "audit.jsonl").open("a", encoding="utf-8") as stream:
+        if self.requests.current_request_id:
+            record["request_id"] = self.requests.current_request_id
+        with self._audit_lock, self.audit_locks.acquire("journal", timeout=15), (self.config.state_dir / "audit.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(record) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
@@ -287,7 +320,7 @@ class RobotBridge:
     def list_files(self, robot_id: str, remote_dir: str, offset: int = 0, limit: int = 1000) -> dict:
         if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 1000:
             raise ValueError("Directory pagination requires offset >= 0 and limit between 1 and 1000")
-        with self._lock, self._robot_lock(robot_id):
+        with self._robot_lock(robot_id):
             remote = self._path(robot_id, remote_dir)
             self._audit("list_requested", robot_id=robot_id, remote_path=remote)
             try:
@@ -313,7 +346,7 @@ class RobotBridge:
                 raise RuntimeError("Controller listing failed; check connection and profile") from None
 
     def read_file(self, robot_id: str, path: str) -> dict:
-        with self._lock, self._robot_lock(robot_id):
+        with self._robot_lock(robot_id):
             remote = self._path(robot_id, path)
             folder = self._folder()
             name = remote.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
@@ -458,13 +491,14 @@ class RobotBridge:
         return payload, source
 
     def _trim_plans(self):
-        now = time.monotonic()
-        self._plans = {key: plan for key, plan in self._plans.items() if plan.expires > now}
-        if len(self._plans) >= 64:
-            raise ValueError("Too many pending plans; cancel plans before preparing more")
+        with self._lock:
+            now = time.monotonic()
+            self._plans = {key: plan for key, plan in self._plans.items() if plan.expires > now}
+            if len(self._plans) >= 64:
+                raise ValueError("Too many pending plans; cancel plans before preparing more")
 
     def prepare_file_create(self, robot_id: str, path: str, source_file: str) -> dict:
-        with self._lock, self._robot_lock(robot_id):
+        with self._robot_lock(robot_id):
             remote = self._path(robot_id, path, create=True)
             payload, source = self._source_payload(remote, source_file)
             self._trim_plans()
@@ -483,8 +517,10 @@ class RobotBridge:
             preview = self._display(proposed, remote)
             proposed_hash = hashlib.sha256(payload).hexdigest()
             plan_id = uuid.uuid4().hex
-            self._plans[plan_id] = UploadPlan(robot_id, remote, None, proposed_hash, payload,
-                                             time.monotonic() + self.config.plan_ttl_seconds, folder)
+            with self._lock:
+                self._trim_plans()
+                self._plans[plan_id] = UploadPlan(robot_id, remote, None, proposed_hash, payload,
+                                                 time.monotonic() + self.config.plan_ttl_seconds, folder)
             result = {"plan_id": plan_id, "operation": "create", "robot_id": robot_id, "remote_path": remote,
                       "original_sha256": None, "proposed_sha256": proposed_hash, "bytes": len(payload),
                       "absence_evidence_path": str(folder / "original_absent.json"), "proposed_path": str(proposed),
@@ -499,7 +535,7 @@ class RobotBridge:
             return result
 
     def prepare_upload(self, robot_id: str, path: str, source_file: str, expected_sha256: str) -> dict:
-        with self._lock:
+        with self._robot_lock(robot_id):
             remote = self._path(robot_id, path, write=True)
             if not _HASH.fullmatch(expected_sha256):
                 raise ValueError("expected_sha256 must be the SHA-256 returned by read_file")
@@ -520,8 +556,10 @@ class RobotBridge:
                 diff = "\n".join(difflib.unified_diff(original["text"].splitlines(), preview["text"].splitlines(),
                                                        fromfile="controller", tofile="proposed", lineterm=""))[:32768]
             plan_id = uuid.uuid4().hex
-            self._plans[plan_id] = UploadPlan(robot_id, remote, expected_sha256, proposed_hash,
-                                             payload, time.monotonic() + self.config.plan_ttl_seconds, folder)
+            with self._lock:
+                self._trim_plans()
+                self._plans[plan_id] = UploadPlan(robot_id, remote, expected_sha256, proposed_hash,
+                                                 payload, time.monotonic() + self.config.plan_ttl_seconds, folder)
             result = {"plan_id": plan_id, "robot_id": robot_id, "remote_path": remote,
                       "original_sha256": expected_sha256, "proposed_sha256": proposed_hash,
                       "bytes": len(payload), "backup_path": original["local_path"],
@@ -548,8 +586,8 @@ class RobotBridge:
                 raise ValueError("Unknown or already consumed plan; prepare a new plan")
             if self.config.approval_mode == "elicitation" and not client_approved:
                 raise ValueError("This bridge requires confirmation through the MCP client's elicitation interface")
-            with self._robot_lock(plan.robot_id):
-                return self._commit_upload_locked(plan_id, approved_sha256)
+        with self._robot_lock(plan.robot_id):
+            return self._commit_upload_locked(plan_id, approved_sha256)
 
     def upload_review(self, plan_id: str, approved_sha256: str) -> dict:
         with self._lock:
@@ -575,35 +613,35 @@ class RobotBridge:
                 raise ValueError("Approval SHA-256 does not match the prepared bytes")
             # One use, including failures. Restart also discards all pending plans.
             self._plans.pop(plan_id)
-            upload = plan.folder / "upload.bin"
-            with upload.open("xb") as stream:
-                stream.write(plan.payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-            started = False
+        upload = plan.folder / "upload.bin"
+        with upload.open("xb") as stream:
+            stream.write(plan.payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        started = False
 
-            def before_upload():
-                nonlocal started
-                self._audit("upload_started", plan_id=plan_id, robot_id=plan.robot_id,
-                            remote_path=plan.remote, sha256=plan.proposed_sha256,
-                            operation="create" if plan.original_sha256 is None else "replace")
-                started = True
+        def before_upload():
+            nonlocal started
+            self._audit("upload_started", plan_id=plan_id, robot_id=plan.robot_id,
+                        remote_path=plan.remote, sha256=plan.proposed_sha256,
+                        operation="create" if plan.original_sha256 is None else "replace")
+            started = True
 
-            try:
-                controller = self._controller(plan.robot_id)
-                if plan.original_sha256 is None:
-                    result = controller.create_file_verified(upload, plan.remote, plan.folder / "preflight_absent.json",
-                        plan.folder / "readback.bin", self.config.max_file_bytes, before_upload)
-                else:
-                    result = controller.replace_file_verified(
-                        upload, plan.remote, plan.original_sha256, plan.folder / "preflight.bin",
-                        plan.folder / "readback.bin", self.config.max_file_bytes, before_upload)
-                self._audit("upload_verified", plan_id=plan_id, **result)
-                return {**result, "plan_id": plan_id, "program_loaded_or_running": "not_verified"}
-            except Exception as exc:
-                state = "uncertain" if started else "not_attempted"
-                self._audit("upload_failed", plan_id=plan_id, controller_state=state,
-                            error_type=type(exc).__name__)
-                raise RuntimeError(f"Upload failed; controller write state: {state}. "
-                                   "Inspect current bytes before preparing another plan. "
-                                   "The plan is consumed; no automatic retry or rollback occurred.") from None
+        try:
+            controller = self._controller(plan.robot_id)
+            if plan.original_sha256 is None:
+                result = controller.create_file_verified(upload, plan.remote, plan.folder / "preflight_absent.json",
+                    plan.folder / "readback.bin", self.config.max_file_bytes, before_upload)
+            else:
+                result = controller.replace_file_verified(
+                    upload, plan.remote, plan.original_sha256, plan.folder / "preflight.bin",
+                    plan.folder / "readback.bin", self.config.max_file_bytes, before_upload)
+            self._audit("upload_verified", plan_id=plan_id, **result)
+            return {**result, "plan_id": plan_id, "program_loaded_or_running": "not_verified"}
+        except Exception as exc:
+            state = "uncertain" if started else "not_attempted"
+            self._audit("upload_failed", plan_id=plan_id, controller_state=state,
+                        error_type=type(exc).__name__)
+            raise RuntimeError(f"Upload failed; controller write state: {state}. "
+                               "Inspect current bytes before preparing another plan. "
+                               "The plan is consumed; no automatic retry or rollback occurred.") from None

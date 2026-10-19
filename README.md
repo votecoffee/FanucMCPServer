@@ -40,6 +40,11 @@ behind a versioned operation catalog. Compatible feature updates use
 `reload_extensions` in the current MCP session. Host schemas, policy or plugin
 metadata changes require the corresponding host/client update.
 
+The host supports [bounded concurrent requests](docs/REQUEST_CONCURRENCY.md),
+with parallel access to independent controllers and serialized preflight,
+changes and readback for each configured host. Status/cancellation calls have
+their own worker lane; existing approval and single-use change plans still apply.
+
 ## Install
 
 ### Dependencies

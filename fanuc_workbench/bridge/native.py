@@ -51,9 +51,14 @@ class NativeChanges:
     def _client(self, robot_id):
         access = self._access(robot_id)
         with self.client_lock:
-            if robot_id not in self.clients:
-                self.clients[robot_id] = self.factory(access.profile)
-            return self.clients[robot_id]
+            client = self.clients.get(robot_id)
+        if client is None:
+            candidate = self.factory(access.profile)
+            with self.client_lock:
+                client = self.clients.setdefault(robot_id, candidate)
+            if client is not candidate:
+                candidate.close()
+        return client
 
     def _identity(self, robot_id):
         access = self._access(robot_id)
@@ -164,23 +169,24 @@ class NativeChanges:
             return self._capture(robot_id, "program", program, state, folder=folder)
 
     def _freeze(self, robot_id, kind, target, before, proposed, folder, source=None):
-        self.plans = {key: plan for key, plan in self.plans.items() if plan.expires > time.monotonic()}
-        if len(self.plans) >= 64:
-            raise ValueError("Too many pending native plans")
-        payload = canonical({**self._identity(robot_id), "kind": kind, "target": target, "before": before,
-                             "proposed": proposed})
-        checksum = hashlib.sha256(payload).hexdigest()
-        identifier = uuid.uuid4().hex
-        plan = NativePlan(payload, checksum, time.monotonic()+self.bridge.config.plan_ttl_seconds, folder, source)
-        atomic_json(folder / "native_plan.json", {"plan_id": identifier, "proposal": json.loads(payload), "sha256": checksum})
-        self.bridge._audit("native_prepared", robot_id=robot_id, kind=kind, target=target, plan_id=identifier, sha256=checksum)
-        self.plans[identifier] = plan
-        return {"plan_id": identifier, "proposed_sha256": checksum, "proposal": json.loads(payload),
-                "status": "prepared_only", "requires_user_approval": True, "controller_written": False,
-                "review_path": str(folder / "native_plan.json")}
+        with self.bridge._lock:
+            self.plans = {key: plan for key, plan in self.plans.items() if plan.expires > time.monotonic()}
+            if len(self.plans) >= 64:
+                raise ValueError("Too many pending native plans")
+            payload = canonical({**self._identity(robot_id), "kind": kind, "target": target, "before": before,
+                                 "proposed": proposed})
+            checksum = hashlib.sha256(payload).hexdigest()
+            identifier = uuid.uuid4().hex
+            plan = NativePlan(payload, checksum, time.monotonic()+self.bridge.config.plan_ttl_seconds, folder, source)
+            atomic_json(folder / "native_plan.json", {"plan_id": identifier, "proposal": json.loads(payload), "sha256": checksum})
+            self.bridge._audit("native_prepared", robot_id=robot_id, kind=kind, target=target, plan_id=identifier, sha256=checksum)
+            self.plans[identifier] = plan
+            return {"plan_id": identifier, "proposed_sha256": checksum, "proposal": json.loads(payload),
+                    "status": "prepared_only", "requires_user_approval": True, "controller_written": False,
+                    "review_path": str(folder / "native_plan.json")}
 
     def prepare_register(self, robot_id, target, change, expected_sha256):
-        with self.bridge._lock, self.bridge._robot_lock(robot_id):
+        with self.bridge._robot_lock(robot_id):
             self._access(robot_id, target=target)
             reference = self._reference(robot_id, "register", target, expected_sha256)
             before = self._client(robot_id).call("read_register", target=target)
@@ -201,7 +207,7 @@ class NativeChanges:
             data = stream.read(min(1024*1024, self.bridge.config.max_file_bytes)+1)
         proposal = validate_source(data)
         name = proposal["program"]
-        with self.bridge._lock, self.bridge._robot_lock(robot_id):
+        with self.bridge._robot_lock(robot_id):
             self._access(robot_id, program=name)
             reference = self._reference(robot_id, "program", name, expected_sha256)
             folder = self.bridge._folder()
@@ -217,10 +223,11 @@ class NativeChanges:
             return self._freeze(robot_id, "program", name, before, proposal, folder, data)
 
     def review(self, plan_id, approved_sha256):
-        plan = self.plans.get(plan_id)
-        if plan is None or plan.expires <= time.monotonic() or plan.sha256 != approved_sha256:
-            raise ValueError("Unknown, expired or mismatched native plan")
-        return {"plan_id": plan_id, "proposed_sha256": plan.sha256, "proposal": json.loads(plan.payload)}
+        with self.bridge._lock:
+            plan = self.plans.get(plan_id)
+            if plan is None or plan.expires <= time.monotonic() or plan.sha256 != approved_sha256:
+                raise ValueError("Unknown, expired or mismatched native plan")
+            return {"plan_id": plan_id, "proposed_sha256": plan.sha256, "proposal": json.loads(plan.payload)}
 
     def cancel(self, plan_id):
         with self.bridge._lock:
@@ -238,73 +245,80 @@ class NativeChanges:
             plan = self.plans[plan_id]
             value = json.loads(plan.payload)
             robot_id, target = value["robot_id"], value["target"]
-            if any(value.get(key) != item for key, item in self._identity(robot_id).items()):
-                raise ValueError("Native plan belongs to an earlier endpoint")
-            self._access(robot_id, **({"target": target} if value["kind"] == "register" else {"program": target}))
-            with self.bridge._robot_lock(robot_id):
-                folder = self.bridge._folder()
-                if value["kind"] == "register":
-                    before = self._client(robot_id).call("read_register", target=target)
-                else:
-                    before = self._program_state(robot_id, target, folder)
-                if before != value["before"]:
-                    raise ValueError("Native target changed after approval; retrieve and prepare again")
-                atomic_json(folder / "preflight.json", {**self._identity(robot_id), "target": target, "value": before})
-                # Audit failure prevents a vendor write and leaves the plan available.
+        with self.bridge._robot_lock(robot_id):
+            with self.bridge._lock:
+                self.review(plan_id, approved_sha256)
+                if any(value.get(key) != item for key, item in self._identity(robot_id).items()):
+                    raise ValueError("Native plan belongs to an earlier endpoint")
+                self._access(robot_id, **({"target": target} if value["kind"] == "register" else {"program": target}))
+            folder = self.bridge._folder()
+            if value["kind"] == "register":
+                before = self._client(robot_id).call("read_register", target=target)
+            else:
+                before = self._program_state(robot_id, target, folder)
+            if before != value["before"]:
+                raise ValueError("Native target changed after approval; retrieve and prepare again")
+            atomic_json(folder / "preflight.json", {**self._identity(robot_id), "target": target, "value": before})
+            # Cancellation/expiration may win while preflight reads are in progress.
+            # Claim the plan and persist the start event together before a vendor write.
+            with self.bridge._lock:
+                self.review(plan_id, approved_sha256)
                 self.bridge._audit("native_commit_started", robot_id=robot_id, target=target,
                                    plan_id=plan_id, sha256=plan.sha256)
                 self.plans.pop(plan_id)
-                try:
-                    if value["kind"] == "register":
-                        result = self._client(robot_id).call("write_register", target=target,
-                            expected=before, proposed=value["proposed"]["value"])
-                        if not register_matches(result["value"], value["proposed"]["value"]):
-                            raise RuntimeError("Native register readback does not match the approved proposal")
-                        result["capture"] = self._capture(robot_id, "register", target, result["value"], folder=folder)
-                    else:
-                        (folder / "load").mkdir()
-                        path = folder / "load" / (target + ".LS")
-                        with path.open("xb") as stream:
-                            stream.write(plan.source)
-                            stream.flush()
-                            os.fsync(stream.fileno())
-                        if hashlib.sha256(path.read_bytes()).hexdigest() != value["proposed"]["source_sha256"]:
-                            raise ValueError("Frozen program source changed")
-                        guard = self._client(robot_id).call("program_load_preflight", name=target,
-                                                           expected_programs=before["program"])
-                        transfer = self.bridge._controller(robot_id).upload_ascii_program(path, target)
-                        after_folder = self.bridge._folder()
-                        after = self._program_state(robot_id, target, after_folder)
-                        if not after["exists"]:
-                            raise RuntimeError("Native loader did not produce a compiled program")
-                        comparison = verify_listing(plan.source, (after_folder / (target + ".LS")).read_bytes())
-                        if not comparison["matches"]:
-                            atomic_json(after_folder / "listing_verification.json", comparison)
-                            raise RuntimeError("Program loaded but LS readback differs; inspect before further changes")
-                        loaded = {"status": "controller_ascii_load_verified", "preflight": guard,
-                                  "transfer": transfer, "executed": False}
-                        result = {"status": "verified", "native_loader": loaded, "listing_verification": comparison,
-                                  "capture": self._capture(robot_id, "program", target, after, folder=after_folder), "executed": False}
-                    atomic_json(folder / "readback.json", result)
-                    self.bridge._audit("native_commit_verified", robot_id=robot_id, target=target, plan_id=plan_id)
-                    return {**result, "plan_id": plan_id, "robot_id": robot_id, "target": target,
-                            "proposed_sha256": plan.sha256, "evidence_path": str(folder)}
-                except Exception as exc:
-                    failure = {"error_type": type(exc).__name__, "state": "inspect_before_retry"}
-                    if isinstance(exc, NativeApiError):
-                        failure["native_api"] = exc.details
-                    atomic_json(folder / "failure.json", failure)
-                    self.bridge._audit("native_commit_failed", robot_id=robot_id, target=target, plan_id=plan_id,
-                                       error_type=type(exc).__name__)
-                    raise RuntimeError("Native change failed or verification is incomplete; plan consumed. Inspect preserved evidence and the controller before another change") from None
+            try:
+                if value["kind"] == "register":
+                    result = self._client(robot_id).call("write_register", target=target,
+                        expected=before, proposed=value["proposed"]["value"])
+                    if not register_matches(result["value"], value["proposed"]["value"]):
+                        raise RuntimeError("Native register readback does not match the approved proposal")
+                    result["capture"] = self._capture(robot_id, "register", target, result["value"], folder=folder)
+                else:
+                    (folder / "load").mkdir()
+                    path = folder / "load" / (target + ".LS")
+                    with path.open("xb") as stream:
+                        stream.write(plan.source)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    if hashlib.sha256(path.read_bytes()).hexdigest() != value["proposed"]["source_sha256"]:
+                        raise ValueError("Frozen program source changed")
+                    guard = self._client(robot_id).call("program_load_preflight", name=target,
+                                                       expected_programs=before["program"])
+                    transfer = self.bridge._controller(robot_id).upload_ascii_program(path, target)
+                    after_folder = self.bridge._folder()
+                    after = self._program_state(robot_id, target, after_folder)
+                    if not after["exists"]:
+                        raise RuntimeError("Native loader did not produce a compiled program")
+                    comparison = verify_listing(plan.source, (after_folder / (target + ".LS")).read_bytes())
+                    if not comparison["matches"]:
+                        atomic_json(after_folder / "listing_verification.json", comparison)
+                        raise RuntimeError("Program loaded but LS readback differs; inspect before further changes")
+                    loaded = {"status": "controller_ascii_load_verified", "preflight": guard,
+                              "transfer": transfer, "executed": False}
+                    result = {"status": "verified", "native_loader": loaded, "listing_verification": comparison,
+                              "capture": self._capture(robot_id, "program", target, after, folder=after_folder), "executed": False}
+                atomic_json(folder / "readback.json", result)
+                self.bridge._audit("native_commit_verified", robot_id=robot_id, target=target, plan_id=plan_id)
+                return {**result, "plan_id": plan_id, "robot_id": robot_id, "target": target,
+                        "proposed_sha256": plan.sha256, "evidence_path": str(folder)}
+            except Exception as exc:
+                failure = {"error_type": type(exc).__name__, "state": "inspect_before_retry"}
+                if isinstance(exc, NativeApiError):
+                    failure["native_api"] = exc.details
+                atomic_json(folder / "failure.json", failure)
+                self.bridge._audit("native_commit_failed", robot_id=robot_id, target=target, plan_id=plan_id,
+                                   error_type=type(exc).__name__)
+                raise RuntimeError("Native change failed or verification is incomplete; plan consumed. Inspect preserved evidence and the controller before another change") from None
 
     def reconnect(self, robot_id):
-        with self.bridge._lock, self.bridge._robot_lock(robot_id), self.client_lock:
-            if self.bridge.operations.jobs.events:
-                raise ValueError("Finish read jobs before reconnecting a native provider")
-            self.bridge._audit("native_reconnected", robot_id=robot_id, invalidated_native_plans=len(self.plans))
-            self.plans.clear()
-            client = self.clients.pop(robot_id, None)
+        with self.bridge._robot_lock(robot_id):
+            with self.bridge._lock:
+                if self.bridge.operations.jobs.events:
+                    raise ValueError("Finish read jobs before reconnecting a native provider")
+                self.bridge._audit("native_reconnected", robot_id=robot_id, invalidated_native_plans=len(self.plans))
+                self.plans.clear()
+            with self.client_lock:
+                client = self.clients.pop(robot_id, None)
             if client:
                 client.close()
             return self.status(robot_id)

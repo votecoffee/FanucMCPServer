@@ -63,6 +63,7 @@ class WorkbenchOperations:
         if robot_id is not None:
             self.bridge._access(robot_id)
         return {"runtime": {"gui_imported": any(name == "PySide6" or name.startswith("PySide6.") for name in sys.modules)},
+                "concurrency": self.bridge.requests.status(),
                 "analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],
                 "live_reads": ["R", "PR", "DI", "DO", "GI", "GO", "AI", "AO", "RI", "RO", "UI", "UO", "F"],
                 "sampling_provider": "auto: native FRRobot if enabled, otherwise files; explicit snpx: digital/group/analog I/O",
@@ -251,7 +252,9 @@ class WorkbenchOperations:
         def work(context):
             folder = self.bridge._folder()
             self.bridge._audit("backup_started", job_id=context.identifier, robot_id=robot_id)
-            with self.bridge._robot_lock(robot_id):
+            with self.bridge._robot_lock(robot_id, timeout=self.bridge.config.robot_lock_timeout_seconds,
+                                         cancel_event=context.cancel):
+                context.check()
                 result = None
                 try:
                     root = BackupService(ScopedReadBackend(self.bridge, robot_id), access.connection_profile()).run(
@@ -387,7 +390,8 @@ class WorkbenchOperations:
             folder = self.bridge._folder()
             sample_ids = []
             try:
-                with self.bridge._robot_lock(robot_id):
+                with self.bridge._robot_lock(robot_id, timeout=self.bridge.config.robot_lock_timeout_seconds,
+                                             cancel_event=context.cancel):
                     for index in range(samples):
                         context.progress(f"Sample {index + 1}/{samples}")
                         remaining = max(0, interval_seconds - (time.monotonic() - self._last_sample_time(robot_id)))
@@ -446,7 +450,7 @@ class WorkbenchOperations:
         rows = []
         total = 0
         if path.exists():
-            with path.open(encoding="utf-8") as stream:
+            with self.bridge._audit_lock, self.bridge.audit_locks.acquire("journal", timeout=15), path.open(encoding="utf-8") as stream:
                 for index, line in enumerate(stream):
                     total = index + 1
                     if offset <= index < offset + limit:

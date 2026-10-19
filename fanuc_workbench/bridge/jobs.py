@@ -6,7 +6,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from fanuc_workbench.bridge.storage import ArtifactStore, RobotLocks, atomic_json, utc_now
+from fanuc_workbench.bridge.storage import ArtifactStore, RequestCancelled, RobotLocks, atomic_json, utc_now
 
 
 class JobCancelled(RuntimeError):
@@ -44,7 +44,7 @@ class JobManager:
         return self.directory / (ArtifactStore.check_id(identifier) + ".json")
 
     def update(self, identifier: str, **changes):
-        with self.lock, self.leases.acquire("metadata-" + identifier):
+        with self.lock, self.leases.acquire("metadata-" + identifier, timeout=15):
             path = self._path(identifier)
             item = json.loads(path.read_text(encoding="utf-8"))
             if changes.get("status") == "cancel_requested" and item["status"] not in {"queued", "running", "cancel_requested"}:
@@ -94,7 +94,7 @@ class JobManager:
                         result = work(context)
                         context.check()
                         self.update(identifier, status="complete", result=result)
-                    except JobCancelled:
+                    except (JobCancelled, RequestCancelled):
                         self.update(identifier, status="cancelled")
                     except Exception as exc:
                         self.update(identifier, status="failed", error_type=type(exc).__name__,

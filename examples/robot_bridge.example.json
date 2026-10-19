@@ -6,6 +6,9 @@
   "max_file_bytes": 16777216,
   "max_backup_files": 5000,
   "max_backup_bytes": 536870912,
+  "max_concurrent_requests": 4,
+  "max_pending_requests": 16,
+  "robot_lock_timeout_seconds": 15,
   "plan_ttl_seconds": 900,
   "robots": {
     "robot1": {

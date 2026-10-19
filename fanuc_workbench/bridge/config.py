@@ -76,6 +76,9 @@ class BridgeConfig:
     approval_mode: str = "chat"
     max_backup_files: int = 5000
     max_backup_bytes: int = 512 * 1024 * 1024
+    max_concurrent_requests: int = 4
+    max_pending_requests: int = 16
+    robot_lock_timeout_seconds: float = 15
 
     @property
     def read_only(self) -> bool:
@@ -199,5 +202,16 @@ class BridgeConfig:
             raise ValueError("max_backup_files must be between 1 and 20000")
         if type(byte_limit) is not int or not 1 <= byte_limit <= 2 * 1024 * 1024 * 1024:
             raise ValueError("max_backup_bytes must be between 1 and 2147483648")
+        workers = data.get("max_concurrent_requests", 4)
+        pending = data.get("max_pending_requests", 16)
+        wait = data.get("robot_lock_timeout_seconds", 15)
+        # Validate without starting worker threads or creating an executor.
+        if type(workers) is not int or not 1 <= workers <= 16:
+            raise ValueError("max_concurrent_requests must be between 1 and 16")
+        if type(pending) is not int or not 0 <= pending <= 128:
+            raise ValueError("max_pending_requests must be between 0 and 128")
+        if type(wait) not in (int, float) or not 0 <= wait <= 60:
+            raise ValueError("robot_lock_timeout_seconds must be between 0 and 60")
         return cls(local_dir("state_dir"), local_dir("source_dir"), robots,
-                   data.get("allow_writes", False), maximum, ttl, approval, file_limit, byte_limit)
+                   data.get("allow_writes", False), maximum, ttl, approval, file_limit, byte_limit,
+                   workers, pending, wait)
