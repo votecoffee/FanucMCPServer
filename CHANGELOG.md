@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Saved connection profiles and desktop preferences now share flushed atomic JSON
+  replacement, preserving the previous saved file when serialization or I/O fails.
 - Added desktop layout reset and a saved horizontal dependency-view divider.
   Preserved intended wide default columns, including Live / Recorder's 520-pixel
   value column, instead of shrinking them during layout setup.

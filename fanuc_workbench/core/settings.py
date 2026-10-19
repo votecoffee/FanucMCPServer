@@ -30,7 +30,22 @@ class SettingsStore:
 
     def save_profiles(self, profiles: list[RobotProfile]) -> None:
         payload = {"profiles": [p.to_dict() for p in profiles]}
-        self.path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        self._write_json(self.path, payload)
+
+    @staticmethod
+    def _write_json(path: Path, payload: dict) -> None:
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
+                                             prefix=f'.{path.stem}-', suffix='.tmp', delete=False) as stream:
+                temporary = Path(stream.name)
+                json.dump(payload, stream, indent=2, allow_nan=False)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
     def preferences(self) -> dict:
         try:
@@ -44,16 +59,7 @@ class SettingsStore:
         if all(data.get(key) == value for key, value in changes.items()):
             return
         data.update(changes)
-        temporary = None
-        try:
-            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=self.path.parent,
-                                             prefix='.desktop-', suffix='.tmp', delete=False) as stream:
-                temporary = Path(stream.name)
-                json.dump(data, stream, indent=2, allow_nan=False)
-            os.replace(temporary, self.preferences_path)
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
+        self._write_json(self.preferences_path, data)
 
     @staticmethod
     def profile_key(profile: RobotProfile) -> dict:

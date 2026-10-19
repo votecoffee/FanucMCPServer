@@ -53,6 +53,9 @@ for the next app session.
 Selection alone is also remembered when no previous successful connection is
 available. Reopening the app selects the profile without automatically connecting.
 Passwords are excluded from saved profiles and desktop preferences.
+Profiles and desktop preferences are flushed to a temporary file before atomic
+replacement. A failed serialization, flush or replacement retains the previous
+saved file and removes the incomplete temporary file.
 
 ## Tables, panes and tabs
 
