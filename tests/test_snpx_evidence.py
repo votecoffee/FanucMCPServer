@@ -263,12 +263,12 @@ def test_same_mcp_session_adds_inspection_and_rolls_back_with_48_tools(tmp_path)
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             assert len(tools) == 48
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
-                assert not response.isError, response
+                assert not response.is_error, response
                 return json.loads(response.content[0].text)
 
             await call('list_operations', {})
@@ -284,10 +284,10 @@ def test_same_mcp_session_adds_inspection_and_rolls_back_with_48_tools(tmp_path)
             result = (await call('run_read_operation', request))['result']
             assert result['supported_trace_valid'] and not result['controller_contacted']
             assert (await session.call_tool('run_read_operation', {**request,
-                'arguments': {**args, 'wire_path': '../wire.json'}})).isError
+                'arguments': {**args, 'wire_path': '../wire.json'}})).is_error
             install_release(tmp_path / 'state/extensions', releases / 'snpx_v1_1_0')
             await call('reload_extensions', {})
-            assert (await session.call_tool('run_read_operation', request)).isError
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools
+            assert (await session.call_tool('run_read_operation', request)).is_error
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools
 
     asyncio.run(scenario())

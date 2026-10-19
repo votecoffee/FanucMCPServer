@@ -67,8 +67,8 @@ with RobotBridge.from_config(Path(sys.argv[1]), lambda profile: robot) as bridge
     settings = json.loads((state / "settings.json").read_text())
 
     def data(result):
-        assert not result.isError, result.model_dump_json()
-        return result.structuredContent or json.loads(result.content[0].text)
+        assert not result.is_error, result.model_dump_json()
+        return result.structured_content or json.loads(result.content[0].text)
 
     async def scenario():
         from mcp import ClientSession, StdioServerParameters
@@ -94,9 +94,9 @@ with RobotBridge.from_config(Path(sys.argv[1]), lambda profile: robot) as bridge
                 clients.append(client)
             owner, other = clients
             data(await owner.call_tool("refresh_services"))
-            before = (await owner.list_tools()).model_dump()
+            before = (await owner.list_tools()).model_dump(by_alias=True)
             context = data(await owner.call_tool("acquire_service", {"service_id": "fanuc-mcp-server"}))["context_id"]
-            assert (await other.call_tool("acquire_service", {"service_id": "fanuc-mcp-server"})).isError
+            assert (await other.call_tool("acquire_service", {"service_id": "fanuc-mcp-server"})).is_error
 
             async def call(name, arguments, request_id=None, client=owner):
                 tool_id = "fanuc-mcp-server/" + name
@@ -107,7 +107,7 @@ with RobotBridge.from_config(Path(sys.argv[1]), lambda profile: robot) as bridge
                     payload["request_id"] = request_id
                 return await client.call_tool("call_write_tool" if request_id else "call_read_tool", payload)
 
-            assert (await call("list_robots", {}, client=other)).isError
+            assert (await call("list_robots", {}, client=other)).is_error
             data(await owner.call_tool("refresh_capabilities", {"service_id": "fanuc-mcp-server", "context_id": context}))
             matches = data(await owner.call_tool("search_tools", {
                 "service_id": "fanuc-mcp-server", "kind": "capability", "query": "core.files.replace"}))["matches"]
@@ -129,8 +129,8 @@ with RobotBridge.from_config(Path(sys.argv[1]), lambda profile: robot) as bridge
             data(await owner.call_tool("refresh_capabilities", {"service_id": "fanuc-mcp-server", "context_id": context}))
             assert (await feature_match())["capability_revision"] != original_match["capability_revision"]
             assert (await owner.call_tool("describe_capability", {"service_id": "fanuc-mcp-server",
-                "capability_id": "demo.read", "capability_revision": original_match["capability_revision"]})).isError
-            assert (await call("run_read_operation", arguments)).isError
+                "capability_id": "demo.read", "capability_revision": original_match["capability_revision"]})).is_error
+            assert (await call("run_read_operation", arguments)).is_error
             operation = data(await call("describe_operation", {"operation_id": "demo.read"}))
             arguments["revision"] = operation["revision"]
             assert data(await call("run_read_operation", arguments))["result"] == {"value": "updated"}
@@ -153,15 +153,15 @@ with RobotBridge.from_config(Path(sys.argv[1]), lambda profile: robot) as bridge
             data(await owner.call_tool("refresh_services"))
             result = await call("commit_change", {"plan_id": plan["plan_id"],
                 "approved_sha256": plan["proposed_sha256"]}, "commit-fixture")
-            assert result.isError is (not approved)
+            assert result.is_error is (not approved)
             assert len(prompts) == 1 and foreign_prompts == []
             expected = PROPOSED if approved else ORIGINAL
             assert data(await call("read_file", {"robot_id": "fixture", "path": "md:MAIN.LS"}))["sha256"] == digest(expected)
             assert (await call("commit_change", {"plan_id": plan["plan_id"],
-                "approved_sha256": plan["proposed_sha256"]}, "commit-fixture")).isError
+                "approved_sha256": plan["proposed_sha256"]}, "commit-fixture")).is_error
             data(await owner.call_tool("get_request_status", {"request_id": "commit-fixture"}))
             assert len(prompts) == 1
-            assert (await owner.list_tools()).model_dump() == before
+            assert (await owner.list_tools()).model_dump(by_alias=True) == before
             data(await owner.call_tool("release_service", {"service_id": "fanuc-mcp-server", "context_id": context}))
 
     with (tmp_path / "broker.log").open("wb") as log:

@@ -216,11 +216,11 @@ def test_same_mcp_session_loads_handshake_and_rolls_back_without_tool_changes(tm
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
-                assert not response.isError, response
+                assert not response.is_error, response
                 return json.loads(response.content[0].text)
 
             imported = await call('import_workspace', {'source_folder': 'fixture'})
@@ -234,11 +234,11 @@ def test_same_mcp_session_loads_handshake_and_rolls_back_without_tool_changes(tm
             result = (await call('run_read_operation', request))['result']
             assert result['items'][0]['status'] == 'ack_observed' and not result['physical_timing_verified']
             assert (await session.call_tool('run_read_operation', {**request,
-                'arguments': {**request['arguments'], 'path': '../outside'}})).isError
+                'arguments': {**request['arguments'], 'path': '../outside'}})).is_error
             (Path(imported['root']) / 'recording.json').write_text('{}')
-            assert (await session.call_tool('run_read_operation', request)).isError
+            assert (await session.call_tool('run_read_operation', request)).is_error
             install_release(tmp_path / 'state/extensions', releases / 'recording_v1_1_0')
             await call('reload_extensions', {})
-            assert (await session.call_tool('run_read_operation', request)).isError
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools and len(tools) == 48
+            assert (await session.call_tool('run_read_operation', request)).is_error
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 48
     asyncio.run(scenario())

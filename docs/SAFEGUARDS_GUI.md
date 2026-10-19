@@ -44,6 +44,15 @@ validator checks combinations and supported bounds during review. Unknown local
 metadata and other robots are preserved; changing a displayed default does not
 rewrite unrelated settings.
 
+## App-owned framework
+
+The **App framework** tab edits `fanuc-application.json` using the same service
+controls as the broker section below. It preserves backend identity and artifacts
+and stages a new policy revision without activation. Finish/release retained work
+and explicitly refresh the app host. The **Host / broker settings** runtime
+selector also accepts the dedicated app host state for global port/token/request
+limits. See [the framework workflow](APP_FRAMEWORK.md).
+
 ## Optional broker
 
 Select the installed broker's **runtime.json**, then click **Load broker runtime**.

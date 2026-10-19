@@ -46,12 +46,12 @@ def create_server(bridge: RobotBridge):
 async def service_manifest(bridge: RobotBridge, python: Path, config: Path, *, allow_writes=False) -> dict:
     tools = await create_server(bridge).list_tools()
     write_tools = sorted(tool.name for tool in tools
-                         if not tool.annotations or tool.annotations.readOnlyHint is not True)
+                         if not tool.annotations or tool.annotations.read_only_hint is not True)
     variables = sorted({name for access in bridge.config.robots.values()
                         for name in (access.password_env, access.http_read_password_env) if name})
     return {"schema_version": 1, "id": "fanuc-mcp-server", "display_name": "FanucMCPServer",
         "description": "FANUC files, backups, diagnostics and reviewed changes through app-owned policy.",
-        "transport": {"type": "stdio", "command": str(python.resolve()),
+        "transport": {"type": "stdio", "command": str(python.absolute()),
             "args": ["-B", "-m", "fanuc_workbench.bridge.broker_server", "--config", str(config.resolve())],
             "cwd": str(config.resolve().parent), "env_vars": variables},
         "session_mode": "exclusive", "resource_id": "fanuc-mcp-server", "lease_seconds": 900.0,

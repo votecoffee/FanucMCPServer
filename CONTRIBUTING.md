@@ -11,9 +11,14 @@ Use Python 3.11 or newer. From the repository root on Windows:
 
 ```powershell
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev,mcp]"
+.\.venv\Scripts\python.exe -m pip install C:/Packages/universal_codex_tools-0.14.0-py3-none-any.whl
+.\.venv\Scripts\python.exe -m pip install -c packaging/framework-requirements.txt -e ".[dev,mcp]"
 .\.venv\Scripts\python.exe -B -m pytest -q
 ```
+
+Use the verified local framework wheel and tested dependency constraints in
+[the framework guide](docs/APP_FRAMEWORK.md). No universal aggregation plugin is
+required, and development must use an isolated environment.
 
 Tests use synthetic files, simulated controller transports and local MCP
 sessions. Running the suite does not establish controller or commissioning

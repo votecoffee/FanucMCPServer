@@ -206,11 +206,11 @@ def test_same_mcp_session_bundles_upgrades_inspects_and_rolls_back(bridge_case, 
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
-                assert not response.isError, response
+                assert not response.is_error, response
                 return json.loads(response.content[0].text)
 
             core = await call('describe_operation', {'operation_id': 'core.recordings.bundle_evidence'})
@@ -225,10 +225,10 @@ def test_same_mcp_session_bundles_upgrades_inspects_and_rolls_back(bridge_case, 
                 'arguments': {'artifact_id': bundled['artifact_id'], 'path': 'bundle.json'}}
             assert (await call('run_read_operation', request))['result']['all_selected_samples_match_recording']
             (bridge.operations.store.root(bundled['artifact_id']) / 'samples/000/sample.json').write_text('{}')
-            assert (await session.call_tool('run_read_operation', request)).isError
+            assert (await session.call_tool('run_read_operation', request)).is_error
             install_release(config.state_dir / 'extensions', releases / 'recording')
             await call('reload_extensions', {})
-            assert (await session.call_tool('run_read_operation', request)).isError
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools and len(tools) == 48
+            assert (await session.call_tool('run_read_operation', request)).is_error
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 48
     asyncio.run(scenario())
     assert robot.connects == robot.uploads == 0

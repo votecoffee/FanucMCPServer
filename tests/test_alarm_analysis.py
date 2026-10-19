@@ -217,11 +217,11 @@ def test_same_mcp_session_loads_alarm_feature_and_handles_large_page_with_48_too
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
-                assert not response.isError, response
+                assert not response.is_error, response
                 return json.loads(response.content[0].text)
 
             baseline_total = (await call('list_operations', {}))['total']
@@ -235,9 +235,9 @@ def test_same_mcp_session_loads_alarm_feature_and_handles_large_page_with_48_too
             assert result['parsed_alarm_records'] == 100 and len(result['items']) == 100
             assert not result['alarm_occurrences_verified'] and (await call('list_operations', {}))['total'] == baseline_total + 2
             assert (await session.call_tool('run_read_operation', {**request,
-                'arguments': {**request['arguments'], 'path': '../outside'}})).isError
-            assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).isError
+                'arguments': {**request['arguments'], 'path': '../outside'}})).is_error
+            assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).is_error
             (Path(imported['root']) / 'alarm.txt').write_text('changed')
-            assert (await session.call_tool('run_read_operation', request)).isError
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools and len(tools) == 48
+            assert (await session.call_tool('run_read_operation', request)).is_error
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 48
     asyncio.run(scenario())

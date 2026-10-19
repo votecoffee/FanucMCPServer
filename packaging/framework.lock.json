@@ -1,0 +1,13 @@
+{
+  "package": "universal-codex-tools",
+  "version": "0.14.0",
+  "wheel": "universal_codex_tools-0.14.0-py3-none-any.whl",
+  "sha256": "3a64c1730cabf8803345b19e879e7ba65e4d2211616150d60cd7179038456e6b",
+  "dependencies": [
+    "mcp==2.3.0",
+    "jsonschema==4.26.0",
+    "anyio==4.15.1",
+    "PyYAML==6.0.3",
+    "httpx==0.28.1"
+  ]
+}

@@ -164,12 +164,12 @@ def test_same_mcp_session_upgrades_and_rolls_back_without_host_changes(tmp_path)
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             assert len(tools) == 48
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
-                assert not response.isError, response
+                assert not response.is_error, response
                 return json.loads(response.content[0].text)
 
             await call('list_operations', {})  # Seed standard analyses first.
@@ -183,7 +183,7 @@ def test_same_mcp_session_upgrades_and_rolls_back_without_host_changes(tmp_path)
             install_release(tmp_path / 'state/extensions', releases / 'snpx_v1_1_0')
             reloaded = await call('reload_extensions', {})
             assert not reloaded['mcp_tools_changed'] and not reloaded['controller_contacted']
-            assert (await session.call_tool('run_read_operation', old_request)).isError
+            assert (await session.call_tool('run_read_operation', old_request)).is_error
             descriptor = await call('describe_operation', {'operation_id': 'workbench.snpx.compare_words'})
             args = {'before_artifact_id': imported['artifact_id'], 'before_path': 'before.json',
                     'after_artifact_id': imported['artifact_id'], 'after_path': 'after.json',
@@ -197,8 +197,8 @@ def test_same_mcp_session_upgrades_and_rolls_back_without_host_changes(tmp_path)
             # Rollback selects preserved bytes; no client/host restart or tool refresh.
             install_release(tmp_path / 'state/extensions', releases / 'snpx')
             await call('reload_extensions', {})
-            assert (await session.call_tool('run_read_operation', request)).isError
+            assert (await session.call_tool('run_read_operation', request)).is_error
             assert (await call('run_read_operation', old_request))['result']['items'][0]['values'] == [1.0]
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools
 
     asyncio.run(scenario())

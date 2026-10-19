@@ -345,14 +345,14 @@ def test_mcp_stdio_handshake_schemas_and_readonly_policy(tmp_path):
             assert {"list_robots", "list_files", "read_file", "collect_logs", "prepare_upload", "commit_upload",
                     "cancel_upload", "start_backup", "sample_robot", "analyze_workspace", "start_watch",
                     "job_status", "read_artifact", "read_audit", "prepare_restore_file"} <= set(tools)
-            assert "ctx" not in tools["commit_upload"].inputSchema["properties"]
-            assert tools["read_file"].annotations.readOnlyHint
-            assert tools["commit_upload"].annotations.destructiveHint
-            assert tools["commit_upload"].annotations.idempotentHint is False
+            assert "ctx" not in tools["commit_upload"].input_schema["properties"]
+            assert tools["read_file"].annotations.read_only_hint
+            assert tools["commit_upload"].annotations.destructive_hint
+            assert tools["commit_upload"].annotations.idempotent_hint is False
             result = await session.call_tool("list_robots", {})
-            assert not result.isError
+            assert not result.is_error
             assert json.loads(result.content[0].text) == {"allow_writes": False, "write_scope": "allowlisted", "robots": []}
             denied = await session.call_tool("read_file", {"robot_id": "unknown", "path": "md:MAIN.LS"})
-            assert denied.isError
+            assert denied.is_error
 
     asyncio.run(scenario())

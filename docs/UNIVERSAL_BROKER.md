@@ -5,6 +5,11 @@ The desktop and Python API also run independently. Universal Tools from
 [CodexMCPBroker](https://github.com/votecoffee/CodexMCPBroker) is an optional
 discovery and routing layer over the same FANUC services.
 
+The shared development direction is an [app-owned framework](APP_FRAMEWORK.md),
+using the pinned 0.14.0 package and SDK 2.3.0 without a Universal Tools plugin.
+This guide describes the existing direct aggregation adapter. Aggregating the
+new framework host needs separate nested-policy, discovery and host assessment.
+
 ## Installation routes
 
 Build the normal [offline plugin bundle](ROBOT_PLUGIN_SETUP.md), then choose:

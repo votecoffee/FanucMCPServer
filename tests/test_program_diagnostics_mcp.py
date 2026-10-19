@@ -31,10 +31,10 @@ def test_same_mcp_session_reloads_all_six_capabilities_and_can_roll_back(tmp_pat
             env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader,writer),ClientSession(reader,writer) as session:
             await session.initialize()
-            tools=[tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools=[tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             async def call(name,args):
                 response=await session.call_tool(name,args)
-                assert not response.isError,response
+                assert not response.is_error,response
                 return json.loads(response.content[0].text)
             imported=await call('import_workspace',{'source_folder':'fixture'})
             staged=install_builtin(tmp_path/'state/extensions','program-logic')
@@ -59,11 +59,11 @@ def test_same_mcp_session_reloads_all_six_capabilities_and_can_roll_back(tmp_pat
             assert not result['preserved_checks_pass']
             result,_=await operation('dependencies',paths=['MAIN.LS','CHILD.LS'],entry_programs=['MAIN'])
             assert result['reachable_programs']==2
-            assert len(tools)==48 and [tool.model_dump() for tool in (await session.list_tools()).tools]==tools
-            assert (await session.call_tool('run_read_operation',{**request,'revision':'stale'})).isError
-            assert (await session.call_tool('run_read_operation',{**request,'arguments':{**request['arguments'],'paths':['../MAIN.LS']}})).isError
+            assert len(tools)==48 and [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]==tools
+            assert (await session.call_tool('run_read_operation',{**request,'revision':'stale'})).is_error
+            assert (await session.call_tool('run_read_operation',{**request,'arguments':{**request['arguments'],'paths':['../MAIN.LS']}})).is_error
             install_builtin(tmp_path/'state/extensions','programs')
             await call('reload_extensions',{})
-            assert (await session.call_tool('describe_operation',{'operation_id':'workbench.programs.trace'})).isError
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools]==tools
+            assert (await session.call_tool('describe_operation',{'operation_id':'workbench.programs.trace'})).is_error
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]==tools
     asyncio.run(scenario())

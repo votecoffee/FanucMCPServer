@@ -188,11 +188,11 @@ def test_same_mcp_session_loads_compares_rolls_back_and_checks_both_artifacts(tm
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(repo)})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
-                assert not response.isError, response
+                assert not response.is_error, response
                 return json.loads(response.content[0].text)
 
             baseline_total = (await call('list_operations', {}))['total']
@@ -210,12 +210,12 @@ def test_same_mcp_session_loads_compares_rolls_back_and_checks_both_artifacts(tm
             assert (await call('list_operations', {}))['total'] == baseline_total + 2
             for field in ('baseline_path', 'candidate_path'):
                 assert (await session.call_tool('run_read_operation', {**request,
-                    'arguments': {**request['arguments'], field: '../outside'}})).isError
-            assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).isError
+                    'arguments': {**request['arguments'], field: '../outside'}})).is_error
+            assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).is_error
             install_release(release_root, repo / 'fanuc_workbench/extensions/alarms', packaged=True)
             await call('reload_extensions', {})
             assert (await call('list_operations', {}))['total'] == baseline_total + 1
-            assert (await session.call_tool('run_read_operation', request)).isError
+            assert (await session.call_tool('run_read_operation', request)).is_error
             legacy = await call('describe_operation', {'operation_id': 'workbench.alarms.analyze'})
             install_builtin(release_root, 'alarms')
             await call('reload_extensions', {})
@@ -225,7 +225,7 @@ def test_same_mcp_session_loads_compares_rolls_back_and_checks_both_artifacts(tm
                 path = Path(artifact['root']) / 'alarm.txt'
                 data = path.read_bytes()
                 path.write_bytes(b'changed')
-                assert (await session.call_tool('run_read_operation', request)).isError
+                assert (await session.call_tool('run_read_operation', request)).is_error
                 path.write_bytes(data)
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools and len(tools) == 48
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 48
     asyncio.run(scenario())

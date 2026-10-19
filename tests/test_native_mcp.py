@@ -50,7 +50,7 @@ with RobotBridge.from_config(Path(sys.argv[1]), lambda _: backend) as bridge:
             await session.initialize()
             async def call(name, args):
                 result = await session.call_tool(name, args)
-                assert not result.isError, result
+                assert not result.is_error, result
                 return json.loads(result.content[0].text)
             op = await call('describe_operation', {'operation_id': 'core.registers.read'})
             captured = (await call('run_read_operation', {'operation_id': op['id'], 'revision': op['revision'],
@@ -60,8 +60,14 @@ with RobotBridge.from_config(Path(sys.argv[1]), lambda _: backend) as bridge:
                 'arguments': {'robot_id': 'r1', 'target': 'R[999]', 'expected_sha256': captured['sha256'],
                 'change': {'type': 'integer', 'value': 1}}})
             args = {'plan_id': plan['plan_id'], 'approved_sha256': plan['proposed_sha256']}
-            denied = await session.call_tool('commit_change', args)
-            assert denied.isError and not marker.exists()
+            if supports_confirmation:
+                denied = await session.call_tool('commit_change', args)
+                assert denied.is_error
+            else:
+                from mcp.shared.exceptions import MCPError
+                with pytest.raises(MCPError, match='Elicitation not supported'):
+                    await session.call_tool('commit_change', args)
+            assert not marker.exists()
             if supports_confirmation:
                 accepted = await call('commit_change', args)
                 assert accepted['status'] == 'verified' and marker.exists()

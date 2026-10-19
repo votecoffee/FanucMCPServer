@@ -168,6 +168,14 @@ def validate_policy(document, kind, path, broker=None):
         BridgeConfig.from_document(document, path)
     elif kind in {"broker", "broker_limits"}:
         _broker_call(broker, kind, document)
+    elif kind == "application":
+        try:
+            from universal_tools.framework import ApplicationDefinition
+        except ImportError:
+            raise ValueError("Install the app's pinned framework dependency to edit its publication") from None
+        model = ApplicationDefinition.model_validate(document)
+        if model.id != "fanuc-mcp-server" or len(model.backends) != 1 or model.backends[0].service.id != model.id:
+            raise ValueError("Select the FanucMCPServer application publication")
     else:
         raise ValueError("Unknown policy kind")
 
@@ -184,6 +192,20 @@ def load_policy(path, kind="robot", broker=None):
 
 def review_policy(snapshot, document):
     document = copy.deepcopy(document)
+    if snapshot.kind == "application":
+        from fanuc_workbench.bridge.framework_host import POLICY_KEYS, revision
+        before = snapshot.document
+        proposed_service = document["backends"][0]["service"]
+        allowed = copy.deepcopy(before)
+        for key in POLICY_KEYS:
+            if key in proposed_service:
+                allowed["backends"][0]["service"][key] = proposed_service[key]
+            else:
+                allowed["backends"][0]["service"].pop(key, None)
+        if document != allowed:
+            raise ValueError("Only access policy can be edited; publish backend code/identity changes through the app updater")
+        if document != before:
+            document["backends"][0]["revision"] = revision(document["backends"][0])
     validate_policy(document, snapshot.kind, snapshot.path, snapshot.broker)
     if snapshot.path.read_bytes() != snapshot.raw:
         raise ValueError("The policy changed since loading; reload it before review")
@@ -206,7 +228,7 @@ def save_policy(review):
         return snapshot, None
     document = json.loads(review.proposed)
     validate_policy(document, snapshot.kind, snapshot.path, snapshot.broker)
-    if snapshot.kind == "robot":
+    if snapshot.kind in {"robot", "application"}:
         history = snapshot.path.parent / ".fanuc-policy-history"
         history.mkdir(mode=0o700, exist_ok=True)
         with RobotLocks(history / "locks").acquire(str(snapshot.path)):

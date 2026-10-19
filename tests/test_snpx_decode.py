@@ -196,12 +196,12 @@ def test_same_mcp_session_adds_and_updates_decoder_without_tool_changes(tmp_path
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             assert len(tools) == 48
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
-                assert not response.isError, response
+                assert not response.is_error, response
                 return json.loads(response.content[0].text)
 
             await call('list_operations', {})
@@ -228,15 +228,15 @@ def test_same_mcp_session_adds_and_updates_decoder_without_tool_changes(tmp_path
             (updated / 'extension.json').write_text(json.dumps(manifest))
             install_release(tmp_path / 'state/extensions', updated)
             await call('reload_extensions', {})
-            assert (await session.call_tool('run_read_operation', request)).isError
+            assert (await session.call_tool('run_read_operation', request)).is_error
             request['revision'] = (await call('describe_operation', {'operation_id': descriptor['id']}))['revision']
             assert (await call('run_read_operation', request))['result']['items'][0]['values'] == [1.0]
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools
             bad = {**request, 'arguments': {**arguments, 'path': '../outside.json'}}
-            assert (await session.call_tool('run_read_operation', bad)).isError
+            assert (await session.call_tool('run_read_operation', bad)).is_error
             # Captured-file tampering is refused by the host before feature dispatch.
             catalogs = json.loads((tmp_path / 'state/catalog' / (imported['artifact_id'] + '.json')).read_text())
             (Path(catalogs['root']) / 'sample.json').write_text('{}')
-            assert (await session.call_tool('run_read_operation', request)).isError
+            assert (await session.call_tool('run_read_operation', request)).is_error
 
     asyncio.run(scenario())

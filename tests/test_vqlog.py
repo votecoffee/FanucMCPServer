@@ -119,11 +119,11 @@ def test_same_mcp_session_loads_vqlog_without_new_tools_or_controller_access(tmp
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
 
             async def call(name, arguments):
                 result = await session.call_tool(name, arguments)
-                assert not result.isError, result
+                assert not result.is_error, result
                 return json.loads(result.content[0].text)
 
             await call('list_operations', {})
@@ -136,10 +136,10 @@ def test_same_mcp_session_loads_vqlog_without_new_tools_or_controller_access(tmp
             request = {'operation_id': descriptor['id'], 'revision': descriptor['revision'], 'arguments': arguments}
             result = (await call('run_read_operation', request))['result']
             assert result['records_total'] == 2 and result['source_sha256'] == hashlib.sha256(data).hexdigest()
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools
             assert len(tools) == 48
             bad = {**request, 'arguments': {**arguments, 'path': '../outside.txt'}}
-            assert (await session.call_tool('run_read_operation', bad)).isError
+            assert (await session.call_tool('run_read_operation', bad)).is_error
             assert (await call('capabilities', {}))['controller_access']['read_only']
 
     asyncio.run(scenario())

@@ -217,11 +217,11 @@ def test_same_mcp_session_loads_summary_with_48_tools_and_checks_artifact_hashes
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
-                assert not response.isError, response
+                assert not response.is_error, response
                 return json.loads(response.content[0].text)
 
             baseline_total = (await call('list_operations', {}))['total']
@@ -234,13 +234,13 @@ def test_same_mcp_session_loads_summary_with_48_tools_and_checks_artifact_hashes
             result = (await call('run_read_operation', request))['result']
             assert result['items'][0]['adjacent_changes'] == 1 and not result['controller_contacted']
             assert (await call('list_operations', {}))['total'] == baseline_total + 3
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools
             assert len(tools) == 48
             assert (await session.call_tool('run_read_operation', {**request,
-                'arguments': {**arguments, 'path': '../outside.json'}})).isError
-            assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).isError
+                'arguments': {**arguments, 'path': '../outside.json'}})).is_error
+            assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).is_error
             (Path(imported['root']) / 'recording.json').write_text('{}')
-            assert (await session.call_tool('run_read_operation', request)).isError
+            assert (await session.call_tool('run_read_operation', request)).is_error
             assert (await call('capabilities', {}))['controller_access']['read_only']
 
     asyncio.run(scenario())

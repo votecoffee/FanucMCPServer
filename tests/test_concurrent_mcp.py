@@ -51,29 +51,29 @@ with RobotBridge.from_config(Path(sys.argv[1]),lambda profile:robots[profile.hos
             env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':os.pathsep.join([str(repo),str(repo/'tests')])})
         async with stdio_client(params) as (reader,writer),ClientSession(reader,writer,elicitation_callback=confirm) as session:
             await session.initialize()
-            before=[tool.model_dump() for tool in (await session.list_tools()).tools]
+            before=[tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             plans=[]
             for name in ('r1','r2'):
                 result=await session.call_tool('prepare_upload',{'robot_id':name,'path':'md:MAIN.LS',
                     'source_file':'MAIN.LS','expected_sha256':digest(ORIGINAL)})
-                assert not result.isError
+                assert not result.is_error
                 plans.append(json.loads(result.content[0].text))
             results=await asyncio.gather(*(session.call_tool('commit_change',{
                 'plan_id':plan['plan_id'],'approved_sha256':plan['proposed_sha256']}) for plan in plans))
-            assert not results[0].isError
-            assert results[1].isError is (not approve_both)
+            assert not results[0].is_error
+            assert results[1].is_error is (not approve_both)
             assert sorted(messages)==['r1','r2']
             for name in ('r1','r2'):
                 result=await session.call_tool('read_file',{'robot_id':name,'path':'md:MAIN.LS'})
-                assert not result.isError
+                assert not result.is_error
                 expected=PROPOSED if approve_both or name=='r1' else ORIGINAL
                 assert json.loads(result.content[0].text)['sha256']==digest(expected)
             described=await session.call_tool('describe_operation',{'operation_id':'core.requests.status'})
             descriptor=json.loads(described.content[0].text)
             status=await session.call_tool('run_read_operation',{'operation_id':descriptor['id'],
                 'revision':descriptor['revision'],'arguments':{}})
-            assert not status.isError and json.loads(status.content[0].text)['result']['recent']
-            assert before==[tool.model_dump() for tool in (await session.list_tools()).tools]
+            assert not status.is_error and json.loads(status.content[0].text)['result']['recent']
+            assert before==[tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             assert len(before)==48
     asyncio.run(scenario())
     audit=[json.loads(line) for line in (tmp_path/'state/audit.jsonl').read_text().splitlines()]

@@ -34,8 +34,8 @@ def test_broker_keeps_direct_schemas_and_exports_explicit_retained_policy(tmp_pa
     config = tmp_path / "policy.json"
     config.write_text(json.dumps({"state_dir": "state", "source_dir": "edits", "robots": {"r1": {"profile": {"host": "192.0.2.1"}, "password_env": "SYNTHETIC_FTP_PASSWORD"}}}))
     async def check(bridge):
-        direct = {tool.name: tool.model_dump() for tool in await direct_server(bridge).list_tools()}
-        broker = {tool.name: tool.model_dump() for tool in await create_server(bridge).list_tools()}
+        direct = {tool.name: tool.model_dump(by_alias=True) for tool in await direct_server(bridge).list_tools()}
+        broker = {tool.name: tool.model_dump(by_alias=True) for tool in await create_server(bridge).list_tools()}
         assert len(direct) == 48 and len(broker) == 49
         assert {name: broker[name] for name in direct} == direct
         assert broker["list_broker_capabilities"]["annotations"]["readOnlyHint"] is True

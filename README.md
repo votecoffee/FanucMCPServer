@@ -62,8 +62,15 @@ Install the desktop application and MCP adapter from source on Windows:
 git clone https://github.com/votecoffee/FanucMCPServer.git
 cd FanucMCPServer
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[mcp]"
+.\.venv\Scripts\python.exe -m pip install C:/Packages/universal_codex_tools-0.14.0-py3-none-any.whl
+.\.venv\Scripts\python.exe -m pip install -c packaging/framework-requirements.txt -e ".[mcp]"
 ```
+
+MCP packages pin **SDK 2.3.0** and **universal-codex-tools 0.14.0**. Obtain
+the verified framework wheel using the [framework guide](docs/APP_FRAMEWORK.md);
+public package-feed availability is not assumed. The separate app-owned host is
+experimental. Source/package upgrades do not migrate installed plugins or live
+connections.
 
 The default distribution includes the desktop dependencies. For a separate
 runtime without Qt, follow the [headless plugin bundle guide](docs/ROBOT_PLUGIN_SETUP.md).
@@ -257,7 +264,7 @@ it requires a compatible controller service/options and never changes assignment
 Install the test dependencies and run the offline suite:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[dev,mcp]"
+.\.venv\Scripts\python.exe -m pip install -c packaging/framework-requirements.txt -e ".[dev,mcp]"
 .\.venv\Scripts\python.exe -B -m pytest -q
 ```
 

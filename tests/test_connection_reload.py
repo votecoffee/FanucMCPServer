@@ -217,7 +217,7 @@ def test_real_mcp_refresh_does_not_need_server_restart(tmp_path):
             await client.initialize()
             async def call(name):
                 result = await client.call_tool(name, {})
-                assert not result.isError, result.content
+                assert not result.is_error, result.content
                 return json.loads(result.content[0].text)
             assert (await call('list_robots'))['robots'][0]['host'] == '192.0.2.1'
             document['robots']['r1']['profile']['host'] = '192.0.2.2'

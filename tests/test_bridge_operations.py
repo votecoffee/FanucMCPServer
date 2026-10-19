@@ -401,25 +401,25 @@ finally: bridge.close()
             await session.initialize()
             import base64
             captured = await session.call_tool("read_file", {"robot_id": "r1", "path": "md:MAIN.LS"})
-            assert not captured.isError
+            assert not captured.is_error
             capture = json.loads(captured.content[0].text)
             exact = await session.call_tool("read_captured_file", {"robot_id": "r1", "path": "md:MAIN.LS",
                                                                   "sha256": capture['sha256']})
-            assert not exact.isError and base64.b64decode(json.loads(exact.content[0].text)['base64']) == ORIGINAL
+            assert not exact.is_error and base64.b64decode(json.loads(exact.content[0].text)['base64']) == ORIGINAL
             staged = await session.call_tool("stage_file", {"filename": "MAIN.LS",
                 "data_base64": base64.b64encode(PROPOSED).decode('ascii'), "expected_sha256": digest(PROPOSED)})
-            assert not staged.isError
+            assert not staged.is_error
             source = json.loads(staged.content[0].text)['source_file']
             prepared = await session.call_tool("prepare_upload", {"robot_id": "r1", "path": "md:MAIN.LS",
                                                                    "source_file": source, "expected_sha256": digest(ORIGINAL)})
-            assert not prepared.isError
+            assert not prepared.is_error
             plan = json.loads(prepared.content[0].text)
             args = {"plan_id": plan["plan_id"], "approved_sha256": plan["proposed_sha256"]}
             denied = await session.call_tool(commit_tool, args)
-            assert denied.isError and not uploaded.exists()
+            assert denied.is_error and not uploaded.exists()
             if client_supports_confirmation:
                 accepted = await session.call_tool(commit_tool, args)
-                assert not accepted.isError and uploaded.exists()
+                assert not accepted.is_error and uploaded.exists()
                 assert all(plan["proposed_sha256"] in message and "md:MAIN.LS" in message for message in messages)
 
     asyncio.run(scenario())

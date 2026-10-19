@@ -41,8 +41,13 @@ Build in a Python environment with pip, setuptools and wheel. This step uses
 the package index to resolve dependency wheels for that Python/Windows version:
 
 ```powershell
-python -B scripts/build_robot_plugin.py --output C:/RobotTools/FanucPluginBundle
+python -B scripts/build_robot_plugin.py --output C:/RobotTools/FanucPluginBundle --framework-wheel C:/Packages/universal_codex_tools-0.14.0-py3-none-any.whl
 ```
+
+The framework wheel must match `packaging/framework.lock.json`; the builder
+checks its SHA-256, metadata and RECORD, then resolves dependencies using the
+committed framework constraints. See [app-owned framework hosting](APP_FRAMEWORK.md).
+The universal aggregation plugin remains optional.
 
 Keep that bundle at a stable path. Install with the matching Python version;
 the setup script verifies file hashes and installs only from bundled wheels:

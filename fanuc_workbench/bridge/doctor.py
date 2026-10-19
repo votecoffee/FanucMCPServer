@@ -25,10 +25,10 @@ async def diagnose(config: Path, probe: str | None = None) -> dict:
         await session.initialize()
         tools = await session.list_tools()
         robots = await session.call_tool("list_robots", {})
-        if robots.isError:
+        if robots.is_error:
             raise RuntimeError("Robot configuration tool failed")
         capabilities = await session.call_tool("capabilities", {})
-        if capabilities.isError:
+        if capabilities.is_error:
             raise RuntimeError("Runtime capability check failed")
         runtime = json.loads(capabilities.content[0].text)["runtime"]
         names = [tool.name for tool in tools.tools]
@@ -42,7 +42,7 @@ async def diagnose(config: Path, probe: str | None = None) -> dict:
                   "client_confirmation_ui": "verify separately in your chat client"}
         if probe is not None:
             checked = await session.call_tool("probe_robot", {"robot_id": probe})
-            if checked.isError:
+            if checked.is_error:
                 result.update(status="error", probe={"error": "Probe tool failed"})
             else:
                 result["probe"] = json.loads(checked.content[0].text)

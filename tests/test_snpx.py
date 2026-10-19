@@ -379,12 +379,12 @@ def test_mcp_catalog_reads_snpx_without_adding_tools(controller, tmp_path):
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
-            tools = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             assert len(tools) == 48
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
-                assert not response.isError, response
+                assert not response.is_error, response
                 return json.loads(response.content[0].text)
 
             descriptor = await call('describe_operation', {'operation_id': 'core.snpx.read_words'})
@@ -396,7 +396,7 @@ def test_mcp_catalog_reads_snpx_without_adding_tools(controller, tmp_path):
             assert sampled['values'] == {'GI[1]': 65535, 'AO[1]': -32768}
             assert sampled['value_formats'] == {'GI[1]': 'u16', 'AO[1]': 'i16'}
             assert not sampled['scaling_applied']
-            assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools
     asyncio.run(scenario())
     assert len(seen) == 7
 

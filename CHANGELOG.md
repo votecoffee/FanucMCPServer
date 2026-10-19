@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Upgraded source/packages to MCP SDK 2.3.0 and shared framework 0.14.0, retaining
+  the existing 48-tool standalone contract and standalone plugin. Added an explicit
+  experimental app-owned host with versioned backend publications, verified app
+  deployment files and policy, GUI host policy controls and a fixed discovery
+  front door. Existing installed integrations are not migrated.
+
 - Added an operator-selectable `all_supported` write scope for broad local access
   without exact write lists. Exposed it in the GUI and current policy metadata;
   public defaults remain allowlisted. Preserved read roots, provider selection,

@@ -318,10 +318,10 @@ def test_same_mcp_session_discovers_new_operation_without_tool_schema_changes(tm
             env={**os.environ, 'PYTHONDONTWRITEBYTECODE': '1', 'PYTHONPATH': str(Path(__file__).resolve().parents[1])})
         async with stdio_client(parameters) as (r, w), ClientSession(r, w) as session:
             await session.initialize()
-            before = [tool.model_dump() for tool in (await session.list_tools()).tools]
+            before = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             async def call(name, args):
                 result = await session.call_tool(name, args)
-                assert not result.isError, result
+                assert not result.is_error, result
                 return json.loads(result.content[0].text)
             original = await call('describe_operation', {'operation_id': 'demo.read'})
             old_pid = (await call('list_operations', {}))['extensions'][0]['worker_pid']
@@ -335,8 +335,8 @@ def test_same_mcp_session_discovers_new_operation_without_tool_schema_changes(tm
             result = await call('run_read_operation', {'operation_id': current['id'], 'arguments': {'value': 'new operation'}, 'revision': current['revision']})
             assert result['result']['value'] == 'new operation'
             assert old_pid != (await call('list_operations', {}))['extensions'][0]['worker_pid']
-            assert before == [tool.model_dump() for tool in (await session.list_tools()).tools]
+            assert before == [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             stale = await session.call_tool('run_read_operation', {'operation_id': 'demo.read', 'arguments': {'value': 'old'}, 'revision': original['revision']})
-            assert stale.isError
+            assert stale.is_error
             assert len(before) == 48
     asyncio.run(scenario())

@@ -74,7 +74,7 @@ class PolicyPane(QWidget):
         row.addWidget(self.review_button); row.addWidget(self.save_button); layout.addLayout(row)
         self.config_path.textChanged.connect(self.invalidate_file)
         self.invalidate_file()
-        if path and kind == "robot": self.load_document()
+        if path and kind in {"robot", "application"}: self.load_document()
 
     def invalidate_file(self, *_):
         self.snapshot = self.reviewed = None
@@ -108,6 +108,8 @@ class PolicyPane(QWidget):
     def value(self, path, default):
         result = self.draft
         for key in path:
+            if isinstance(result, list) and isinstance(key, int) and 0 <= key < len(result):
+                result = result[key]; continue
             if not isinstance(result, dict) or key not in result:
                 return copy.deepcopy(default)
             result = result[key]
@@ -115,7 +117,7 @@ class PolicyPane(QWidget):
 
     def put(self, path, value, remove=False):
         target = self.draft
-        for key in path[:-1]: target = target.setdefault(key, {})
+        for key in path[:-1]: target = target[key] if isinstance(target, list) else target.setdefault(key, {})
         if remove: target.pop(path[-1], None)
         else: target[path[-1]] = value
         if path[-2:] == ("profile", "transport") and "port" not in target:
@@ -173,7 +175,7 @@ class PolicyPane(QWidget):
                 if spec.kind == "secret":
                     widget.setEchoMode(QLineEdit.Password); widget.setMaxLength(128)
                 widget.textChanged.connect(lambda text, p=path, k=spec.kind: self.put(p, text, k == "optional" and not text))
-            widget.setObjectName(".".join(path)); widget.setToolTip(spec.hint)
+            widget.setObjectName(".".join(map(str, path))); widget.setToolTip(spec.hint)
             self.widgets[path] = widget
             form.addRow(spec.label, widget)
             if spec.hint:
@@ -202,6 +204,10 @@ class PolicyPane(QWidget):
             self.robot_tabs = QTabWidget(); form.addRow(self.robot_tabs)
             self.robot.currentTextChanged.connect(self.build_robot)
             self.build_robot()
+        elif self.kind == "application":
+            form = self.page("App host access", BROKER_FIELDS, ("backends", 0, "service"))
+            note = QLabel("App-owned framework host, independent of the universal broker. Saving stages a new policy revision. Finish and release retained work, then refresh the app host to apply it. Robot online-write permission remains separate.")
+            note.setWordWrap(True); form.addRow(note)
         else:
             form = self.page("Broker service" if self.kind == "broker" else "Broker server", BROKER_FIELDS if self.kind == "broker" else BROKER_SERVER_FIELDS)
             note = QLabel("Broker policy is separate from robot policy. Stop the broker and reconcile retained work before saving registered settings; refresh/reconnect after saving. Broker server settings affect every registered app.")
@@ -285,7 +291,7 @@ class PolicyPane(QWidget):
         if self.snapshot is None or self.errors: return
         try:
             self.reviewed = review_policy(self.snapshot, self.draft)
-            shown = copy.deepcopy(self.draft)
+            shown = json.loads(self.reviewed.proposed)
             if self.kind == "broker_limits": shown["token"] = "<authentication token hidden>"
             self.preview.setPlainText(f"File: {self.snapshot.path}\nOriginal SHA-256: {self.snapshot.sha256}\nProposed SHA-256: {self.reviewed.sha256}\n\n{self.reviewed.diff}\n\nComplete policy:\n{json.dumps(shown, indent=2)}")
             self.tabs.setCurrentWidget(self.preview); self.save_button.setEnabled(True)
@@ -318,6 +324,7 @@ class SafeguardsDialog(QDialog):
         tabs = QTabWidget(); layout.addWidget(tabs, 1)
         self.robot_policy = PolicyPane("robot", policy_path); tabs.addTab(self.robot_policy, "Robot policy")
         self.robot_policy.saved.connect(self.remember_policy)
+        self.application_policy = PolicyPane("application"); tabs.addTab(self.application_policy, "App framework")
         broker_page = QWidget(); box = QVBoxLayout(broker_page)
         row = QHBoxLayout(); self.broker_runtime_path = QLineEdit(broker_runtime_path)
         row.addWidget(QLabel("Broker runtime.json")); row.addWidget(self.broker_runtime_path, 1)
@@ -329,7 +336,7 @@ class SafeguardsDialog(QDialog):
         self.broker_status = QLabel("Select the installed broker runtime to validate its own policy contract. No daemon or controller is started.")
         self.broker_status.setWordWrap(True); box.addWidget(self.broker_status)
         self.broker_runtime_path.textChanged.connect(self.invalidate_broker)
-        tabs.addTab(broker_page, "Universal broker")
+        tabs.addTab(broker_page, "Host / broker settings")
         guards = QPlainTextEdit(BUILT_IN_GUARDS); guards.setReadOnly(True); tabs.addTab(guards, "Built-in checks")
         buttons = QDialogButtonBox(QDialogButtonBox.Close); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
 
@@ -359,7 +366,7 @@ class SafeguardsDialog(QDialog):
             self.broker_status.setText(f"Could not load broker runtime: {error}")
 
     def reject(self):
-        panes = (self.robot_policy, self.broker_policy, self.broker_limits)
+        panes = (self.robot_policy, self.application_policy, self.broker_policy, self.broker_limits)
         if any(pane.snapshot and (pane.errors or pane.draft != pane.snapshot.document) for pane in panes):
             answer = QMessageBox.question(self, "Unsaved policy edits", "Discard unsaved policy edits?",
                                           QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel)
