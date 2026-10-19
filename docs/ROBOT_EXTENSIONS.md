@@ -95,6 +95,12 @@ The bundled optional [VQLOG feature](VQLOG_ANALYSIS.md) can be staged with
 `reload_extensions`. It adds `workbench.vqlog.analyze` to the operation catalog
 without changing the 48 permanent tools. It is self-contained and read-only.
 
+The optional [text alarm feature](ALARM_ANALYSIS.md) stages with
+`install-builtin alarms`. `workbench.alarms.analyze` reads an explicit saved file,
+retains unrecognized lines, and reports code recurrence with explicit date order,
+fixed UTC offset and file-order assumptions. It is a self-contained MIT release
+using only the standard library; compatible host API 1 sessions can reload it.
+
 The optional [offline SNPX decoder](SNPX_DECODING.md) stages with
 `install-builtin snpx`. Version 1.3.0 supplies `workbench.snpx.decode_words`,
 `workbench.snpx.compare_words` and [wire evidence inspection](SNPX_EVIDENCE.md)

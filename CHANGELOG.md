@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a self-contained MIT `workbench.alarms` feature for bounded selected-log
+  analysis, unrecognized/malformed evidence, explicit date order/UTC offsets,
+  exact microseconds and paginated code recurrence. Parsed records do not verify
+  physical occurrences, clock assumptions or log completeness; 48 tools remain.
 - Added `workbench.recording` 1.2.0 with sampled request/ack analysis, explicit
   scalar states, stale/coobserved/gap/open outcomes and nominal polling-interval
   timing ranges. Physical timing, continuous observation and causation remain

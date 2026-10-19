@@ -9,7 +9,7 @@ from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.extension_release import install_release, load_registry
 
 
-BUILTINS = {'analysis': 'analysis', 'vqlog': 'vqlog', 'snpx': 'snpx_v1_3_0', 'recording': 'recording_v1_2_0'}
+BUILTINS = {'analysis': 'analysis', 'vqlog': 'vqlog', 'snpx': 'snpx_v1_3_0', 'recording': 'recording_v1_2_0', 'alarms': 'alarms'}
 
 
 def install_builtin(root: Path, name: str):

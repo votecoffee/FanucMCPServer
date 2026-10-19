@@ -147,6 +147,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 | Offline SNPX analysis | Reloadable word decoding/comparison, frame inspection and named I/O payload checks with explicit read-order assumptions |
 | Extensions | 48 stable MCP tools, a versioned operation catalog and reloadable feature workers, including 20 workspace analyses |
 | Visual Line Tracking | Optional reloadable VQLOG event analysis, filters, timelines and explicit tick-period assumptions |
+| Alarm logs | Optional reloadable text alarm records and recurrence with explicit date/offset/order assumptions and retained unrecognized lines |
 | Desktop workflows | Fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |
 
 MCP writes default to disabled and require exact target policy, preserved originals,
@@ -185,6 +186,7 @@ it requires a compatible controller service/options and never changes assignment
 - [Recording and referenced-sample evidence bundles](docs/RECORDING_EVIDENCE.md)
 - [Sampled request/ack analysis with gaps and nominal timing](docs/RECORDING_HANDSHAKE.md)
 - [Reloadable VQLOG analysis](docs/VQLOG_ANALYSIS.md)
+- [Reloadable alarm records and recurrence analysis](docs/ALARM_ANALYSIS.md)
 - [Community integration references](docs/COMMUNITY_INTEGRATIONS.md)
 - [Reloadable feature development](docs/ROBOT_EXTENSIONS.md)
 - [Shared-service coverage](docs/ROBOT_BRIDGE_COVERAGE.md)

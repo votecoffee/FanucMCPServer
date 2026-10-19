@@ -18,7 +18,7 @@ reported through `capabilities`.
 | Compare, workspace, parsers | Workspace comparisons, programs, positions, variables, comments, R/PR/frame/I-O evidence | Preserved/hash-checked workspace IDs |
 | Comment/data editing | Separate source copies through existing setters | Generated listings stay offline; no live value/frame writes |
 | Live comments | ComSet preparation/approval/readback with preserved references and target description staleness checks | Exact target/origin and byte/encoding policy; controller-specific ComSet compatibility must be verified |
-| Diagnostics | Health, alarms, recurrence, mastering and DCS evidence | Mastering/DCS read-only |
+| Diagnostics | Health, alarms, recurrence, optional explicit-clock text log analysis, mastering and DCS evidence | Offline record counts and clock assumptions stay unverified; mastering/DCS read-only |
 | Lint and cross references | Lint, dependencies, unused programs, register usage, LS validation and flow | Structural evidence; no compiler |
 | Option inventory | Matches and unknown status | Does not authenticate installed options |
 | EtherNet/IP | Adapter/scanner evidence | No configuration write |
