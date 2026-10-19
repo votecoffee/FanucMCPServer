@@ -18,6 +18,7 @@ from fanuc_workbench.services.transforms import transform_pose_between_frames
 from fanuc_workbench.services.snapshots import capture_snapshot,compare_snapshots
 from fanuc_workbench.services.diagnostics import alarm_intelligence
 from fanuc_workbench.services.display import watch_value
+from fanuc_workbench.services.profiles import copy_profile,profile_signature
 
 def item(v,editable=False):
     x=QTableWidgetItem('' if v is None else str(v))
@@ -177,17 +178,35 @@ class FleetTab(QWidget):
     def sync_workspace(self):pass
     def manager(self):return FleetManager(Path(self.dest.text())/'fleet.json')
     def load_profiles(self):
+        if self.running:
+            self._reload_pending=True
+            return
+        previous={self.table.item(r,0).data(Qt.UserRole):
+            (self.table.item(r,0).checkState(),[self.table.item(r,c).text() for c in range(4,8)])
+            for r in range(self.table.rowCount())}
+        first_load=not getattr(self,'_profiles_loaded',False)
         self.table.setRowCount(0)
         for p in self.owner.profiles:
-            r=self.table.rowCount();self.table.insertRow(r);chk=QTableWidgetItem();chk.setFlags(chk.flags()|Qt.ItemIsUserCheckable);chk.setCheckState(Qt.Checked);self.table.setItem(r,0,chk)
-            for c,v in enumerate([p.name,p.host,p.transport,1440,'','',''] ,start=1):self.table.setItem(r,c,item(v,editable=(c==4)))
+            signature=profile_signature(p)
+            state=previous.get(signature,(Qt.Checked if first_load else Qt.Unchecked,[1440,'','','']))
+            r=self.table.rowCount();self.table.insertRow(r);chk=QTableWidgetItem();chk.setFlags(chk.flags()|Qt.ItemIsUserCheckable);chk.setCheckState(state[0]);chk.setData(Qt.UserRole,signature);self.table.setItem(r,0,chk)
+            for c,v in enumerate([p.name,p.host,p.transport,*state[1]],start=1):self.table.setItem(r,c,item(v,editable=(c==4)))
+        self._profiles_loaded=True
     def _rows(self,checked_only=True):
         out=[]
-        by={p.name:p for p in self.owner.profiles}
+        by={profile_signature(p):p for p in self.owner.profiles}
         for r in range(self.table.rowCount()):
-            if checked_only and self.table.item(r,0).checkState()!=Qt.Checked:continue
-            p=by.get(self.table.item(r,1).text())
-            if p:out.append((r,FleetRobot(p,True,int(self.table.item(r,4).text() or 1440),self.table.item(r,5).text(),'')))
+            enabled=self.table.item(r,0).checkState()==Qt.Checked
+            if checked_only and not enabled:continue
+            p=by.get(self.table.item(r,0).data(Qt.UserRole))
+            if p:
+                try:
+                    interval=int(self.table.item(r,4).text() or 1440)
+                    if not 1<=interval<=525600:raise ValueError()
+                except ValueError:
+                    self.table.setItem(r,7,item('Interval must be 1–525600 minutes'));continue
+                out.append((r,FleetRobot(copy_profile(p),enabled,interval,self.table.item(r,5).text(),'')))
+            else:self.table.setItem(r,7,item('Connection changed; reload profiles'))
         return out
     def backup_checked(self):self._run(self._rows(True))
     def run_due(self):
@@ -196,7 +215,11 @@ class FleetTab(QWidget):
         if self.running or not rows:return
         self.running=True;dest=Path(self.dest.text());dest.mkdir(parents=True,exist_ok=True);mgr=self.manager();mgr.robots=[x[1] for x in self._rows(False)];mgr.save()
         def work(*,progress):return [(idx,mgr.backup_one(fr,dest,progress=progress)) for idx,fr in rows]
-        wk=Worker(work);wk.signals.progress.connect(lambda x:self.log.appendPlainText(x.get('message',str(x)) if isinstance(x,dict) else str(x)));wk.signals.result.connect(self._done);wk.signals.error.connect(lambda e:self.log.appendPlainText(e));wk.signals.finished.connect(lambda:setattr(self,'running',False));self.owner.thread_pool.start(wk)
+        wk=Worker(work);wk.signals.progress.connect(lambda x:self.log.appendPlainText(x.get('message',str(x)) if isinstance(x,dict) else str(x)));wk.signals.result.connect(self._done);wk.signals.error.connect(lambda e:self.log.appendPlainText(e));wk.signals.finished.connect(self._finished);self.owner.thread_pool.start(wk)
+    def _finished(self):
+        self.running=False
+        if getattr(self,'_reload_pending',False):
+            self._reload_pending=False;self.load_profiles()
     def _done(self,rows):
         for r,res in rows:
             self.table.setItem(r,5,item(res.backup));self.table.setItem(r,6,item(res.changed_files));self.table.setItem(r,7,item(res.status+(' — CHANGED' if res.changed_files else '')));self.log.appendPlainText(f'{res.robot}: {res.status}, changed files={res.changed_files} {res.message}')

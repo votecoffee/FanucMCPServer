@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Bound Fleet rows/jobs to displayed connection settings, honored unchecked rows
+  in scheduled backups, preserved choices on reload and deferred row replacement
+  until active jobs finish. Added a shared offline profile catalog for validated
+  edits, unique names, copies and remembered-connection migration.
 - Saved connection profiles and desktop preferences now share flushed atomic JSON
   replacement, preserving the previous saved file when serialization or I/O fails.
 - Added desktop layout reset and a saved horizontal dependency-view divider.

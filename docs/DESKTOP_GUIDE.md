@@ -90,6 +90,18 @@ show their error in the tooltip. Display formatting leaves recorded data intact.
 Use **Add watch row** and **Remove selected watch rows** to change the watch list,
 and drag the vertical splitter to expose more rows.
 
+## Fleet / Scheduler
+
+The **Run** checkbox controls both **Back up checked now** and scheduled backups.
+Set each interval to 1–525600 minutes. Invalid intervals are shown in the row and
+skipped. Enable the in-app scheduler explicitly when ready.
+
+Fleet rows are bound to the connection settings displayed when they were loaded.
+If those settings change, the old row is skipped until profiles are reloaded.
+Reloading preserves choices, intervals and results for unchanged connections;
+new or changed connections start unchecked. A reload requested during an active
+fleet job waits for that job to finish before rebuilding the rows.
+
 ## Backup progress
 
 Backup / History shows an activity indicator during directory discovery, then a
