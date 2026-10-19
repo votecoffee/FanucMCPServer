@@ -9,6 +9,8 @@ deployment through the existing operation catalog. See [native API setup and
 verification limits](ROBOT_NATIVE_API.md). Native access is disabled by default.
 See [controller interfaces and software requirements](CONTROLLER_INTERFACES.md)
 for the FTP/SFTP, HTTP description and native TCP dependencies.
+An [optional HTTP file reader](HTTP_READS.md) can retrieve exactly allowlisted
+MD text files for reads/logs and file-based samples without changing tool schemas.
 
 ## Setup
 

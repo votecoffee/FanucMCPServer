@@ -47,6 +47,10 @@ class RobotAccess:
     native_provider: str = "disabled"
     native_register_targets: tuple[str, ...] = ()
     native_programs: tuple[str, ...] = ()
+    http_read_url: str | None = None
+    http_read_files: tuple[str, ...] = ()
+    http_read_username: str = ""
+    http_read_password_env: str | None = None
 
     def connection_profile(self) -> RobotProfile:
         # Resolve secrets only at connection time; never return them through tools.
@@ -101,6 +105,31 @@ class BridgeConfig:
             if not isinstance(roots, list) or not roots:
                 raise ValueError("At least one explicit remote root is required")
             profile.roots = [remote_path(r.rstrip("/") if r != "/" else r) for r in roots]
+            from fanuc_workbench.services.http_files import read_origin, read_path
+            http_url = item.get("http_read_url")
+            http_files = item.get("http_read_files", [])
+            if not isinstance(http_files, list) or len(http_files) > 64:
+                raise ValueError("HTTP reads require a bounded exact file allowlist")
+            http_files = tuple(remote_path(value) for value in http_files)
+            if len(set(value.casefold() for value in http_files)) != len(http_files):
+                raise ValueError("HTTP read files cannot contain duplicate targets")
+            if http_url is not None:
+                http_url = read_origin(http_url, profile.host)
+                if not http_files:
+                    raise ValueError("An HTTP read origin requires an exact file allowlist")
+            elif http_files:
+                raise ValueError("HTTP read files require an explicit origin")
+            for value in http_files:
+                read_path(value)
+                if not any(under_root(value, root) for root in profile.roots):
+                    raise ValueError("HTTP read files must remain inside configured roots")
+            http_user, http_env = item.get("http_read_username", ""), item.get("http_read_password_env")
+            if (not isinstance(http_user, str) or len(http_user) > 100
+                    or any(ord(char) < 32 or ord(char) == 127 or char == ':' for char in http_user)
+                    or (http_env is not None and (not isinstance(http_env, str)
+                        or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", http_env)))
+                    or bool(http_user) != bool(http_env) or (http_user and http_url is None)):
+                raise ValueError("HTTP authentication requires an explicit username and password environment-variable name")
             writable = tuple(remote_path(p) for p in item.get("writable_files", []))
             if any(not any(under_root(p, r) for r in profile.roots) for p in writable):
                 raise ValueError("Writable files must stay inside configured remote roots")
@@ -139,7 +168,8 @@ class BridgeConfig:
             for name in native_programs:
                 program_name(name)
             robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable, comment_url, targets,
-                creatable, maximum_comment, comment_encoding, native_provider, tuple(native_targets), tuple(native_programs))
+                creatable, maximum_comment, comment_encoding, native_provider, tuple(native_targets), tuple(native_programs),
+                http_url, http_files, http_user, http_env)
 
         def local_dir(key: str) -> Path:
             value = Path(data[key])

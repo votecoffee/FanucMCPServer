@@ -158,8 +158,9 @@ program. Offline analysis, file-transfer success and loader verification each
 have separate limits; none establishes production or commissioning acceptance.
 See the [coverage matrix](docs/ROBOT_BRIDGE_COVERAGE.md) for details.
 
-Default reads and backups use FTP/SFTP; optional HTTP is used for description
-changes. Native data uses FANUC's Robot Object API over TCP. Native access needs
+Default reads and backups use FTP/SFTP. An optional exact-file HTTP reader can
+retrieve generated MD files for reads, logs and file-based samples; HTTP also
+supports reviewed description changes. Native data uses FANUC's Robot Object API over TCP. Native access needs
 licensed PC/controller support, and loading LS source needs ASCII Program Loader.
 See [controller interfaces and software requirements](docs/CONTROLLER_INTERFACES.md)
 for feature-specific dependencies, including SFTP server options.
@@ -170,6 +171,7 @@ for feature-specific dependencies, including SFTP server options.
 - [Headless plugin installation and upgrades](docs/ROBOT_PLUGIN_SETUP.md)
 - [Native controller configuration and verification limits](docs/ROBOT_NATIVE_API.md)
 - [Controller interfaces and software requirements](docs/CONTROLLER_INTERFACES.md)
+- [Optional allowlisted HTTP file reads](docs/HTTP_READS.md)
 - [Reloadable feature development](docs/ROBOT_EXTENSIONS.md)
 - [Shared-service coverage](docs/ROBOT_BRIDGE_COVERAGE.md)
 - [Desktop Plugin SDK](PLUGIN_SDK.md)
@@ -209,3 +211,4 @@ validation, and use sanitized examples suitable for a public repository.
 ## License
 
 [MIT](LICENSE) © 2026 votecoffee.
+Adapted community components retain their [upstream notices and licenses](fanuc_workbench/licenses/THIRD_PARTY_NOTICES.md).

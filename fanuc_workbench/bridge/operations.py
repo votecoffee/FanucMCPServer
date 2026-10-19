@@ -66,6 +66,9 @@ class WorkbenchOperations:
                 "analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],
                 "live_reads": ["R", "PR", "DI", "DO", "GI", "GO", "AI", "AO", "RI", "RO", "UI", "UO", "F"],
                 "sampling_provider": "controller-generated files or explicitly configured native FRRobot API; verify per-operation availability",
+                "http_reads": {"policy": "optional same-host origin and exact MD text-file allowlist",
+                               "scope": "read_file, collect_logs and file-based samples; no listing, backup or write fallback",
+                               "redirects": "refused", "environment_proxies": "disabled"},
                 "native_access": {"operations": ["core.controller.status", "core.controller.sample", "core.controller.programs",
                     "core.registers.read", "core.registers.update", "core.programs.inspect", "core.programs.deploy", "core.controller.reconnect"],
                     "provider": self.bridge._access(robot_id).native_provider if robot_id else "per configured robot",
@@ -331,26 +334,27 @@ class WorkbenchOperations:
                           for name, value in data["values"].items()}
                 return {**data, "values": values, "unavailable_files": [], "source": "native FRRobot TCP API"}
             folder = self.bridge._folder()
-            unavailable = []
+            unavailable, transports = [], {}
             for name in sorted(needed):
                 for root in access.profile.roots:
                     if checkpoint:
                         checkpoint()
                     remote = root + name if root.endswith(":") else root.rstrip("/") + "/" + name
                     try:
-                        self.bridge._controller(robot_id).download_file(
-                            self.bridge._path(robot_id, remote), folder / name, maximum=self.bridge.config.max_file_bytes)
+                        transports[name] = self.bridge._download_read(
+                            robot_id, self.bridge._path(robot_id, remote), folder / name)
                         break
                     except Exception:
                         continue
                 else:
                     unavailable.append(name)
             sample = WorkspaceSampleProvider(folder).sample(specs)
-            atomic_json(folder / "sample.json", serial(sample))
+            atomic_json(folder / "sample.json", {**serial(sample), "file_transports": transports})
             artifact = self.store.register(folder, "sample", robot_id=robot_id)
             self.bridge._audit("sample_captured", robot_id=robot_id, artifact_id=artifact["artifact_id"])
             return {**serial(sample), "artifact_id": artifact["artifact_id"], "unavailable_files": unavailable,
-                    "capture_is_atomic": False, "source": "controller-generated file evidence"}
+                    "capture_is_atomic": False, "source": "controller-generated file evidence",
+                    "file_transports": transports}
 
     def start_watch(self, robot_id: str, expressions: list[str], samples: int = 10,
                     interval_seconds: float = 2.0, cycle_signal: str = "") -> dict:

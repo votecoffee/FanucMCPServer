@@ -11,13 +11,15 @@ desktop automation is used for these controller operations.
 | --- | --- | --- |
 | List/retrieve files, logs and backups; reviewed application-file transfer | FTP, or SFTP when selected in the profile | The controller must provide that server and grant the required file/device access. FTP normally uses TCP 21 plus passive data connections; SFTP normally uses TCP 22. Ports are configurable. |
 | Default R/PR/I/O samples and offline diagnostics | Retrieve controller-generated `NUMREG.VA`, `POSREG.VA`, `IOSTATE.DG` and other evidence over the selected file transport, then parse locally | Availability varies by controller software, file devices and permissions. This does not scrape controller web pages. Captures are sequential and sampling is bounded. |
+| Optional exact-file reads, logs and file-based samples | HTTP(S) generated-file retrieval under `/MD/` with an explicit origin and file allowlist | Disabled by default; same-host origins, bounded bytes and optional separate Basic credentials. No directory listing, backup or write fallback. See [HTTP reads](HTTP_READS.md). |
 | Optional live description/comment changes | HTTP(S) to the controller's `/karel/ComSet` service, followed by fresh file-listing readback | Requires the controller's ComSet service and suitable HTTP/KAREL access settings. Disabled by default; exact origin/targets, byte policy and approval are required. This is a write even though the endpoint uses HTTP GET. |
 | Optional native R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR changes | FANUC Robot Object (`FRRobot.FRCRobot`) through locally installed COM software, which communicates with the controller over TCP/IP | Requires compatible licensed PC software and controller PC Interface support. COM is the local vendor data API, not window control. Vendor software manages the native connection; the app does not implement a raw socket-messaging server. |
 | Reviewed LS program deployment | Selected FTP/SFTP transport to `md:NAME.LS`, with the controller's ASCII loader; native API preflight/catalog checks and TP/LS capture for verification | Requires the native provider as well as compatible controller ASCII loading support. A successful transfer alone does not prove compilation. No program selection or execution occurs. |
 
 The web server is therefore **not required for ordinary file/log retrieval or
 the default file-based samples**. HTTP is used by the optional description-write
-path. Optional native reads use the vendor API even in read-only mode.
+path and, when explicitly enabled, the allowlisted HTTP file reader. Optional
+native reads use the vendor API even in read-only mode.
 
 This project does not install a custom KAREL program or use User Socket
 Messaging, SNPX, EtherNet/IP or OPC UA as its controller transport. Inspecting

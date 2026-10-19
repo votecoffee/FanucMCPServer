@@ -132,6 +132,8 @@ class RobotBridge:
             # Preserve whether HTTP writes are enabled and prohibit scheme changes.
             origin = access["comment_service_url"]
             access["comment_service_url"] = urlsplit(origin).scheme if origin else None
+            origin = access["http_read_url"]
+            access["http_read_url"] = urlsplit(origin).scheme if origin else None
         return policy
 
     def reload_connections(self) -> dict:
@@ -159,11 +161,13 @@ class RobotBridge:
                 endpoints = [{"robot_id": key, "before": {"host": self.config.robots[key].profile.host,
                               "port": self.config.robots[key].profile.port,
                               "timeout": self.config.robots[key].profile.timeout,
-                              "comment_service_url": self.config.robots[key].comment_service_url},
+                              "comment_service_url": self.config.robots[key].comment_service_url,
+                              "http_read_url": self.config.robots[key].http_read_url},
                               "after": {"host": candidate.robots[key].profile.host,
                               "port": candidate.robots[key].profile.port,
                               "timeout": candidate.robots[key].profile.timeout,
-                              "comment_service_url": candidate.robots[key].comment_service_url}}
+                              "comment_service_url": candidate.robots[key].comment_service_url,
+                              "http_read_url": candidate.robots[key].http_read_url}}
                              for key in changed]
                 # Persist the event before applying the in-memory switch. Preserve all evidence.
                 self._audit("connections_reloaded", robot_ids=changed,
@@ -183,7 +187,8 @@ class RobotBridge:
                         "controller_contacted": False, "requires_fresh_reads": True,
                         "connections": [{"robot_id": key, "host": candidate.robots[key].profile.host,
                                          "port": candidate.robots[key].profile.port,
-                                         "comment_service_url": candidate.robots[key].comment_service_url}
+                                         "comment_service_url": candidate.robots[key].comment_service_url,
+                                         "http_read_url": candidate.robots[key].http_read_url}
                                         for key in changed]}
 
     def _access(self, robot_id: str):
@@ -194,6 +199,22 @@ class RobotBridge:
 
     def _controller(self, robot_id: str) -> ControllerService:
         return ControllerService(self._access(robot_id).connection_profile(), self.backend_factory)
+
+    def _download_read(self, robot_id: str, remote: str, local: Path) -> str:
+        access = self._access(robot_id)
+        if access.http_read_url and remote.casefold() in {value.casefold() for value in access.http_read_files}:
+            from fanuc_workbench.services.http_files import HttpFileReader
+            password = ""
+            if access.http_read_password_env:
+                if access.http_read_password_env not in os.environ:
+                    raise ValueError("The HTTP password environment variable is unavailable")
+                password = os.environ[access.http_read_password_env]
+            reader = HttpFileReader(access.http_read_url, access.profile.host, access.profile.timeout,
+                                    username=access.http_read_username, password=password)
+            reader.download_file(remote, local, maximum=self.config.max_file_bytes)
+            return urlsplit(access.http_read_url).scheme
+        self._controller(robot_id).download_file(remote, local, maximum=self.config.max_file_bytes)
+        return access.profile.transport
 
     def _path(self, robot_id: str, value: str, *, write: bool = False, create: bool = False) -> str:
         access = self._access(robot_id)
@@ -249,6 +270,7 @@ class RobotBridge:
             {"id": key, "name": access.profile.name, "host": access.profile.host,
              "port": access.profile.port, "timeout": access.profile.timeout,
              "transport": access.profile.transport, "roots": access.profile.roots,
+             "http_read_url": access.http_read_url, "http_read_files": list(access.http_read_files),
              "writable_files": list(access.writable_files), "comment_targets": list(access.comment_targets),
              "creatable_files": list(access.creatable_files),
              "native_provider": access.native_provider, "native_register_targets": list(access.native_register_targets),
@@ -295,8 +317,9 @@ class RobotBridge:
             local = folder / ("original" + Path(name).suffix.lower())
             self._audit("read_requested", robot_id=robot_id, remote_path=remote)
             try:
-                self._controller(robot_id).download_file(remote, local, maximum=self.config.max_file_bytes)
+                transport = self._download_read(robot_id, remote, local)
                 result = self._display(local, remote)
+                result["transport"] = transport
                 self._audit("read_complete", robot_id=robot_id, remote_path=remote,
                             sha256=result["sha256"], local_path=str(local))
                 atomic_json(self._read_receipt(robot_id, remote, result["sha256"]),
@@ -310,8 +333,12 @@ class RobotBridge:
         if not isinstance(digest, str) or not _HASH.fullmatch(digest):
             raise ValueError("Reference SHA-256 must identify a preserved controller read")
         profile = self._access(robot_id).profile
-        key = json.dumps([robot_id, profile.host.casefold(), profile.port, profile.transport,
-                          remote.casefold() if ":" in remote else remote, digest])
+        fields = [robot_id, profile.host.casefold(), profile.port, profile.transport,
+                  remote.casefold() if ":" in remote else remote, digest]
+        access = self._access(robot_id)
+        if access.http_read_url and remote.casefold() in {value.casefold() for value in access.http_read_files}:
+            fields.append(access.http_read_url)
+        key = json.dumps(fields)
         return self.config.state_dir / "read-receipts" / (hashlib.sha256(key.encode()).hexdigest() + ".json")
 
     def reference_capture(self, robot_id: str, path: str, digest: str) -> dict:

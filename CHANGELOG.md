@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added optional same-host HTTP(S) reads of exact allowlisted MD text files for
+  reads, logs and file samples. Preserved byte hashes, bounded requests, separate
+  optional credentials, redirect/HTML rejection and origin-bound receipts;
+  FTP/SFTP still owns listings, backups and write verification. Included upstream
+  MIT notices for the adapted ONE Robotics retrieval convention.
 - Made masked, malformed, duplicate and nonfinite PR axes explicit as unavailable;
   retained external axes and prevented configuration text from swallowing the
   next line. File-based samples reject incomplete PRs and invalid numeric values.

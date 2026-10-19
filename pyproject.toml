@@ -32,4 +32,4 @@ where = ["."]
 include = ["fanuc_workbench*"]
 
 [tool.setuptools.package-data]
-fanuc_workbench = ["extensions/**/*.json", "extensions/**/*.py"]
+fanuc_workbench = ["extensions/**/*.json", "extensions/**/*.py", "licenses/*.txt", "licenses/*.md"]
