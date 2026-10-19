@@ -64,5 +64,8 @@ The `extensions/snpx_v1_3_0` release adds fixed-port I/O payload comparisons
 under supplied ordering and format assumptions. `wire.py` and `io_evidence.py`
 retain the same Apache-2.0 protocol attribution, license and notice. The previous
 releases remain intact.
+The `extensions/recording_v1_2_0` release preserves the recording 1.1.0
+wire/decoder components and their licenses unchanged. Its added sampled handshake
+analysis is original MIT code and has no protocol or controller dependency.
 It does not use the upstream high-level `connect()` method, which also clears
 assignments. It does not incorporate RMI, Stream Motion or proprietary binaries.

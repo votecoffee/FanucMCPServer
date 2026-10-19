@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `workbench.recording` 1.2.0 with sampled request/ack analysis, explicit
+  scalar states, stale/coobserved/gap/open outcomes and nominal polling-interval
+  timing ranges. Physical timing, continuous observation and causation remain
+  unverified. Preserved prior releases, operation schemas and component licenses.
 - Added `workbench.snpx` 1.3.0 with offline named I/O payload checks under an
   explicit supplied read order, exact signed/unsigned formats, shared-address
   diagnostics, partial/unavailable handling and source snapshots read once.

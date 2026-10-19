@@ -253,6 +253,11 @@ recording and selected sample artifacts for offline review. It resolves referenc
 through the host's artifact store without contacting a controller. See
 [recording evidence bundles](RECORDING_EVIDENCE.md) for limits and host compatibility.
 
+`workbench.recording.handshake` reads saved raw samples with explicit active and
+inactive states. It distinguishes fresh/coobserved/stale acknowledgments, gaps
+and open requests, with nominal timestamp-grid ranges rather than verified
+physical response times. See [sampled handshake analysis](RECORDING_HANDSHAKE.md).
+
 ## Reviewed changes and recovery
 
 Enable writes locally and add exact application paths to writable_files, then

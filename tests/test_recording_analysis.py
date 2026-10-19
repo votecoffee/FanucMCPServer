@@ -194,7 +194,7 @@ def test_self_contained_release_staging_and_handler_contract(tmp_path):
     result = install_builtin(tmp_path, 'recording')
     assert result['status'] == 'staged_only' and not result['controller_contacted']
     assert {row['id'] for row in load_registry(tmp_path)} == {'workbench.analysis', 'workbench.recording'}
-    manifest, _ = load_release(tmp_path / 'releases/workbench.recording/1.1.0', result['manifest_sha256'])
+    manifest, _ = load_release(tmp_path / 'releases/workbench.recording/1.2.0', result['manifest_sha256'])
     assert {'feature.py', 'summary.py', 'LICENSE.txt', 'APACHE-2.0.txt', 'NOTICE.txt'} <= manifest['files'].keys()
     assert manifest['operations'][0]['effect'] == 'read'
     with pytest.raises(ValueError, match='Unknown'):
@@ -233,7 +233,7 @@ def test_same_mcp_session_loads_summary_with_48_tools_and_checks_artifact_hashes
             request = {'operation_id': descriptor['id'], 'revision': descriptor['revision'], 'arguments': arguments}
             result = (await call('run_read_operation', request))['result']
             assert result['items'][0]['adjacent_changes'] == 1 and not result['controller_contacted']
-            assert (await call('list_operations', {}))['total'] == 36
+            assert (await call('list_operations', {}))['total'] == 37
             assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools
             assert len(tools) == 48
             assert (await session.call_tool('run_read_operation', {**request,

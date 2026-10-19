@@ -23,7 +23,7 @@ reported through `capabilities`.
 | Option inventory | Matches and unknown status | Does not authenticate installed options |
 | EtherNet/IP | Adapter/scanner evidence | No configuration write |
 | Monitoring | Samples, watch jobs, trend/timeline/cycle exports, profiles, offline summaries and recording evidence bundles | Two-second minimum; sample links and retained SNPX traces can be inspected offline; physical provenance and I/O wire-value mapping stay unverified |
-| Handshake | Mapping authoring and recording analysis | New local workspace versions; timestamp evidence |
+| Handshake | Mapping authoring, event correlation and optional sampled request/ack analysis | Explicit states and gaps; nominal timestamp-grid ranges; no verified physical timing or causation |
 | Snapshots | Capture and compare | Offline troubleshooting evidence |
 | Commissioning | Checklist versions, baseline packages and comparisons | User-authored evidence; no acceptance approval |
 | Transformations | Finite six-axis frame conversion | Calculation only; physical verification pending |

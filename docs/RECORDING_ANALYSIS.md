@@ -18,7 +18,7 @@ An older host that already supports host API 1 can stage the self-contained
 release through its existing installer:
 
 ```powershell
-python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/recording_v1_1_0
+python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/recording_v1_2_0
 ```
 
 The operation catalog gains `workbench.recording.summarize`; the permanent 48
@@ -27,6 +27,9 @@ Staging or reloading the feature does not install dependencies or contact a robo
 Version 1.1.0 preserves this summary and adds [recording evidence bundle
 inspection](RECORDING_EVIDENCE.md). The original 1.0.0 release remains in
 `extensions/recording` for rollback.
+Version 1.2.0 adds [sampled request/ack analysis](RECORDING_HANDSHAKE.md) with
+explicit states, missing-data handling and nominal timing limits. Version 1.1.0
+also remains preserved under `extensions/recording_v1_1_0`.
 
 ## Use
 
