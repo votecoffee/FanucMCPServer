@@ -57,5 +57,8 @@ The offline inspector in `extensions/snpx_v1_2_0/wire.py` adapts the same pinned
 wire layout for saved-trace diagnostics, hash binding and word-payload
 correlation. Its self-contained release includes `APACHE-2.0.txt` and `NOTICE.txt`,
 alongside the MIT license for the original decoder/comparison code.
+The `extensions/recording_v1_1_0` release retains that wire inspector and decoder
+for portable recording bundle analysis. Its `APACHE-2.0.txt` and `NOTICE.txt`
+preserve the same attribution; original recording/bundle code remains MIT.
 It does not use the upstream high-level `connect()` method, which also clears
 assignments. It does not incorporate RMI, Stream Motion or proprietary binaries.

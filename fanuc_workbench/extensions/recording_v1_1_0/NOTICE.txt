@@ -1,0 +1,16 @@
+FanucMCPServer recording analysis release 1.1.0
+
+Original summary, bundle analysis and entrypoint code:
+Copyright (c) 2026 votecoffee. MIT license in LICENSE.txt.
+
+wire.py adapts the SNPX wire layout from fanuc_ucl:
+Copyright 2026 Bowan Foryt. Apache License 2.0 in APACHE-2.0.txt.
+Source: https://github.com/valstad-shipworks/fanuc_ucl
+Pinned commit: ce5b12ddc5b567d3f9cacf0d19e09e59ec89be4b
+References: src/hmi/proto/wire.rs and src/hmi/proto/ports.rs.
+No separate upstream NOTICE file was present at that revision.
+
+The retained wire inspector adds bounded saved-evidence inspection, protocol
+failure classifications, hash binding and raw-word correlation. This release
+checks selected recording/sample links and invokes that offline inspector.
+No socket, controller handle, write route or assignment setup is included.

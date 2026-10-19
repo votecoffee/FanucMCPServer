@@ -1,6 +1,6 @@
 # Offline watch recording analysis
 
-The optional `workbench.recording` 1.0.0 feature summarizes a saved watch's
+The optional `workbench.recording` feature summarizes a saved watch's
 `recording.json`. It reads preserved samples, opens no controller connection and
 does not modify the input. Local Python and the reloadable MCP operation use
 the same implementation.
@@ -18,12 +18,15 @@ An older host that already supports host API 1 can stage the self-contained
 release through its existing installer:
 
 ```powershell
-python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/recording
+python -B -m fanuc_workbench.bridge.extensions_cli --config C:/RobotTools/bridge.json install C:/path/to/FanucMCPServer/fanuc_workbench/extensions/recording_v1_1_0
 ```
 
 The operation catalog gains `workbench.recording.summarize`; the permanent 48
 MCP tools remain unchanged. See [extension staging and reload](ROBOT_EXTENSIONS.md).
 Staging or reloading the feature does not install dependencies or contact a robot.
+Version 1.1.0 preserves this summary and adds [recording evidence bundle
+inspection](RECORDING_EVIDENCE.md). The original 1.0.0 release remains in
+`extensions/recording` for rollback.
 
 ## Use
 
@@ -103,7 +106,8 @@ most 10^12 seconds. `offset` is nonnegative and `limit` is 1–100. A timing gap
 threshold must be finite and in (0, 86400] seconds.
 
 The self-contained release requires only Python's standard library and includes
-the project's MIT license. No FANUC software option is needed for this offline
+the project's MIT license; 1.1.0 also retains the Apache-2.0 wire component's
+license and notice. No FANUC software option is needed for this offline
 analysis. Collecting a watch still requires its chosen provider's controller
 interfaces and options.
 

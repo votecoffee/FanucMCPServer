@@ -141,7 +141,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 | --- | --- |
 | Files and backups | FTP/SFTP listing, exact file/log capture, backup jobs, manifests, comparisons and reviewed per-file recovery |
 | Offline engineering | LS inspection, lint, cross references, R/PR/frame/comment evidence, mastering/DCS comparisons and documentation packages |
-| Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation, troubleshooting snapshots, offline summaries and hash-checked recording/sample bundles |
+| Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation, troubleshooting snapshots, offline summaries and recording/sample bundle verification |
 | Native controller API | R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR value changes and LS deployment |
 | Experimental SNPX | Optional digital/group/analog I/O samples with explicit word decoding and raw assigned-word reads over TCP; controller compatibility remains unverified |
 | Offline SNPX analysis | Reloadable decoding, comparison and wire-evidence inspection, with explicit layouts, source hashes and unverified mappings |

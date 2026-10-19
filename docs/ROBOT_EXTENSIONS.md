@@ -115,6 +115,11 @@ sample availability, numeric ranges, observed changes and timestamp summaries.
 It distinguishes adjacent changes from differences after missing data and does
 not resolve the recording's sample artifact references. It uses only the standard
 library and can also be staged as a release directory on a host API 1 runtime.
+Version 1.1.0 adds `workbench.recording.inspect_bundle`, checking selected saved
+sample links and retained SNPX wire evidence inside a [portable bundle](RECORDING_EVIDENCE.md).
+Bundle creation is a core operation requiring an updated server runtime; importing
+and analyzing an existing bundle works on host API 1. Release 1.0.0 is preserved
+for rollback.
 
 Use `fanuc_workbench/extensions/analysis/extension.json` as a complete manifest
 example. A small read-only handler looks like:

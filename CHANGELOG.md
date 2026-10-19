@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `workbench.recording` 1.1.0 with portable bundle hash/path checks,
+  recording/sample equality, native value projection, retained SNPX wire
+  inspection, explicit unknown/unavailable evidence and paginated reports.
+  Preserved 1.0.0 unchanged for rollback and retained all component licenses.
 - Added `core.recordings.bundle_evidence` to copy selected recording/sample
   evidence locally with source manifest checks, exact hashes, paging, copy-time
   verification and bounded resource use. The catalog operation requires an
