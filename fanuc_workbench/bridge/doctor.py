@@ -35,6 +35,7 @@ async def diagnose(config: Path, probe: str | None = None) -> dict:
         result = {"status": "ok", "python": sys.version.split()[0], "mcp": importlib.metadata.version("mcp"),
                   "tool_count": len(names), "tools": names, "configured_robots": sorted(loaded.robots),
                   "writes_enabled": loaded.allow_writes, "read_only": loaded.read_only,
+                  "write_scope": loaded.write_scope,
                   "approval_mode": loaded.approval_mode,
                   "controller_contacted": probe is not None, "gui_imported": runtime["gui_imported"],
                   "caller_gui_imported": any(x.startswith("PySide6") for x in sys.modules),

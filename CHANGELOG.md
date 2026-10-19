@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added an operator-selectable `all_supported` write scope for broad local access
+  without exact write lists. Exposed it in the GUI and current policy metadata;
+  public defaults remain allowlisted. Preserved read roots, provider selection,
+  supported write classes, proposal approval, preflight and readback.
+
 - Added a complete GUI editor for robot access policies and optional broker
   permissions/settings, including online-write targets, approval mode, plan
   expiry, transfer/concurrency limits and HTTP/SNPX read scopes. Added validated

@@ -39,12 +39,12 @@ class NativeChanges:
             raise ValueError("Native access is disabled; the operator must configure the frrobot provider")
         if target is not None:
             register_target(target)
-            if not self.bridge.config.allow_writes or target not in access.native_register_targets:
+            if not self.bridge.config.permits_write_target(target, access.native_register_targets):
                 raise ValueError("Native register writes require writes enabled and an exact native_register_targets entry")
         if program is not None:
             program_name(program)
             self.bridge._path(robot_id, "md:" + program + ".TP")
-            if not self.bridge.config.allow_writes or program not in access.native_programs:
+            if not self.bridge.config.permits_write_target(program, access.native_programs):
                 raise ValueError("Native deployment requires writes enabled and an exact native_programs entry")
         return access
 

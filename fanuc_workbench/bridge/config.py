@@ -79,11 +79,16 @@ class BridgeConfig:
     max_concurrent_requests: int = 4
     max_pending_requests: int = 16
     robot_lock_timeout_seconds: float = 15
+    write_scope: str = "allowlisted"
 
     @property
     def read_only(self) -> bool:
         """Whether controller writes are disabled; local artifacts remain writable."""
         return not self.allow_writes
+
+    def permits_write_target(self, target: str, allowlist) -> bool:
+        """Operator scope only; callers still validate supported targets and paths."""
+        return self.allow_writes and (self.write_scope == "all_supported" or target in allowlist)
 
     @classmethod
     def load(cls, path: Path) -> "BridgeConfig":
@@ -99,6 +104,9 @@ class BridgeConfig:
             raise ValueError("Policy and robots must be JSON objects")
         if type(data.get("allow_writes", False)) is not bool:
             raise ValueError("allow_writes must be a JSON boolean")
+        scope = data.get("write_scope", "allowlisted")
+        if not isinstance(scope, str) or scope not in {"allowlisted", "all_supported"}:
+            raise ValueError("write_scope must be allowlisted or all_supported")
         robots = {}
         for robot_id, item in data.get("robots", {}).items():
             if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", robot_id):
@@ -222,4 +230,4 @@ class BridgeConfig:
             raise ValueError("robot_lock_timeout_seconds must be between 0 and 60")
         return cls(local_dir("state_dir"), local_dir("source_dir"), robots,
                    data.get("allow_writes", False), maximum, ttl, approval, file_limit, byte_limit,
-                   workers, pending, wait)
+                   workers, pending, wait, scope)

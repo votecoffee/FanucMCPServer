@@ -46,6 +46,7 @@ def change_endpoint(path, original):
 
 @pytest.mark.parametrize('field,value',[
     ('max_concurrent_requests',2),('max_pending_requests',3),('robot_lock_timeout_seconds',.5),
+    ('write_scope','all_supported'),
 ])
 def test_capacity_changes_require_host_reconnect(reload_case,field,value):
     bridge,_,path,document,contacted=reload_case

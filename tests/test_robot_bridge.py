@@ -351,7 +351,7 @@ def test_mcp_stdio_handshake_schemas_and_readonly_policy(tmp_path):
             assert tools["commit_upload"].annotations.idempotentHint is False
             result = await session.call_tool("list_robots", {})
             assert not result.isError
-            assert json.loads(result.content[0].text) == {"allow_writes": False, "robots": []}
+            assert json.loads(result.content[0].text) == {"allow_writes": False, "write_scope": "allowlisted", "robots": []}
             denied = await session.call_tool("read_file", {"robot_id": "unknown", "path": "md:MAIN.LS"})
             assert denied.isError
 

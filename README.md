@@ -148,9 +148,13 @@ keep their previous policy until reconnected. The **Native Controller** view
 needs its policy loaded again separately.
 
 The setting uses the existing JSON key: `"allow_writes": false` means read-only;
-`true` permits reviewed writes to configured targets. Backups, analysis and local
-staged edits remain available in either mode. Enabling writes keeps the exact
-target allowlists, confirmation and readback checks. `capabilities` and the
+`true` permits reviewed writes. **Controller write scope** selects `allowlisted`
+(the default) or `all_supported` for broad access to supported write targets on
+all configured robots. The broad mode removes the need to maintain exact write
+lists. Keep machine-specific choices in private local policy, rather than changing
+public defaults. Backups, analysis and local staged edits remain available in
+either mode. Configured read roots, explicit providers, supported write classes,
+proposal approval, preflight and readback still apply. `capabilities` and the
 doctor report show the loaded read-only mode. Other desktop upload/restore tools
 retain their own confirmations.
 

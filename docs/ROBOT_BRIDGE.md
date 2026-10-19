@@ -4,6 +4,13 @@ The GUI, local Python API and MCP adapter share controller, parser and analysis
 services. The server exposes 48 tools. Physical-controller acceptance remains
 pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 
+Write-list requirements below describe the default `write_scope: "allowlisted"`.
+For broad access on a trusted local installation, the operator can choose
+`write_scope: "all_supported"` in the [GUI policy editor](SAFEGUARDS_GUI.md).
+This permits supported targets without exact write lists; configured roots,
+providers, supported write classes, proposal approval, preflight and readback
+remain required. Public defaults stay allowlisted.
+
 FanucMCPServer 2.1 / bridge 0.9 adds native data, reviewed R/PR value edits and LS
 deployment through the existing operation catalog. See [native API setup and
 verification limits](ROBOT_NATIVE_API.md). Native access is disabled by default.

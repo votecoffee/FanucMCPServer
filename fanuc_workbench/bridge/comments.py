@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import time
 import uuid
@@ -38,7 +39,9 @@ class CommentChanges:
         bridge = self.bridge
         access = bridge._access(robot_id)
         bridge._path(robot_id, remote)
-        if not bridge.config.allow_writes or not access.comment_service_url or target not in access.comment_targets:
+        if not isinstance(target, str) or not re.fullmatch(r"(?:R|PR|DIN|DOUT|GIN|GOUT|AIN|AOUT|RI|RO|FLG)\[[1-9][0-9]{0,5}\]", target):
+            raise ValueError("Comment target must be an explicit supported register or I/O identifier")
+        if not access.comment_service_url or not bridge.config.permits_write_target(target, access.comment_targets):
             raise ValueError("Live comments require writes enabled, a configured comment service URL and an exact comment target")
         name = remote.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
         if name.upper() not in {"NUMREG.VA", "POSREG.VA", "IOSTATE.DG"}:

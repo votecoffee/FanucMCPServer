@@ -263,7 +263,7 @@ class RobotBridge:
             if not self.config.allow_writes:
                 raise ValueError("Controller writes are disabled by the local bridge configuration")
             allowed = access.creatable_files if create else access.writable_files
-            if value not in allowed:
+            if not self.config.permits_write_target(value, allowed):
                 raise ValueError("Remote file is not explicitly listed in " + ("creatable_files" if create else "writable_files"))
             name = value.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
             if create and (value.startswith("md:") or Path(name).suffix.upper() not in {".TXT", ".CSV"}):
@@ -306,7 +306,7 @@ class RobotBridge:
         return result
 
     def list_robots(self) -> dict:
-        return {"allow_writes": self.config.allow_writes, "robots": [
+        return {"allow_writes": self.config.allow_writes, "write_scope": self.config.write_scope, "robots": [
             {"id": key, "name": access.profile.name, "host": access.profile.host,
              "port": access.profile.port, "timeout": access.profile.timeout,
              "transport": access.profile.transport, "roots": access.profile.roots,

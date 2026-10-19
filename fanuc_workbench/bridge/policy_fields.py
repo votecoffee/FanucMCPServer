@@ -17,6 +17,8 @@ class PolicyField:
 F = PolicyField
 SERVER_FIELDS = (
     F("allow_writes", "Allow reviewed controller writes", "bool", False),
+    F("write_scope", "Controller write scope", "choice", "allowlisted", choices=("allowlisted", "all_supported"),
+      hint="all_supported permits supported targets for every configured robot without maintaining exact write lists. Read roots, providers, supported write classes and proposal verification still apply."),
     F("approval_mode", "Approval method", "choice", "chat", choices=("chat", "elicitation"),
       hint="chat requires exact proposal approval in the calling workflow; elicitation additionally requires the client confirmation form."),
     F("plan_ttl_seconds", "Prepared-change lifetime (seconds)", "int", 900, 1, 3600),
@@ -92,7 +94,7 @@ BUILT_IN_GUARDS = """These checks are part of the supported protocol rather than
 • Supported numeric bounds, protocol framing, payload/schema integrity and immutable feature hashes.
 • Broker authentication, literal loopback binding, context ownership and recovery barriers.
 
-The policy controls configure access, targets, approval method, expiry and resource limits
+The policy controls configure access, exact-list or broad supported-target scope, approval method, expiry and resource limits
 within those contracts. Editing local policy does not authorize a robot change or update an
 already loaded MCP/native session. Save, reconnect/reload deliberately, then retrieve fresh
 evidence and prepare a new change. Broker edits require a stopped broker and reconciled work.

@@ -18,6 +18,7 @@ def test_gui_edits_limits_targets_and_snpx_with_review_and_backup(editor_policy)
     pane.widgets[("max_backup_bytes",)].setValue(2147483648)
     pane.widgets[("plan_ttl_seconds",)].setValue(75)
     pane.widgets[("allow_writes",)].setChecked(True)
+    pane.widgets[("write_scope",)].setCurrentText("all_supported")
     pane.widgets[("approval_mode",)].setCurrentText("chat")
     prefix = ("robots", "r1")
     pane.widgets[prefix + ("native_provider",)].setCurrentText("frrobot")
@@ -33,6 +34,7 @@ def test_gui_edits_limits_targets_and_snpx_with_review_and_backup(editor_policy)
     pane.save_changes()
     updated = BridgeConfig.load(path)
     assert not updated.read_only and updated.plan_ttl_seconds == 75 and updated.max_backup_bytes == 2147483648
+    assert updated.write_scope == "all_supported"
     assert updated.robots["r1"].native_register_targets == ("R[1]", "PR[1,1]")
     assert updated.robots["r1"].snpx_read.word_ranges == ((1, 2),)
     assert json.loads(path.read_text())["robots"]["r2"] == original["robots"]["r2"]

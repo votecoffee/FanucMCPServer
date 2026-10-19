@@ -9,7 +9,7 @@ is made by loading, reviewing or saving these local settings.
 
 | Area | Editable controls |
 | --- | --- |
-| Server safeguards | Online-write permission, chat/client-form approval method, prepared-change expiry, file/backup limits, concurrent/queued requests, controller-lock waiting, evidence/edit directories. |
+| Server safeguards | Online-write permission, exact-list or broad supported-target write scope, chat/client-form approval method, prepared-change expiry, file/backup limits, concurrent/queued requests, controller-lock waiting, evidence/edit directories. |
 | Per-robot connection | Explicit host, transport, port, deadline, username, password environment-variable name, remote read roots, native provider and sample provider. |
 | Per-robot write scope | Exact replacement/creation paths, native R/PR targets, program deployment names and description targets/origin/encoding/size. |
 | HTTP reads | Explicit origin, exact file allowlist, username and credential environment-variable name. |
@@ -18,8 +18,24 @@ is made by loading, reviewing or saving these local settings.
 Clearing **Allow reviewed controller writes** blocks controller uploads,
 description changes, native R/PR changes and native program deployment. Local
 backups, analysis and edit staging remain available. Enabling it still requires
-the exact per-robot target allowlists and the normal proposal/approval workflow.
+the selected target-scope policy and the normal proposal/approval workflow.
 This does not add motion or program execution.
+
+**Controller write scope** defaults to `allowlisted`, requiring the existing exact
+replacement, creation, R/PR, deployment and description lists. An operator may
+select `all_supported` for broad access across all configured robots, including
+robots later added to that policy. Exact write lists remain saved but are not used
+in this mode. Online writes must still be enabled, and native/description providers
+must still be explicitly configured. The mode preserves configured read roots,
+explicit per-request target validation, supported application-file classes,
+storage-only TXT/CSV creation, R/PR typing, program protection, preserved originals,
+approval, preflight, single-use plans and readback. It does not permit arbitrary
+hosts, system/safety file writes, I/O forcing, motion or program execution.
+
+Store a PC-specific broad policy outside Git and select that same file in the
+desktop and MCP runtime. It applies to every chat using that policy after the
+MCP server reconnects; saving alone does not elevate existing sessions. A broker
+write channel is a separate setting when the optional broker route is in use.
 
 The robot selector supports multiple robots, adding/renaming IDs and removing a
 robot from the draft. Target lists use one entry per line. SNPX ranges use
@@ -76,7 +92,7 @@ settings; the history directory is excluded from Git.
 
 The **Built-in checks** page lists integrity requirements rather than permission
 switches: exact source/proposal hashes, single-use plans, commit preflight,
-verified readback, explicit target/path rules, SFTP host-key verification,
+verified readback, explicit per-request target/path validation, SFTP host-key verification,
 supported write classes, protocol bounds, authentication and recovery barriers.
 These remain mandatory. This editor changes app/broker policy, not the Codex
 host's own Full access/approval settings or the controller's safety configuration.
