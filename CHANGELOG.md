@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Extended experimental SNPX sampling to allowlisted GI/GO/AI/AO ports, with
+  mandatory per-target signed/unsigned 16-bit decoding, retained sample format
+  metadata and no engineering-unit scaling. Existing digital reads and the
+  48-tool MCP interface remain compatible; controller acceptance is pending.
 - Added experimental opt-in SNPX digital I/O sampling and catalog-based raw
   assigned-word reads with exact read policy, bounded framing/deadlines, audited
   hash-manifested wire evidence and no automatic fallback. Assignment meaning is

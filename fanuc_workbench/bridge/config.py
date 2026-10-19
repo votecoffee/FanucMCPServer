@@ -175,7 +175,7 @@ class BridgeConfig:
             if not isinstance(sample_provider, str) or sample_provider not in {"auto", "snpx"}:
                 raise ValueError("sample_provider must be auto or snpx")
             if sample_provider == "snpx" and (snpx_read is None or not snpx_read.io_targets):
-                raise ValueError("SNPX sampling requires an explicit SNPX digital I/O allowlist")
+                raise ValueError("SNPX sampling requires an explicit SNPX I/O allowlist")
             robots[robot_id] = RobotAccess(profile, item.get("password_env"), writable, comment_url, targets,
                 creatable, maximum_comment, comment_encoding, native_provider, tuple(native_targets), tuple(native_programs),
                 http_url, http_files, http_user, http_env, snpx_read, sample_provider)

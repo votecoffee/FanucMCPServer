@@ -7,7 +7,7 @@ reported through `capabilities`.
 | Existing area | Chat/API access | Boundary |
 | --- | --- | --- |
 | Native controller data | R/PR/I/O, current position, tasks, alarms and program metadata through FRRobot TCP API | Configured provider; sequential captures; per-section availability errors |
-| Experimental SNPX | Exact digital I/O samples and raw `%R` words through the existing catalog | Explicit read allowlists; hashed wire evidence; no assignments/writes or typed R/PR decoding; controller acceptance pending |
+| Experimental SNPX | Exact digital/group/analog I/O samples and raw `%R` words through the existing catalog | Explicit read allowlists and word decoding; no scaling; hashed evidence; no assignments/writes or typed R/PR decoding; controller acceptance pending |
 | Native changes | Reviewed R/PR values and LS loading/compilation through core plans | Exact target policy; native readback; PR tolerance explicit; no program execution |
 | Feature extensions | Stable MCP catalog, exact-revision read/proposal calls and atomic worker reload; all 20 workspace analyses delegated | Trusted local hash-pinned releases, no arbitrary native write classes; failed reload preserves active features and plans |
 | Controller, FTP/SFTP | Listing, exact retrieval, reviewed application-file replacement and TXT/CSV storage creation | Creation outside MD: with separate exact allowlist; no native load/run acceptance |

@@ -143,7 +143,7 @@ Keep the bridge alive while background jobs run and close it when finished.
 | Offline engineering | LS inspection, lint, cross references, R/PR/frame/comment evidence, mastering/DCS comparisons and documentation packages |
 | Monitoring | Bounded samples, trends, I/O timelines, cycle recordings, alarm correlation and troubleshooting snapshots |
 | Native controller API | R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR value changes and LS deployment |
-| Experimental SNPX | Optional exact digital I/O samples and raw assigned-word reads over TCP; assignment meaning and controller compatibility remain unverified |
+| Experimental SNPX | Optional digital/group/analog I/O samples with explicit word decoding and raw assigned-word reads over TCP; controller compatibility remains unverified |
 | Extensions | 48 stable MCP tools, a versioned operation catalog and reloadable feature workers, including 20 workspace analyses |
 | Visual Line Tracking | Optional reloadable VQLOG event analysis, filters, timelines and explicit tick-period assumptions |
 | Desktop workflows | Fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |

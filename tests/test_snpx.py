@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from fanuc_workbench.services.snpx import SnpxError, SnpxReader, SnpxReadPolicy, bit_target
+from fanuc_workbench.services.snpx import SnpxError, SnpxReader, SnpxReadPolicy, bit_target, io_target
 from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.service import RobotBridge
 from test_robot_bridge import MemoryRobot
@@ -42,10 +42,10 @@ def controller():
                         response = request
                     else:
                         assert request[0:2] == b'\x02\0' and request[31] == 0xc0
-                        assert request[42] == 4 and request[43] in {8, 0x46, 0x48}
+                        assert request[42] == 4 and request[43] in {8, 0x46, 0x48, 0x0A, 0x0C}
                         seq = request[30]
                         segment, index, count = request[43], *struct.unpack_from('<HH', request, 44)
-                        size = count * 2 if segment == 8 else (count + 7) // 8
+                        size = count * 2 if segment in {8, 0x0A, 0x0C} else (count + 7) // 8
                         data = replies.get((segment, index), bytes(size))
                         response = bytearray(56 + (size if size > 6 else 0))
                         struct.pack_into('<HH', response, 0, 3, seq)
@@ -368,7 +368,10 @@ def test_mcp_catalog_reads_snpx_without_adding_tools(controller, tmp_path):
 
     port, seen, replies, _ = controller
     replies[8, 0] = struct.pack('<H', 1234)
-    path, _ = bridge_policy(tmp_path, port)
+    replies[0x0C, 0], replies[0x0A, 1000] = b'\xff\xff', b'\x00\x80'
+    path, _ = bridge_policy(tmp_path, port, snpx_read={'port': port,
+        'io_targets': ['GI[1]', 'AO[1]'], 'io_word_formats': {'GI[1]': 'u16', 'AO[1]': 'i16'},
+        'word_ranges': [{'address': 1, 'count': 1}]})
 
     async def scenario():
         params = StdioServerParameters(command=sys.executable,
@@ -389,6 +392,107 @@ def test_mcp_catalog_reads_snpx_without_adding_tools(controller, tmp_path):
             result = (await call('run_read_operation', {'operation_id': descriptor['id'],
                 'revision': descriptor['revision'], 'arguments': {'robot_id': 'r1', 'address': 1}}))['result']
             assert result['words_u16'] == [1234] and not result['mapping_verified']
+            sampled = await call('sample_robot', {'robot_id': 'r1', 'expressions': ['GI[1]', 'AO[1]']})
+            assert sampled['values'] == {'GI[1]': 65535, 'AO[1]': -32768}
+            assert sampled['value_formats'] == {'GI[1]': 'u16', 'AO[1]': 'i16'}
+            assert not sampled['scaling_applied']
             assert [tool.model_dump() for tool in (await session.list_tools()).tools] == tools
     asyncio.run(scenario())
-    assert len(seen) == 3
+    assert len(seen) == 7
+
+
+@pytest.mark.parametrize('target,expected', [
+    ('GI[1]', (0x0C, 0)), ('GO[1]', (0x0A, 0)),
+    ('AI[1]', (0x0C, 1000)), ('AO[1]', (0x0A, 1000)),
+    ('GI[1000]', (0x0C, 999)), ('GO[1000]', (0x0A, 999)),
+    ('AI[1000]', (0x0C, 1999)), ('AO[1000]', (0x0A, 1999))])
+def test_word_io_offsets_and_boundaries(target, expected):
+    assert io_target(target) == expected
+
+
+@pytest.mark.parametrize('targets,formats', [
+    (['GI[1]'], {}), (['AI[1]'], {'AI[1]': 'float'}),
+    (['GO[1]'], {'GO[1]': 16}), (['AO[1]'], {'AO[1]': None}),
+    (['GI[1]'], {'GI[1]': 'u16', 'DI[1]': 'u16'}),
+    (['DI[1]'], {'DI[1]': 'i16'}), (['GO[1]'], {'GO[2]': 'i16'}),
+    (['AO[1]'], ['i16']), (['AO[1]'], None),
+    (['GI[1001]'], {'GI[1001]': 'u16'}), (['AI[1001]'], {'AI[1001]': 'i16'}),
+    (['GI[0]'], {'GI[0]': 'u16'}), (['AI[01]'], {'AI[01]': 'i16'})])
+def test_word_io_requires_exact_explicit_formats_and_bounded_targets(targets, formats):
+    with pytest.raises(ValueError):
+        SnpxReadPolicy.load({'io_targets': targets, 'io_word_formats': formats})
+
+
+def test_all_word_io_ports_preserve_signedness_and_exact_read_addresses(controller):
+    port, seen, replies, _ = controller
+    cases = [('GI[1000]', 0x0C, 999), ('GO[1000]', 0x0A, 999),
+             ('AI[1]', 0x0C, 1000), ('AO[1]', 0x0A, 1000)]
+    for format_name in ['u16', 'i16']:
+        access = SnpxReadPolicy.load({'port': port, 'io_targets': [name for name, _, _ in cases],
+                                     'io_word_formats': {name: format_name for name, _, _ in cases}})
+        with SnpxReader('127.0.0.1', access, timeout=3) as client:
+            for word in [0, 32767, 32768, 65535]:
+                for target, segment, index in cases:
+                    replies[segment, index] = struct.pack('<H', word)
+                    value = client.read_io(target)
+                    assert type(value) is int
+                    assert value == (word if format_name == 'u16' or word < 32768 else word - 65536)
+    reads = [frame for frame in seen if frame[42] == 4]
+    assert len(reads) == 32
+    assert all(struct.unpack_from('<H', frame, 46)[0] == 1 for frame in reads)
+    assert {(frame[43], struct.unpack_from('<H', frame, 44)[0]) for frame in reads} == {
+        (segment, index) for _, segment, index in cases}
+
+
+def test_mixed_io_sample_retains_decoding_policy_and_raw_evidence(controller, tmp_path):
+    port, seen, replies, _ = controller
+    replies.update({(0x48, 0): b'\x01', (0x46, 8): b'\x00', (0x0C, 0): b'\xff\xff',
+                    (0x0A, 1): b'\x00\x80', (0x0C, 1000): b'\x00\x00', (0x0A, 1001): b'\xff\xff'})
+    targets = ['DI[1]', 'DO[9]', 'GI[1]', 'GO[2]', 'AI[1]', 'AO[2]']
+    formats = {'GI[1]': 'u16', 'GO[2]': 'u16', 'AI[1]': 'i16', 'AO[2]': 'i16'}
+    path, _ = bridge_policy(tmp_path, port, snpx_read={'port': port, 'io_targets': targets, 'io_word_formats': formats})
+    robot = MemoryRobot()
+    with RobotBridge.from_config(path, lambda _: robot) as bridge:
+        result = bridge.operations.sample('r1', targets)
+        assert result['values'] == {'DI[1]': True, 'DO[9]': False, 'GI[1]': 65535,
+                                    'GO[2]': 32768, 'AI[1]': 0, 'AO[2]': -1}
+        assert type(result['values']['AI[1]']) is int
+        assert result['value_formats'] == {'DI[1]': 'bool', 'DO[9]': 'bool', **formats}
+        assert not result['errors'] and not result['scaling_applied']
+        root = bridge.operations.store.verify(result['artifact_id'])
+        wire = (root / 'wire.json').read_bytes()
+        assert result['wire_sha256'] == hashlib.sha256(wire).hexdigest()
+        saved = json.loads((root / 'sample.json').read_text())
+        assert dict(saved['policy']['io_word_formats']) == formats
+        assert saved['value_formats'] == result['value_formats']
+        assert bridge.operations.capabilities('r1')['snpx_reads']['word_io']['units'] == 'raw counts'
+    assert len(seen) == 8 and robot.connects == robot.uploads == 0
+
+
+def test_failed_word_io_is_null_with_partial_sample_and_no_fallback(controller, tmp_path):
+    port, seen, replies, failures = controller
+    replies[0x0C, 0] = b'\x00\x00'
+    failures.extend([lambda frame: frame] * 3 + [lambda frame: frame[:42] + b'\x01' + frame[43:]])
+    targets = ['GI[1]', 'AO[1]', 'AI[1]']
+    path, _ = bridge_policy(tmp_path, port, snpx_read={'port': port, 'io_targets': targets,
+        'io_word_formats': {'GI[1]': 'u16', 'AO[1]': 'i16', 'AI[1]': 'i16'}})
+    robot = MemoryRobot()
+    with RobotBridge.from_config(path, lambda _: robot) as bridge:
+        result = bridge.operations.sample('r1', targets)
+        assert result['values'] == {'GI[1]': 0, 'AO[1]': None, 'AI[1]': None}
+        assert set(result['errors']) == {'AO[1]', 'AI[1]'}
+        assert result['value_formats'] == {'GI[1]': 'u16', 'AO[1]': 'i16', 'AI[1]': 'i16'}
+        assert bridge.operations.store.verify(result['artifact_id'])
+    assert len(seen) == 4 and robot.connects == robot.uploads == 0
+
+
+def test_word_formats_cannot_be_changed_with_endpoint_reload(controller, tmp_path):
+    port, seen, _, _ = controller
+    path, document = bridge_policy(tmp_path, port, snpx_read={'port': port, 'io_targets': ['GI[1]'],
+                                                          'io_word_formats': {'GI[1]': 'u16'}})
+    with RobotBridge.from_config(path) as bridge:
+        document['robots']['r1']['snpx_read']['io_word_formats']['GI[1]'] = 'i16'
+        path.write_text(json.dumps(document), encoding='utf-8')
+        with pytest.raises(ValueError, match='cannot change'):
+            bridge.reload_connections()
+    assert not seen

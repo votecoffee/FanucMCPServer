@@ -60,13 +60,13 @@ class SnpxReads:
     def sample(self, robot_id, expressions, *, checkpoint=None):
         # The caller holds the robot lock and enforces the shared sampling clock.
         access = self._access(robot_id)
-        targets = []
+        targets, formats = [], {}
         for expression in expressions:
             match = WATCH_RE.fullmatch(expression)
             if match is None or match[3]:
-                raise ValueError("SNPX samples support configured digital I/O only")
+                raise ValueError("SNPX samples support configured digital/group/analog I/O only")
             target = f'{match[1].upper()}[{int(match[2])}]'
-            access.snpx_read.check_io(target)
+            formats[expression] = access.snpx_read.io_format(target)
             targets.append(target)
         if len(set(targets)) != len(targets):
             raise ValueError("SNPX samples require distinct targets")
@@ -80,4 +80,5 @@ class SnpxReads:
             errors = {name: 'SNPX read unavailable; capture stopped without fallback'
                       for name, value in values.items() if value is None}
         return self._capture(robot_id, access, client,
-            {'timestamp': time.time(), 'values': values, 'errors': errors, 'unavailable_files': []}, 'sample')
+            {'timestamp': time.time(), 'values': values, 'errors': errors, 'unavailable_files': [],
+             'value_formats': formats, 'scaling_applied': False}, 'sample')

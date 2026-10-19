@@ -22,6 +22,8 @@ class SnpxError(RuntimeError):
 _BITS = {"DI": (0x48, 0, 5000), "DO": (0x46, 0, 5000),
          "RI": (0x48, 5000, 1000), "RO": (0x46, 5000, 1000),
          "UI": (0x48, 6000, 1000), "UO": (0x46, 6000, 1000)}
+_WORDS = {"GI": (0x0C, 0), "GO": (0x0A, 0),
+          "AI": (0x0C, 1000), "AO": (0x0A, 1000)}
 
 
 def bit_target(value: str) -> tuple[int, int]:
@@ -32,6 +34,17 @@ def bit_target(value: str) -> tuple[int, int]:
     index = int(match[2])
     if index > maximum:
         raise ValueError("SNPX digital target exceeds its fixed port address space")
+    return segment, offset + index - 1
+
+
+def io_target(value: str) -> tuple[int, int]:
+    match = re.fullmatch(r"(GI|GO|AI|AO)\[([1-9][0-9]{0,3})\]", value) if isinstance(value, str) else None
+    if not match:
+        return bit_target(value)
+    index = int(match[2])
+    if index > 1000:
+        raise ValueError("SNPX group/analog targets are limited to indices 1-1000")
+    segment, offset = _WORDS[match[1]]
     return segment, offset + index - 1
 
 
@@ -47,13 +60,14 @@ class SnpxReadPolicy:
     port: int = 60008
     io_targets: tuple[str, ...] = ()
     word_ranges: tuple[tuple[int, int], ...] = ()
+    io_word_formats: tuple[tuple[str, str], ...] = ()
 
     @classmethod
     def load(cls, data):
         if data is None:
             return None
-        if not isinstance(data, dict) or set(data) - {"port", "io_targets", "word_ranges"}:
-            raise ValueError("snpx_read requires port, exact io_targets and/or word_ranges")
+        if not isinstance(data, dict) or set(data) - {"port", "io_targets", "word_ranges", "io_word_formats"}:
+            raise ValueError("snpx_read requires port, exact io_targets/word_ranges and optional io_word_formats")
         port, targets, ranges = data.get("port", 60008), data.get("io_targets", []), data.get("word_ranges", [])
         if type(port) is not int or not 1 <= port <= 65535:
             raise ValueError("SNPX port must be an integer between 1 and 65535")
@@ -61,9 +75,14 @@ class SnpxReadPolicy:
                 or not isinstance(ranges, list) or len(ranges) > 256 or not (targets or ranges)):
             raise ValueError("SNPX reads require bounded nonempty exact target/range allowlists")
         for target in targets:
-            bit_target(target)
+            io_target(target)
         if len(set(targets)) != len(targets):
             raise ValueError("Duplicate SNPX I/O targets are not allowed")
+        formats = data.get("io_word_formats", {})
+        word_targets = {target for target in targets if target.split('[', 1)[0] in _WORDS}
+        if (not isinstance(formats, dict) or set(formats) != word_targets
+                or any(not isinstance(value, str) or value not in {"u16", "i16"} for value in formats.values())):
+            raise ValueError("Each allowed GI/GO/AI/AO target requires an explicit u16/i16 io_word_formats entry; no other entries are allowed")
         spans = []
         for item in ranges:
             if not isinstance(item, dict) or set(item) != {"address", "count"}:
@@ -73,7 +92,7 @@ class SnpxReadPolicy:
             if any(address < start + size and start < address + count for start, size in spans):
                 raise ValueError("SNPX word ranges cannot overlap")
             spans.append((address, count))
-        return cls(port, tuple(targets), tuple(spans))
+        return cls(port, tuple(targets), tuple(spans), tuple(sorted(formats.items())))
 
     def check_words(self, address, count):
         word_span(address, count)
@@ -81,9 +100,19 @@ class SnpxReadPolicy:
             raise ValueError("SNPX word span is outside the configured allowlist")
 
     def check_io(self, target):
-        bit_target(target)
+        io_target(target)
         if target not in self.io_targets:
             raise ValueError("SNPX I/O target is outside the configured allowlist")
+
+    def io_format(self, target):
+        self.check_io(target)
+        if target.split('[', 1)[0] in _WORDS:
+            # Also fail closed for manually constructed policies bypassing load().
+            result = dict(self.io_word_formats).get(target)
+            if result not in {"u16", "i16"}:
+                raise ValueError("SNPX group/analog reads require explicit u16/i16 decoding")
+            return result
+        return "bool"
 
 
 def _frame(kind=0, seq=0, operation=0, message=0, service=0, segment=0, index=0, count=0):
@@ -208,8 +237,11 @@ class SnpxReader:
         return self._read(8, address - 1, count, count * 2)
 
     def read_io(self, target: str):
-        self.policy.check_io(target)
-        segment, index = bit_target(target)
+        format_name = self.policy.io_format(target)
+        segment, index = io_target(target)
+        if format_name != "bool":
+            payload = self._read(segment, index, 1, 2)
+            return struct.unpack("<H" if format_name == "u16" else "<h", payload)[0]
         # Read the containing byte, then select the requested bit only.
         payload = self._read(segment, index - index % 8, 8, 1)
         return bool(payload[0] & (1 << (index % 8)))

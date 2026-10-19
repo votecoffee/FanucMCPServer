@@ -51,5 +51,7 @@ or assume clock wraparound.
 The adaptation implements session setup and memory reads, omits the upstream
 assignment-clearing command, exposes no write/command API, validates exact
 read policy and framing, bounds capture duration and preserves wire evidence.
+Group/analog I/O exposes explicit operator-selected signed/unsigned 16-bit raw
+decoding, with no engineering-unit scaling.
 It does not use the upstream high-level `connect()` method, which also clears
 assignments. It does not incorporate RMI, Stream Motion or proprietary binaries.

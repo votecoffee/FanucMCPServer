@@ -33,7 +33,9 @@ These mutate controller communication mappings and can affect other clients.
 They must not be hidden inside a read-only connection or sampling operation.
 
 The shared Python adapter distinguishes session setup from assignment commands
-and exposes only exact digital reads and bounded raw `%R` words. It omits the
+and exposes exact digital/group/analog reads and bounded raw `%R` words. Word
+I/O decoding requires an explicit signed/unsigned 16-bit choice and applies no
+engineering-unit scaling. It omits the
 upstream clearing step entirely. It cannot verify assignment identity and never
 decodes raw words as robot R/PR values. An offline feature worker receives no
 controller handle. RMI/stream-motion and mapping setup remain outside its scope.

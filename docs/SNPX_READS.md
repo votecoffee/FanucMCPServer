@@ -28,7 +28,8 @@ and total socket-I/O timeout come from that robot's existing `profile`:
   "sample_provider": "snpx",
   "snpx_read": {
     "port": 60008,
-    "io_targets": ["DI[1]", "DO[9]", "RI[1]", "UO[8]"],
+    "io_targets": ["DI[1]", "DO[9]", "GI[1]", "AI[1]"],
+    "io_word_formats": {"GI[1]": "u16", "AI[1]": "i16"},
     "word_ranges": [{"address": 1, "count": 16}]
   }
 }
@@ -41,24 +42,26 @@ word range; each list is limited to 256 entries. Word ranges must not overlap.
 
 `sample_provider` defaults to `"auto"`: existing native FRRobot sampling when
 enabled, otherwise controller-generated files. Explicit `"snpx"` selects the
-SNPX digital sampler, even if the native provider is also enabled. There is no
+SNPX I/O sampler, even if the native provider is also enabled. There is no
 automatic provider fallback. SNPX policy, port and sampling-provider changes
 require reconnecting the host; `reload_connections` only permits the existing
 endpoint host/timeout changes while preserving this policy. Installing this
 host capability requires a host update/reconnect once; `reload_extensions`
 cannot load a new controller transport into an older host.
 
-## Digital samples
+## I/O samples
 
 Use existing `sample_robot` and watch/recording tools with exact allowed targets:
 
 ```json
-{"robot_id": "robot1", "expressions": ["DI[1]", "DO[9]"]}
+{"robot_id": "robot1", "expressions": ["DI[1]", "GI[1]", "AI[1]"]}
 ```
 
-The sampler supports `DI`, `DO`, `RI`, `RO`, `UI` and `UO` only and returns
-booleans. Other expression types, unlisted targets and duplicate targets are
-refused before connecting. The existing two-second minimum sample interval and
+The digital sampler supports `DI`, `DO`, `RI`, `RO`, `UI` and `UO`, returning
+booleans. `GI`, `GO`, `AI` and `AO` return one raw 16-bit word using the exact
+decoding format configured for that target. Other expression types, unlisted
+targets and duplicate targets are refused before connecting. The existing
+two-second minimum sample interval and
 job limits apply. Reads are sequential, not an atomic controller snapshot.
 After a transport/protocol failure, remaining values are null with errors; valid
 earlier values remain. Missing values never become zero/false automatically.
@@ -69,8 +72,28 @@ are DI/DO 1–5000 and RI/RO/UI/UO 1–1000; these are protocol bounds, not a cl
 that every controller implements every index. Boolean reads transfer the
 containing byte; retained wire evidence also includes neighboring bits.
 
-Group/analog I/O, flags, typed numeric/position registers and motion are not
-implemented by this provider. Use the existing file/native providers for their
+Group/analog word ports use segment `0x0c` for GI/AI and `0x0a` for GO/AO.
+GI/GO start at wire offset 0 and AI/AO at offset 1000; public indices are
+one-based. This implementation permits indices 1–1000 for each word port. These
+bounds do not establish installed channel counts or controller configuration.
+
+Every allowed GI/GO/AI/AO target must also appear in `io_word_formats`. Choose
+`"u16"` for unsigned 0–65535 or `"i16"` for signed -32768–32767 decoding. The
+same bytes `ffff` produce 65535 or -1 respectively. There is no implicit format
+or signedness inference, and format entries for digital/unlisted targets are
+refused. The pinned reference client uses signed words; this adapter exposes the
+raw word with an explicit operator-selected interpretation.
+
+These are raw counts, with no conversion to volts, current or other engineering
+units. Wider group values and controller-configured scaling are not inferred.
+Verify the channel's width, signedness, scaling and port behavior on the target
+controller. A compatible protocol response does not verify those settings.
+Samples include per-expression `value_formats` (`bool`, `u16` or `i16`) and
+`scaling_applied: false`; retained policy/evidence records preserve the selection.
+Watches and recordings keep their source sample artifact IDs for that evidence.
+
+Flags, typed numeric/position registers and motion are not implemented by this
+provider. Use the existing file/native providers for their
 supported operations.
 
 ## Raw assigned words
