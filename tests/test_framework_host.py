@@ -28,6 +28,15 @@ def data(result):
     return result.structured_content or json.loads(result.content[0].text)
 
 
+def test_publication_refuses_output_inside_package_before_creating_state(tmp_path):
+    package = tmp_path / "fanuc_workbench"; package.mkdir()
+    config = tmp_path / "policy.json"; config.write_text("{}")
+    state = package / "state"
+    with pytest.raises(ValueError, match="recursive snapshots"):
+        framework_host.publish(state, config, package=package)
+    assert not state.exists()
+
+
 @pytest.fixture
 def app_publication(tmp_path):
     config = tmp_path / "robot.local.json"

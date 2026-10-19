@@ -68,22 +68,22 @@ SNPX_FIELDS = (
 )
 BROKER_FIELDS = (
     F("enabled", "Enable this broker service", "bool", True),
-    F("allow_writes", "Permit the broker write channel", "bool", False,
+    F("allow_writes", "Permit the host write channel", "bool", False,
       hint="Local preparation, staging, jobs and reloads also use this channel. Robot write policy remains separate."),
     F("allowed_write_tools", "Allowed outer write tools", "nullable_lines", None,
       hint="Exact allowlist: empty permits no writes. Unchecked restriction preserves legacy service-wide permission."),
     F("read_only_tools", "Legacy read-only tool classifications", "lines", (), hint="Use only app-owner reviewed classifications; this does not authorize robot changes."),
     F("max_argument_bytes", "Maximum tool arguments (UTF-8 bytes)", "int", 262144, 1, 67108864),
-    F("timeout_seconds", "Broker call deadline (seconds)", "float", 20, .2, 300),
+    F("timeout_seconds", "Host call deadline (seconds)", "float", 20, .2, 300),
     F("session_mode", "Session ownership mode", "choice", "transient", choices=("exclusive", "shared", "transient"),
       hint="FANUC review plans require a retained session. Exclusive is the assessed mode; transient loses plans, and shared does not isolate chat-owned plans."),
     F("lease_seconds", "Exclusive context lifetime (seconds)", "float", 900, 5, 86400),
     F("resource_id", "Cross-registration resource identity", "optional"),
 )
 BROKER_SERVER_FIELDS = (
-    F("max_request_body_bytes", "Broker HTTP request limit (bytes)", "int", 10485760, 1, 134217728),
-    F("port", "Broker loopback port", "int", 8768, 1024, 65535),
-    F("token", "Broker authentication token", "secret", hint="Changing this token requires reconnecting every broker frontend."),
+    F("max_request_body_bytes", "Host HTTP request limit (bytes)", "int", 10485760, 1, 134217728),
+    F("port", "Host loopback port", "int", 8768, 1024, 65535),
+    F("token", "Host authentication token", "secret", hint="Changing this token requires reconnecting every host frontend."),
 )
 
 BUILT_IN_GUARDS = """These checks are part of the supported protocol rather than policy switches:

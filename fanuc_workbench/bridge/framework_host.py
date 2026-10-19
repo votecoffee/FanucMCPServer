@@ -101,6 +101,8 @@ def publish(state: Path, config: Path, *, port=None, allow_writes=None, package=
 
     state, config = state.resolve(), config.resolve(strict=True)
     package = (package or Path(__file__).resolve().parents[1]).resolve()
+    if state == package or state.is_relative_to(package):
+        raise ValueError("Keep app state outside the deployed package to avoid recursive snapshots")
     if any((state / "services").glob("*.json")):
         raise ValueError("Use a dedicated FANUC app state, separate from universal broker registrations")
     state.mkdir(parents=True, exist_ok=True)

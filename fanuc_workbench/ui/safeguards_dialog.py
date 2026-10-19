@@ -210,7 +210,7 @@ class PolicyPane(QWidget):
             note.setWordWrap(True); form.addRow(note)
         else:
             form = self.page("Broker service" if self.kind == "broker" else "Broker server", BROKER_FIELDS if self.kind == "broker" else BROKER_SERVER_FIELDS)
-            note = QLabel("Broker policy is separate from robot policy. Stop the broker and reconcile retained work before saving registered settings; refresh/reconnect after saving. Broker server settings affect every registered app.")
+            note = QLabel("Broker policy is separate from robot policy. Stop the broker and reconcile retained work before saving registered settings; refresh/reconnect after saving. Host server settings affect every registered app.")
             note.setWordWrap(True); form.addRow(note)
             if self.kind == "broker_limits":
                 generate = QPushButton("Generate authentication token")
@@ -305,7 +305,7 @@ class PolicyPane(QWidget):
             self.snapshot, backup = save_policy(self.reviewed)
             self.reviewed = None; self.draft = self.snapshot.document
             self.save_button.setEnabled(False); self.raw_inputs.clear()
-            self.status.setText(f"Saved {self.snapshot.path}. Original: {backup or 'unchanged'}. Reconnect MCP servers / reload the native policy deliberately; broker policy also needs refresh/reconnect.")
+            self.status.setText(f"Saved {self.snapshot.path}. Original: {backup or 'unchanged'}. Reconnect MCP servers / reload the native policy deliberately; host policy also needs refresh/reconnect.")
             self.saved.emit(str(self.snapshot.path))
         except (OSError, ValueError, TypeError, KeyError, AttributeError) as error:
             self.reviewed = None; self.save_button.setEnabled(False)
@@ -327,13 +327,13 @@ class SafeguardsDialog(QDialog):
         self.application_policy = PolicyPane("application"); tabs.addTab(self.application_policy, "App framework")
         broker_page = QWidget(); box = QVBoxLayout(broker_page)
         row = QHBoxLayout(); self.broker_runtime_path = QLineEdit(broker_runtime_path)
-        row.addWidget(QLabel("Broker runtime.json")); row.addWidget(self.broker_runtime_path, 1)
+        row.addWidget(QLabel("Host / broker runtime.json")); row.addWidget(self.broker_runtime_path, 1)
         browse = QPushButton("Browse…"); browse.clicked.connect(self.browse_runtime); row.addWidget(browse)
-        load = QPushButton("Load broker runtime"); load.clicked.connect(self.load_broker); row.addWidget(load); box.addLayout(row)
+        load = QPushButton("Load runtime"); load.clicked.connect(self.load_broker); row.addWidget(load); box.addLayout(row)
         broker_tabs = QTabWidget(); box.addWidget(broker_tabs)
         self.broker_policy = PolicyPane("broker"); broker_tabs.addTab(self.broker_policy, "FANUC service policy")
-        self.broker_limits = PolicyPane("broker_limits"); broker_tabs.addTab(self.broker_limits, "Broker server settings")
-        self.broker_status = QLabel("Select the installed broker runtime to validate its own policy contract. No daemon or controller is started.")
+        self.broker_limits = PolicyPane("broker_limits"); broker_tabs.addTab(self.broker_limits, "Host server settings")
+        self.broker_status = QLabel("Select an app-host or broker runtime to validate its policy contract. No server or controller is started.")
         self.broker_status.setWordWrap(True); box.addWidget(self.broker_status)
         self.broker_runtime_path.textChanged.connect(self.invalidate_broker)
         tabs.addTab(broker_page, "Host / broker settings")
@@ -361,9 +361,9 @@ class SafeguardsDialog(QDialog):
                                (self.broker_limits, runtime.state / "settings.json")):
                 pane.broker = runtime; pane.config_path.setText(str(path))
                 if path.exists(): pane.load_document()
-            self.broker_status.setText("Broker runtime loaded. Registered policies can be saved only after the broker is stopped and retained FANUC work/recovery is reconciled.")
+            self.broker_status.setText("Runtime loaded. Global settings require a stopped host and reconciled work. Use App framework for app publications, or FANUC service policy for broker registrations.")
         except (OSError, ValueError, TypeError, KeyError) as error:
-            self.broker_status.setText(f"Could not load broker runtime: {error}")
+            self.broker_status.setText(f"Could not load runtime: {error}")
 
     def reject(self):
         panes = (self.robot_policy, self.application_policy, self.broker_policy, self.broker_limits)
