@@ -27,6 +27,9 @@ class McpAccessDialog(QDialog):
         load = QPushButton("Load")
         load.clicked.connect(self.load_policy)
         row.addWidget(load)
+        create = QPushButton('New policy…')
+        create.clicked.connect(self.create_policy)
+        row.addWidget(create)
         layout.addLayout(row)
         self.read_only = QCheckBox("Read-only controller access")
         self.read_only.setChecked(True)
@@ -69,6 +72,13 @@ class McpAccessDialog(QDialog):
         path, _ = QFileDialog.getOpenFileName(self, "MCP robot policy", "", "JSON policy (*.json)")
         if path:
             self.config_path.setText(path)
+            self.load_policy()
+
+    def create_policy(self):
+        from fanuc_workbench.ui.policy_dialog import PolicyDialog
+        dialog = PolicyDialog(getattr(self.parent(), 'current_profile', None), self)
+        if dialog.exec():
+            self.config_path.setText(str(dialog.settings.path))
             self.load_policy()
 
     def load_policy(self):

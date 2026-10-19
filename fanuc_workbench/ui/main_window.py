@@ -72,12 +72,22 @@ class MainWindow(QMainWindow):
         self.mcp_access_action = QAction('MCP access…', self)
         self.mcp_access_action.triggered.connect(self.edit_mcp_access)
         self.settings_menu.addAction(self.mcp_access_action)
+        create=QAction('Create robot policy…',self);create.triggered.connect(self.create_robot_policy);self.settings_menu.addAction(create)
+
+    def create_robot_policy(self):
+        from fanuc_workbench.ui.policy_dialog import PolicyDialog
+        dialog=PolicyDialog(self.current_profile,self)
+        if dialog.exec():
+            self._mcp_access_path=str(dialog.settings.path);self.native_tab.config_path.setText(self._mcp_access_path)
+            self.settings.update_preferences(robot_policy_path=self._mcp_access_path)
+            self.statusBar().showMessage('Policy created. Select it in MCP setup or click Load in Native Controller when ready.')
 
     def edit_mcp_access(self):
         path = self.native_tab.config_path.text() or getattr(self, '_mcp_access_path', '')
         dialog = McpAccessDialog(path, self)
         if dialog.exec():
             self._mcp_access_path = str(dialog.settings.path)
+            self.settings.update_preferences(robot_policy_path=self._mcp_access_path)
             self.statusBar().showMessage(
                 'MCP access policy saved. Reconnect MCP servers using that file; '
                 'reload the Native Controller policy separately to apply the mode.')

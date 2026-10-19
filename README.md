@@ -156,6 +156,8 @@ reviewed proposals and readback. The example configuration requests client
 confirmation; verify confirmation support in the chosen client before enabling
 writes. Passwords belong in named environment variables. The MCP bridge requires
 verified SFTP host keys; FTP traffic is unencrypted.
+The GUI's **Settings > Create robot policy** form creates a new local policy with
+an exact-target JSON review; **MCP access** changes an existing policy's access mode.
 
 Motion, program execution/start/stop, I/O forcing, frame writes and
 mastering/DCS writes are unsupported. Native deployment does not select or run a

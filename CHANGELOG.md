@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a GUI policy authoring form with read-only defaults, exact write targets,
+  offline validation, JSON review, exclusive file creation and remembered policy
+  paths. Creating a policy never connects or elevates a loaded controller session.
 - Added backup discovery status and file-based percentage progress through the
   shared service and GUI, with retained failure/warning counts and manifest-first
   completion reporting.

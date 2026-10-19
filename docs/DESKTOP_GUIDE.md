@@ -42,3 +42,28 @@ in their source file's work. This is file-based progress, independent of file si
 or transfer speed. The bar reaches 100% after the manifest has been saved.
 Failed files and unavailable companions appear in the final counts and manifest;
 100% means the capture finished, and can include failures or warnings.
+
+## Create a robot access policy
+
+Use **Settings > Create robot policy**, **Settings > MCP access > New policy**,
+or **Native Controller > New policy**. The form starts with the selected connection
+profile and read-only access. Enter a robot ID, connection details, read roots and
+an optional password environment-variable name. The form never saves a password.
+
+To permit reviewed writes, enter exact permitted remote filenames, storage-file
+creation paths, register targets, native program names or description targets,
+then clear **Read-only controller access**. Native R/PR/program targets require
+the explicit `frrobot` provider; descriptions require the controller's HTTP(S)
+origin. Wildcards and unsupported/system-file targets are refused. Existing
+operation-specific approval, target and readback checks still apply.
+
+Click **Review policy** to validate and inspect the complete JSON, then **Create
+policy** to choose a new `.json` file. Editing any form input requires a fresh
+review. Existing files are never overwritten. Prefer `robot_bridge.local.json`
+outside the source checkout or under its ignored `.local/` directory. Relative
+`robot-state` and `robot-edits` directories resolve beside the policy file.
+
+Creating a policy makes no controller connection and changes no loaded session.
+Select the file in MCP setup and reconnect that server, or click **Load** in
+Native Controller when ready. The selected policy path and native robot selection
+are remembered locally; the app does not automatically load/connect at launch.

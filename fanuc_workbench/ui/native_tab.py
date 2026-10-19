@@ -28,10 +28,12 @@ class NativeControllerTab(QWidget):
         self.busy, self.controls = False, []
         layout = QVBoxLayout(self)
         row = QHBoxLayout()
-        self.config_path = QLineEdit(configuration_environment() or '')
+        saved=owner.settings.preferences() if hasattr(owner,'settings') else {}
+        self.config_path = QLineEdit(configuration_environment() or saved.get('robot_policy_path',''))
         row.addWidget(QLabel('Robot policy'))
         row.addWidget(self.config_path, 1)
         self.button(row, 'Browse…', self.choose_config)
+        if hasattr(owner,'create_robot_policy'):self.button(row,'New policy…',owner.create_robot_policy)
         self.button(row, 'Load', self.load_config)
         self.robot = QComboBox()
         self.robot.currentIndexChanged.connect(self.clear_plan)
@@ -189,11 +191,20 @@ class NativeControllerTab(QWidget):
             candidate = RobotBridge.from_config(Path(self.config_path.text()))
             self.shutdown()
             self.bridge = candidate
+            saved=self.owner.settings.preferences() if hasattr(self.owner,'settings') else {}
+            self.robot.blockSignals(True)
             self.robot.clear()
             for identifier, access in candidate.config.robots.items():
                 self.robot.addItem(f'{access.profile.name} ({identifier})', identifier)
+            if hasattr(self.owner,'settings'):
+                selected=saved.get('native_robot_id') if saved.get('robot_policy_path')==str(Path(self.config_path.text()).resolve()) else None
+                index=self.robot.findData(selected)
+                if index>=0:self.robot.setCurrentIndex(index)
+                self.owner.settings.update_preferences(robot_policy_path=str(Path(self.config_path.text()).resolve()),native_robot_id=self.robot.currentData())
+            self.robot.blockSignals(False)
             self.update_policy()
         except Exception as exc:
+            self.robot.blockSignals(False)
             self.failed(str(exc))
 
     def update_policy(self):
@@ -217,6 +228,8 @@ class NativeControllerTab(QWidget):
         if hasattr(self, 'approve'):
             self.set_busy(self.busy)
         self.update_policy()
+        if self.bridge and self.robot.currentData() and hasattr(self.owner,'settings'):
+            self.owner.settings.update_preferences(native_robot_id=self.robot.currentData())
 
     def invalidate_edited_plan(self):
         if self.plan:
