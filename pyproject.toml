@@ -16,13 +16,15 @@ mcp = ["mcp>=1.30,<2"]
 
 [project.scripts]
 fanuc-mcp-server = "fanuc_workbench.bridge.mcp_server:main"
-fanuc-mcp-server-gui = "fanuc_workbench.app:main"
 fanuc-mcp-server-doctor = "fanuc_workbench.bridge.doctor:main"
 fanuc-mcp-server-extension = "fanuc_workbench.bridge.extensions_cli:main"
 fanuc-workbench = "fanuc_workbench.app:main"
 fanuc-workbench-mcp = "fanuc_workbench.bridge.mcp_server:main"
 fanuc-workbench-doctor = "fanuc_workbench.bridge.doctor:main"
 fanuc-workbench-extension = "fanuc_workbench.bridge.extensions_cli:main"
+
+[project.gui-scripts]
+fanuc-mcp-server-gui = "fanuc_workbench.app:main"
 
 [project.urls]
 Repository = "https://github.com/votecoffee/FanucMCPServer"
@@ -32,4 +34,4 @@ where = ["."]
 include = ["fanuc_workbench*"]
 
 [tool.setuptools.package-data]
-fanuc_workbench = ["extensions/**/*.json", "extensions/**/*.py", "extensions/**/*.txt", "licenses/*.txt", "licenses/*.md"]
+fanuc_workbench = ["extensions/**/*.json", "extensions/**/*.py", "extensions/**/*.txt", "licenses/*.txt", "licenses/*.md", "resources/*.ico", "resources/*.png", "resources/*.md"]

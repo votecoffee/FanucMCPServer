@@ -1,5 +1,29 @@
 # Desktop workflows
 
+## Start menu shortcut
+
+On Windows, `install_and_run.bat` installs the desktop dependencies, creates a
+shortcut under **Start > FanucMCPServer**, then opens the app. The shortcut uses
+the supplied application icon and the installation's `pythonw.exe`, so launching
+from Start does not open a console. Administrator access is unnecessary.
+
+For a manual desktop installation, add or refresh the current user's shortcut:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m fanuc_workbench.desktop_install
+```
+
+Run this command again from the desired desktop Python environment after moving
+or replacing an installation. The shortcut records absolute resolved paths; a
+moved virtual environment may also need to be recreated. To remove the shortcut:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m fanuc_workbench.desktop_install --remove
+```
+
+Removal retains the application, settings and other Start menu entries. The
+headless MCP bundle has its own installer and does not create desktop shortcuts.
+
 ## Connections
 
 Use **Robot > Connection** to create or edit a connection profile and the

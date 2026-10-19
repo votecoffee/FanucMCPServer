@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added the supplied application icon, a console-free Windows GUI launcher and
+  per-user Start menu shortcut creation through the desktop installer, with
+  explicit commands to refresh or remove the shortcut.
 - Added CSV/L5X PLC tag import with scopes, aliases, UDT/member comments, catalog
   filtering, manual I/O assignment and reviewed explicit-reference suggestions.
   Original exports remain intact; assignments are staged until the local map is saved.

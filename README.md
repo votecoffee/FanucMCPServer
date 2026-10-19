@@ -63,6 +63,11 @@ py -3 -m venv .venv
 The default distribution includes the desktop dependencies. For a separate
 runtime without Qt, follow the [headless plugin bundle guide](docs/ROBOT_PLUGIN_SETUP.md).
 For desktop use alone, omit the `mcp` extra or run `install_and_run.bat`.
+On Windows, that script also creates **Start > FanucMCPServer > FanucMCPServer**
+with the application icon for the current user. For a manual installation, run
+`.\.venv\Scripts\python.exe -B -m fanuc_workbench.desktop_install` to add it.
+See the [desktop guide](docs/DESKTOP_GUIDE.md#start-menu-shortcut) for removal or
+updating the shortcut after moving an installation.
 Existing installations should follow the [upgrade notes](docs/ROBOT_PLUGIN_SETUP.md#name-change-and-existing-installations).
 
 ## Usage
