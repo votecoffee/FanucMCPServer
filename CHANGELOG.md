@@ -6,6 +6,9 @@
   backed by `allow_writes`, stale-file protection and explicit reconnect guidance.
   Capabilities, doctor and the Native Controller policy summary expose the loaded
   access mode. Enabling reviewed writes retains target and approval policy.
+- Documented the controller interfaces and per-feature FANUC licensing needs,
+  including the distinction between FTP reads, HTTP description writes, native
+  Robot Object access, SFTP Server and ASCII Program Loader.
 - Renamed the project and repository to FanucMCPServer. New installs use the
   `fanuc-mcp-server` desktop/shared-service distribution and
   `fanuc-mcp-server-bridge` headless distribution. Legacy Python imports and

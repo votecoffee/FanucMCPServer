@@ -158,11 +158,18 @@ program. Offline analysis, file-transfer success and loader verification each
 have separate limits; none establishes production or commissioning acceptance.
 See the [coverage matrix](docs/ROBOT_BRIDGE_COVERAGE.md) for details.
 
+Default reads and backups use FTP/SFTP; optional HTTP is used for description
+changes. Native data uses FANUC's Robot Object API over TCP. Native access needs
+licensed PC/controller support, and loading LS source needs ASCII Program Loader.
+See [controller interfaces and software requirements](docs/CONTROLLER_INTERFACES.md)
+for feature-specific dependencies, including SFTP server options.
+
 ## Documentation
 
 - [MCP setup, tools and Python API](docs/ROBOT_BRIDGE.md)
 - [Headless plugin installation and upgrades](docs/ROBOT_PLUGIN_SETUP.md)
 - [Native controller configuration and verification limits](docs/ROBOT_NATIVE_API.md)
+- [Controller interfaces and software requirements](docs/CONTROLLER_INTERFACES.md)
 - [Reloadable feature development](docs/ROBOT_EXTENSIONS.md)
 - [Shared-service coverage](docs/ROBOT_BRIDGE_COVERAGE.md)
 - [Desktop Plugin SDK](PLUGIN_SDK.md)

@@ -46,6 +46,9 @@ bridge and choose a robot. The FTP/SFTP profile remains the file transport;
 the native adapter connects to that profile's host using the installed vendor
 API. The app requires pywin32 and compatible FANUC Robot Object licensing.
 FANUC libraries are not redistributed.
+Controller PC Interface support and a suitable PC runtime/license are required
+for native reads as well as writes; the LS loader adds a separate controller
+requirement. See [controller interfaces and software requirements](CONTROLLER_INTERFACES.md).
 
 The policy summary shows the loaded read-only/reviewed-write mode. Change the
 saved mode through **Settings → MCP access…**, then load the policy again here;

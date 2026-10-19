@@ -7,6 +7,8 @@ pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 FanucMCPServer 2.1 / bridge 0.9 adds native data, reviewed R/PR value edits and LS
 deployment through the existing operation catalog. See [native API setup and
 verification limits](ROBOT_NATIVE_API.md). Native access is disabled by default.
+See [controller interfaces and software requirements](CONTROLLER_INTERFACES.md)
+for the FTP/SFTP, HTTP description and native TCP dependencies.
 
 ## Setup
 

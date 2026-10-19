@@ -4,6 +4,8 @@ The bridge runs on the Windows PC that can reach the controller. A headless
 Python distribution shares FanucMCPServer services without requiring Qt or changing
 the GUI's environment. Codex uses stdio MCP; other compatible clients can use
 the same server. There is no OpenAI model API call or API key in this bridge.
+See [controller interfaces and software requirements](CONTROLLER_INTERFACES.md)
+for the services and FANUC licenses needed by each optional capability.
 
 ## Name change and existing installations
 
