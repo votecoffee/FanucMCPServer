@@ -99,11 +99,31 @@ Position-register axes display as wrapped, ordered `axis=value` rows rather than
 raw JSON. Hover over the value for the full captured data. Unavailable values
 show their error in the tooltip. Display formatting leaves recorded data intact.
 Use **Add watch row** and **Remove selected watch rows** to change the watch list,
-and drag the vertical splitter to expose more rows.
-Live file sampling shows the selected robot/address. Changing that connection
-pauses live file polling and ignores a late sample or error from the previous
-target. Start polling again explicitly when ready. Existing captured series are
-retained; export and clear them before collecting a separate robot's series.
+and drag the vertical splitter to expose more rows. Watch expressions, aliases
+and row count are remembered locally (up to 1000 rows); sampled values are not
+saved to desktop preferences. Unsupported expressions and duplicate watch names
+are rejected before collection.
+
+Each recording is bound to its workspace or desktop file connection and watch
+definitions. The recording label identifies the captured source independently
+of the current live-file target. Changing the source, workspace, connection or
+watch definitions pauses polling and ignores late results from the previous
+request. Existing data remains available for export. Choose **New recording**
+before collecting a different source/watch list; confirm clearing the current
+buffers only after exporting anything you want to keep. Cancel retains them.
+
+**Export recording JSON** saves the source snapshot, watch definitions, captured
+values and errors, timeline events and current cycle events in one local file.
+Connection passwords are excluded from the source snapshot. Export uses atomic
+replacement, retaining the previous file if writing fails. Individual trend/
+timeline CSV and cycle JSON exports remain available.
+
+Collection stops at 10,000 received samples per recording, including samples
+whose trend rows were later cleared. Export and start a new recording to
+continue. Invalid or backwards sample timestamps stop collection while retaining
+accepted data. Recordings stay in memory until exported; only watch drafts and
+desktop preferences are restored on app launch. Current-workspace snapshots and
+timeline analysis exclude watch data belonging to a different source/watch list.
 
 ## Fleet / Scheduler
 

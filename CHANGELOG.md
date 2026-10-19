@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added source/watch-bound desktop recordings, explicit new-recording reset,
+  complete atomic JSON export and saved watch drafts. Late workspace results,
+  changed-source collection, duplicate watch keys and invalid/backwards samples
+  are rejected; recordings stop at 10,000 samples while retaining captured data.
 - Fixed Fleet jobs to update the same records written to local fleet history and
   leave the scheduler available to retry after a setup/state-save failure.
 - Added staged connection management, explicit new-profile creation, validated

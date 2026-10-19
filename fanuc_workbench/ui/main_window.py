@@ -295,5 +295,6 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self.native_tab.shutdown()
+        self.live_tab.save_watches()
         self.desktop_layout.save()
         super().closeEvent(event)
