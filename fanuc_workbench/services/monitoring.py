@@ -1,5 +1,5 @@
 from __future__ import annotations
-import csv, json, re, tempfile, time
+import csv, json, math, re, tempfile, time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -43,9 +43,15 @@ class WorkspaceSampleProvider:
             if typ=='R':
                 r=nr.get(idx); vals[k]=r.value if r else None
                 if not r:errs[k]='R not found'
+                else:
+                    try: available=math.isfinite(float(r.value))
+                    except (ValueError, OverflowError): available=False
+                    if not available:vals[k]=None;errs[k]='R value is unavailable or nonfinite'
             elif typ=='PR':
                 r=prs.get((group,idx)); vals[k]=dict(r.values) if r else None
                 if not r:errs[k]='PR not found'
+                elif r.unavailable_axes or not r.values:
+                    vals[k]=None;errs[k]='PR contains unavailable axes or is uninitialized'
             else:
                 r=ios.get((typ,idx));vals[k]=r.value if r else None
                 if not r:errs[k]=f'{typ} not found'

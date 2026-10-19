@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Made masked, malformed, duplicate and nonfinite PR axes explicit as unavailable;
+  retained external axes and prevented configuration text from swallowing the
+  next line. File-based samples reject incomplete PRs and invalid numeric values.
 - Added **Settings → MCP access…** with a default read-only controller checkbox
   backed by `allow_writes`, stale-file protection and explicit reconnect guidance.
   Capabilities, doctor and the Native Controller policy summary expose the loaded

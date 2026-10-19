@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,6 +30,7 @@ class PositionRegister:
     values: dict[str, float] = field(default_factory=dict)
     start_line: int = 0
     end_line: int = 0
+    unavailable_axes: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)
@@ -57,7 +59,7 @@ class IOData:
 _NUMREG = re.compile(r"^\s*\[(?P<idx>\d+)\]\s*=\s*(?P<value>.*?)\s+'(?P<comment>[^']*)'\s*$")
 _PR_START = re.compile(r"^\s*\[(?P<group>\d+)\s*,\s*(?P<idx>\d+)\]\s*=\s*'(?P<comment>[^']*)'(?P<tail>.*)$")
 _REAL = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][-+]?\d+)?"
-_AXIS = re.compile(rf"\b(X|Y|Z|W|P|R|J\d+)\s*[:=]\s*({_REAL})(?![\w.])", re.I)
+_AXIS = re.compile(r"\b(X|Y|Z|W|P|R|J\d+|E\d+)\s*[:=]\s*([^\s,;]+)", re.I)
 _UF = re.compile(r"\b(?:UF|UFRAME)\s*[:=]\s*(-?\d+)", re.I)
 _UT = re.compile(r"\b(?:UT|UTOOL)\s*[:=]\s*(-?\d+)", re.I)
 _CONFIG = re.compile(r"\bCONFIG\s*[:=]\s*'?([^'\r\n,]+(?:,[^'\r\n]+){0,3})'?", re.I)
@@ -113,14 +115,26 @@ def parse_position_registers(path: Path) -> list[PositionRegister]:
     rows: list[PositionRegister] = []
     for n, (start, m) in enumerate(starts):
         end = starts[n + 1][0] - 1 if n + 1 < len(starts) else len(lines) - 1
-        blob = " ".join([m.group('tail')] + lines[start + 1:end + 1])
-        vals = {a.group(1).upper(): float(a.group(2)) for a in _AXIS.finditer(blob)}
+        blob = "\n".join([m.group('tail')] + lines[start + 1:end + 1])
+        vals, unavailable, seen = {}, set(), set()
+        for axis in _AXIS.finditer(blob):
+            name, token = axis.group(1).upper(), axis.group(2)
+            if name in seen or not re.fullmatch(_REAL, token):
+                unavailable.add(name)
+            elif math.isfinite(number := float(token)):
+                vals[name] = number
+            else:
+                unavailable.add(name)
+            seen.add(name)
+        for name in unavailable:
+            vals.pop(name, None)
         uf = _UF.search(blob); ut = _UT.search(blob); cfg = _CONFIG.search(blob)
-        rep = "Joint" if any(k.startswith("J") for k in vals) else ("Cartesian" if vals else "Uninitialized")
+        rep = "Joint" if any(k.startswith("J") for k in seen) else ("Cartesian" if seen else "Uninitialized")
         rows.append(PositionRegister(
             path=path, group=int(m.group('group')), index=int(m.group('idx')), comment=m.group('comment'),
             representation=rep, user_frame=uf.group(1) if uf else "", user_tool=ut.group(1) if ut else "",
             config=cfg.group(1).strip() if cfg else "", values=vals, start_line=start + 1, end_line=end + 1,
+            unavailable_axes=tuple(sorted(unavailable)),
         ))
     return rows
 

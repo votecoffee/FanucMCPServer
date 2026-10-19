@@ -216,6 +216,9 @@ evidence exists. PR[group,index] selects multigroup records. When explicitly
 configured, the native provider supplies live values instead. Per-signal errors
 and source evidence are retained. The two-second minimum is shared by bridge
 clients using the same host and state directory.
+Masked/malformed/nonfinite PR axes are reported in `unavailable_axes`, rather
+than invented as zeros. Samples with unavailable axes or uninitialized positions
+return an availability error; invalid/nonfinite numeric-register samples do too.
 
 start_watch captures 1-300 samples at intervals of 2-60 seconds. It retains
 trend/timeline CSV, cycle JSON, recording JSON and source artifact IDs. Missing
