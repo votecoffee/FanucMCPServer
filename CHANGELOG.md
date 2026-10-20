@@ -9,9 +9,8 @@
   Legacy broker runtimes are preserved for explicit reconciliation.
 
 - Made offline setup install the app's standalone Codex plugin by default, with
-  no Universal Tools plugin requirement or automatic broker selection on fresh
-  installs. Runtime-only and optional broker setup remain explicit choices;
-  automatic upgrades retain their recorded integration route.
+  no separate routing plugin requirement. Direct MCP registration and runtime-only
+  setup remain explicit choices.
 
 - Upgraded source/packages to MCP SDK 2.3.0 and shared framework 0.14.0, retaining
   the existing 48-tool standalone contract and standalone plugin. Added an explicit
@@ -24,21 +23,11 @@
   public defaults remain allowlisted. Preserved read roots, provider selection,
   supported write classes, proposal approval, preflight and readback.
 
-- Added a complete GUI editor for robot access policies and optional broker
+- Added a complete GUI editor for robot access policies and app-owned host
   permissions/settings, including online-write targets, approval mode, plan
   expiry, transfer/concurrency limits and HTTP/SNPX read scopes. Added validated
-  review, stale-file protection, original-policy backups and stopped-broker
+  review, stale-file protection, original-policy backups and stopped-host
   administrative locking. Existing sessions retain their loaded permissions.
-
-- Validated broker initialization and complete normalized registrations before
-  accepting an existing route, including tool classification policy. Extended
-  actual-broker fixtures to cover backup jobs, worker reloads and stale revisions.
-
-- Retained the standalone Codex plugin and added an optional Universal Tools
-  adapter with discovery-only feature metadata and exclusive retained sessions.
-  Added automatic fresh-install routing, explicit broker/standalone overrides,
-  route-preserving upgrades and owned FANUC skill installation. Broker write
-  permission remains separate from robot policy and exact-change approval.
 
 - Added bounded concurrent MCP/shared-API requests, a reserved bookkeeping lane,
   configurable controller-lock waiting and request status through the existing
