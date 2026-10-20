@@ -175,6 +175,8 @@ def validate_policy(document, kind, path, host=None):
         model = ApplicationDefinition.model_validate(document)
         if model.id != "fanuc-mcp-server" or len(model.backends) != 1 or model.backends[0].service.id != model.id:
             raise ValueError("Select the FanucMCPServer application publication")
+        from fanuc_workbench.bridge.framework_host import validate_backend_profile
+        validate_backend_profile(model.backends[0].service)
     else:
         raise ValueError("Unknown policy kind")
 

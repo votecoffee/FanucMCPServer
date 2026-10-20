@@ -21,7 +21,8 @@ from fanuc_workbench.bridge.service import RobotBridge
 
 APPLICATION_ID = "fanuc-mcp-server"
 POLICY_KEYS = frozenset({"enabled", "allow_writes", "allowed_write_tools", "read_only_tools",
-    "max_argument_bytes", "timeout_seconds", "session_mode", "lease_seconds", "resource_id"})
+    "max_argument_bytes", "timeout_seconds", "session_mode", "lease_seconds", "resource_id",
+    "protocol_mode", "discovery_cache_ttl_seconds", "watch_catalog"})
 INSTRUCTIONS = (
     "Discover FANUC tools with search_tools and describe_tool. Acquire the exclusive "
     "fanuc-mcp-server context and retain it through review, commit, jobs and reconciliation. "
@@ -37,8 +38,21 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+def validate_backend_profile(service):
+    # The current FANUC handlers use request-bound imperative elicitation. A
+    # modern frontend can resume it through the framework while this downstream
+    # connection retains its legacy back-channel. Modern downstream discovery
+    # requires a separate resolver-based approval integration.
+    if service.protocol_mode != "legacy" or service.watch_catalog:
+        raise ValueError("FANUC backend requires the legacy wire profile for reviewed approval; modern frontends may connect through the app host")
+
+
 def revision(backend):
-    raw = json.dumps({key: backend[key] for key in ("service", "artifact")}, sort_keys=True,
+    from universal_tools.models import ServiceManifest
+    # Hash the validated representation used by the host. JSON integers and
+    # floats accepted for the same policy value must survive republishing.
+    service = ServiceManifest.model_validate(backend["service"]).model_dump(mode="json")
+    raw = json.dumps({"service": service, "artifact": backend["artifact"]}, sort_keys=True,
                      separators=(",", ":"), allow_nan=False).encode()
     return "f-" + digest(raw)[:60]
 
@@ -112,6 +126,8 @@ def publish(state: Path, config: Path, *, port=None, allow_writes=None, package=
         if previous and (previous.id != APPLICATION_ID or len(previous.backends) != 1
                          or previous.backends[0].service.id != APPLICATION_ID):
             raise ValueError("Existing application identity was preserved; select a FANUC app state")
+        if previous:
+            validate_backend_profile(previous.backends[0].service)
         raw = config.read_bytes()
         with RobotBridge.from_config(config) as bridge:
             descriptor = asyncio.run(service_manifest(bridge, Path(sys.executable), config))
@@ -153,7 +169,8 @@ def publish(state: Path, config: Path, *, port=None, allow_writes=None, package=
         backend["revision"] = revision(backend)
         document = {"schema_version": 1, "id": APPLICATION_ID, "display_name": "FanucMCPServer",
                     "instructions": INSTRUCTIONS, "backends": [backend]}
-        ApplicationDefinition.model_validate(document)
+        definition = ApplicationDefinition.model_validate(document)
+        validate_backend_profile(definition.backends[0].service)
         selected_port = port if port is not None else (load_settings(state).port if (state / "settings.json").exists() else 8891)
         if config.read_bytes() != raw:
             raise ValueError("Policy changed while publishing; retry after local edits finish")
@@ -191,6 +208,8 @@ def main(argv=None):
         definition = load_application(publication)
         if definition.id != APPLICATION_ID:
             raise ValueError("Select a FANUC application state")
+        for backend in definition.backends:
+            validate_backend_profile(backend.service)
         if args.command == "serve":
             serve_application(state, publication)
         else:

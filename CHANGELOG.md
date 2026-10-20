@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Aligned source/packages with shared framework 0.15.0 while retaining MCP SDK
+  2.3.0. Assessed modern frontends with the existing reviewed FANUC backend;
+  require its legacy back-channel and reject unsupported downstream modern/watch
+  profiles before startup or publication. Normalized policy revision hashes so
+  numeric settings survive republishing. Existing standalone installations are
+  not migrated by source updates.
+
 - Removed Universal Tools broker registration, adapter entrypoints, routed skill
   guidance and broker policy GUI pages. Setup supports only the standalone
   plugin, direct MCP or runtime-only installation. Kept the shared framework and
