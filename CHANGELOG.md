@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Made offline setup install the app's standalone Codex plugin by default, with
+  no Universal Tools plugin requirement or automatic broker selection on fresh
+  installs. Runtime-only and optional broker setup remain explicit choices;
+  automatic upgrades retain their recorded integration route.
+
 - Upgraded source/packages to MCP SDK 2.3.0 and shared framework 0.14.0, retaining
   the existing 48-tool standalone contract and standalone plugin. Added an explicit
   experimental app-owned host with versioned backend publications, verified app

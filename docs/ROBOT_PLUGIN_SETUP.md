@@ -53,16 +53,18 @@ Keep that bundle at a stable path. Install with the matching Python version;
 the setup script verifies file hashes and installs only from bundled wheels:
 
 ```powershell
-py -3.14 -B C:/RobotTools/FanucPluginBundle/setup.py --runtime-dir C:/RobotTools/FanucRuntime --register plugin
+py -3.14 -B C:/RobotTools/FanucPluginBundle/setup.py --runtime-dir C:/RobotTools/FanucRuntime
 ```
 
-Use `--register auto` to prefer a ready Universal Tools broker for a fresh install,
-or `--register broker` to require it. Both retain the standalone package; broker
-setup installs the app's route-aware skill separately and preserves app policy.
-Automatic upgrades retain their recorded route. See
+Setup installs the app's own Codex plugin by default (`--register plugin`), even
+if a Universal Tools plugin is present. The shared framework is a Python package
+dependency and does not require a second Codex plugin. Use `--register auto` to
+retain a recorded route on upgrades; a fresh automatic install also selects the
+standalone plugin. Select `--register broker` explicitly for optional aggregation.
+Broker setup installs the app's route-aware skill separately and preserves app policy. See
 [Universal Tools integration](UNIVERSAL_BROKER.md) for prerequisites and limits.
 
-Use `--register mcp` for plain MCP registration, or omit registration to install
+Use `--register mcp` for plain MCP registration, or `--register none` to install
 only the runtime. Do not register both forms in the same profile. Optional
 `--codex-home C:/RobotTools/IsolatedCodexProfile` confines CLI registration to a
 separate profile. Python itself and Codex are prerequisites, not bundled software.

@@ -15,18 +15,19 @@ new framework host needs separate nested-policy, discovery and host assessment.
 Build the normal [offline plugin bundle](ROBOT_PLUGIN_SETUP.md), then choose:
 
 ```powershell
-py -3.14 -B C:/RobotTools/FanucPluginBundle/setup.py --runtime-dir C:/RobotTools/FanucRuntime --register auto
+py -3.14 -B C:/RobotTools/FanucPluginBundle/setup.py --runtime-dir C:/RobotTools/FanucRuntime
 ```
 
 | `--register` | Behavior |
 | --- | --- |
-| `auto` | Fresh installation: prefer an enabled, initialized, compatible Universal Tools plugin; otherwise install the standalone FANUC plugin. |
+| `auto` | Retain the recorded integration route on upgrade; use the standalone FANUC plugin on a fresh installation. |
 | `broker` | Require Universal Tools and register the FANUC service; fail without switching routes if prerequisites are missing. |
-| `plugin` | Explicitly install the standalone FANUC plugin, including when Universal Tools is present. |
+| `plugin` (default) | Install the standalone FANUC plugin, including when Universal Tools is present. |
 | `mcp` | Register the standalone MCP server directly with Codex. |
-| `none` (default) | Install/update the runtime only. |
+| `none` | Install/update the runtime only. |
 
-`--codex-home` selects an isolated profile. Detection uses its actual installed
+`--codex-home` selects an isolated profile. Only an explicit broker selection or
+a recorded broker upgrade checks Universal Tools. Detection uses its actual installed
 and enabled plugin inventory and local server policy, then validates the broker
 runtime pointer and version. A folder name alone is insufficient. Setup validates
 broker settings through the broker's own parser without starting its daemon or

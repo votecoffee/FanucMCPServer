@@ -7,16 +7,17 @@ import pytest
 from test_plugin_upgrade import load_setup
 
 
-@pytest.mark.parametrize("prior,plugins,ready,expected", [
-    ({}, [], False, "plugin"), ({}, [], True, "broker"),
-    ({"registration": "plugin"}, [], True, "plugin"),
-    ({"registration": "broker"}, [], False, "broker"),
-    ({"registration": "mcp"}, [], True, "mcp"),
-    ({}, [{"name": "fanuc-workbench", "installed": True}], True, "none"),
+@pytest.mark.parametrize("prior,plugins,expected", [
+    ({}, [], "plugin"),
+    ({}, [{"name": "universal-tools", "installed": True, "enabled": True}], "plugin"),
+    ({"registration": "plugin"}, [], "plugin"),
+    ({"registration": "broker"}, [], "broker"),
+    ({"registration": "mcp"}, [], "mcp"),
+    ({}, [{"name": "fanuc-workbench", "installed": True}], "none"),
 ])
-def test_auto_preserves_routes(prior, plugins, ready, expected):
-    assert load_setup().select_registration("auto", prior, plugins, ready) == expected
-    assert load_setup().select_registration("plugin", prior, plugins, ready) == "plugin"
+def test_auto_preserves_routes(prior, plugins, expected):
+    assert load_setup().select_registration("auto", prior, plugins) == expected
+    assert load_setup().select_registration("plugin", prior, plugins) == "plugin"
 
 
 @pytest.mark.parametrize("enabled,version,disabled,works", [
@@ -92,11 +93,14 @@ def test_existing_registration_and_recovery_are_not_overwritten(tmp_path, monkey
     assert service.read_bytes() == before and not any("register" in command for command in calls)
 
 
-@pytest.mark.parametrize("available,prior,expected", [
-    (True, None, "broker"), (False, None, "plugin"),
-    (True, "plugin", "plugin"), (False, "broker", "error"),
+@pytest.mark.parametrize("requested,available,prior,expected", [
+    (None, True, None, "plugin"), (None, False, None, "plugin"),
+    ("auto", True, None, "plugin"), ("auto", False, None, "plugin"),
+    ("auto", True, "plugin", "plugin"), ("auto", False, "broker", "error"),
+    ("auto", True, "broker", "broker"), ("broker", True, None, "broker"),
+    ("broker", False, None, "error"),
 ])
-def test_setup_auto_records_route_and_never_fails_over(tmp_path, monkeypatch, available, prior, expected):
+def test_setup_defaults_to_plugin_and_only_probes_selected_broker(tmp_path, monkeypatch, requested, available, prior, expected):
     import sys
     setup = load_setup()
     root = tmp_path / "bundle"
@@ -111,8 +115,11 @@ def test_setup_auto_records_route_and_never_fails_over(tmp_path, monkeypatch, av
     setup.__file__ = str(root / "setup.py")
     monkeypatch.setattr(setup, "verify_bundle", lambda _: None)
     monkeypatch.setattr(setup.shutil, "which", lambda _: "codex")
-    monkeypatch.setattr(setup, "installed_plugins", lambda *args: [])
+    inventory = [{"name": "universal-tools", "installed": True, "enabled": True}]
+    monkeypatch.setattr(setup, "installed_plugins", lambda *args: inventory)
+    probes = []
     def find(*args):
+        probes.append("broker")
         if not available: raise ValueError("fixture unavailable")
         return {"python": "broker-python", "state": str(tmp_path / "broker"), "version": "0.11.1"}
     monkeypatch.setattr(setup, "find_broker", find)
@@ -123,18 +130,23 @@ def test_setup_auto_records_route_and_never_fails_over(tmp_path, monkeypatch, av
     monkeypatch.setattr(setup, "register_broker", lambda *args: calls.append("broker") or {})
     monkeypatch.setattr(setup.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps({"tool_count": 48, "configured_robots": []})))
     profile = tmp_path / "new-codex-profile"
-    monkeypatch.setattr(sys, "argv", ["setup.py", "--runtime-dir", str(runtime), "--config", str(config),
-                                     "--register", "auto", "--codex-home", str(profile)])
+    argv = ["setup.py", "--runtime-dir", str(runtime), "--config", str(config), "--codex-home", str(profile)]
+    if requested is not None:
+        argv += ["--register", requested]
+    monkeypatch.setattr(sys, "argv", argv)
     if expected == "error":
-        before = (runtime / "installation.json").read_bytes()
+        marker = runtime / "installation.json"
+        before = marker.read_bytes() if marker.exists() else None
         with pytest.raises(ValueError, match="prior integration preserved"): setup.main()
-        assert calls == [] and (runtime / "installation.json").read_bytes() == before
+        assert calls == []
+        assert (marker.read_bytes() if marker.exists() else None) == before
     else:
         setup.main()
         assert profile.is_dir()
         assert calls[-1] == expected
         assert json.loads((runtime / "installation.json").read_text())["registration"] == expected
         if expected == "broker": assert calls.index("idle") < calls.index("runtime")
+    assert probes == (["broker"] if expected in {"broker", "error"} else [])
 
 
 def test_active_broker_blocks_runtime_only_upgrade_before_file_changes(tmp_path, monkeypatch):
@@ -150,7 +162,7 @@ def test_active_broker_blocks_runtime_only_upgrade_before_file_changes(tmp_path,
     def blocked(*args): raise ValueError("active fixture work")
     monkeypatch.setattr(setup, "require_idle_broker", blocked)
     monkeypatch.setattr(setup.venv, "EnvBuilder", lambda **_: pytest.fail("Runtime changed before preflight"))
-    monkeypatch.setattr(sys, "argv", ["setup.py", "--runtime-dir", str(runtime)])
+    monkeypatch.setattr(sys, "argv", ["setup.py", "--runtime-dir", str(runtime), "--register", "none"])
     with pytest.raises(ValueError, match="active fixture"): setup.main()
     assert marker.read_bytes() == before
 

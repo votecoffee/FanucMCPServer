@@ -77,9 +77,10 @@ runtime without Qt, follow the [headless plugin bundle guide](docs/ROBOT_PLUGIN_
 
 The standalone Codex plugin remains supported. An optional
 [Universal Tools integration](docs/UNIVERSAL_BROKER.md) uses the same services
-through CodexMCPBroker. Bundle setup with `--register auto` prefers a ready broker
-on fresh installations, retains FANUC workflow guidance and preserves recorded
-routes on upgrades. Use `--register plugin` to explicitly choose standalone.
+through CodexMCPBroker. Bundle setup installs the app's own plugin by default,
+without requiring or automatically selecting a universal plugin. Use
+`--register none` for runtime-only setup, `--register broker` for explicit optional
+aggregation, or `--register auto` to preserve a recorded integration route.
 For desktop use alone, omit the `mcp` extra or run `install_and_run.bat`.
 On Windows, that script also creates **Start > FanucMCPServer > FanucMCPServer**
 with the application icon for the current user. For a manual installation, run

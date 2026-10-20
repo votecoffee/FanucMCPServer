@@ -136,7 +136,7 @@ def find_broker(plugins, environment, explicit=None):
     return {"python": str(python), "state": str(state), "version": version}
 
 
-def select_registration(requested, installation, plugins, broker):
+def select_registration(requested, installation, plugins):
     if requested != "auto":
         return requested
     if "registration" in installation:
@@ -146,7 +146,7 @@ def select_registration(requested, installation, plugins, broker):
     if any(row.get("name") in {"fanuc-mcp-server", "fanuc-workbench"}
            and row.get("installed") is True for row in plugins):
         return "none"
-    return "broker" if broker else "plugin"
+    return "plugin"
 
 
 def skill_files(root):
@@ -222,8 +222,8 @@ def main():
     parser = argparse.ArgumentParser(description="Install a local FanucMCPServer plugin runtime from bundled wheels")
     parser.add_argument("--runtime-dir", required=True, type=Path, help="Stable dedicated directory outside the plugin cache")
     parser.add_argument("--config", type=Path, help="Existing bridge JSON; otherwise retain the installed selection, or create a zero-robot configuration on first install")
-    parser.add_argument("--register", choices=("none", "auto", "broker", "plugin", "mcp"), default="none",
-                        help="auto prefers a ready Universal Tools plugin on fresh installs; upgrades retain their route")
+    parser.add_argument("--register", choices=("none", "auto", "broker", "plugin", "mcp"), default="plugin",
+                        help="Install the standalone plugin by default; none installs only the runtime; auto retains a recorded route or uses standalone on fresh installs; broker explicitly requires Universal Tools")
     parser.add_argument("--codex-home", type=Path, help="Optional separate Codex profile for registration/testing")
     parser.add_argument("--broker-runtime", type=Path, help="Optional Universal Tools runtime.json pointer")
     parser.add_argument("--broker-allow-writes", action="store_true",
@@ -258,11 +258,12 @@ def main():
         plugins = []
         if args.register in {"auto", "broker"}:
             plugins = installed_plugins(codex, environment)
+        selected = select_registration(args.register, installation, plugins)
+        if selected == "broker":
             try:
                 broker = find_broker(plugins, environment, args.broker_runtime)
             except (OSError, ValueError, KeyError, subprocess.SubprocessError) as exc:
                 broker_error = str(exc)
-        selected = select_registration(args.register, installation, plugins, broker)
         if selected not in {"none", "plugin", "mcp", "broker"}:
             raise ValueError("The recorded integration route is invalid")
         if selected == "broker":

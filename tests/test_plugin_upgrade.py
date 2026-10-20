@@ -89,9 +89,9 @@ def test_setup_remembers_custom_configuration_across_upgrade(tmp_path, monkeypat
         runtime.mkdir()
         (runtime / 'installation.json').write_text(json.dumps({
             'kind': 'fanuc-workbench-runtime', 'config': str(config.resolve())}))
-    monkeypatch.setattr(sys, 'argv', ['setup.py', '--runtime-dir', str(runtime), '--config', str(config)])
+    monkeypatch.setattr(sys, 'argv', ['setup.py', '--runtime-dir', str(runtime), '--config', str(config), '--register', 'none'])
     module.main()
-    monkeypatch.setattr(sys, 'argv', ['setup.py', '--runtime-dir', str(runtime)])
+    monkeypatch.setattr(sys, 'argv', ['setup.py', '--runtime-dir', str(runtime), '--register', 'none'])
     module.main()
     assert json.loads((runtime / 'installation.json').read_text())['config'] == str(config.resolve())
     assert json.loads((root / 'plugin/runtime.json').read_text())['config'] == str(config.resolve())
