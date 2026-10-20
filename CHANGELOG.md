@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Updated the pinned shared framework to 0.17.0 with its complete required
+  dependency lock, retaining MCP SDK 2.3.0 and the independently usable standalone
+  plugin. Assessed optional Tasks/notifications, Skills, protocol relay, Apps,
+  OAuth and Redis deployment profiles without enabling them. The app-owned host
+  retains one owning process and the current review/recovery contracts.
+
 - Aligned source/packages with shared framework 0.16.0 and MCP SDK 2.3.0. Exposed
   structural argument depth/node budgets in the GUI and preserved them across
   publication. Optional Tasks/Skills remain unregistered; existing jobs, approval

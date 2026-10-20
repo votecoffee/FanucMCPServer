@@ -27,4 +27,4 @@ def test_package_dependencies_pin_the_tested_framework_and_sdk():
     desktop = tomllib.loads((root / "pyproject.toml").read_text())["project"]
     bridge = tomllib.loads((root / "packaging/bridge/pyproject.toml").read_text())["project"]
     for deps in (desktop["optional-dependencies"]["mcp"], bridge["dependencies"]):
-        assert "mcp==2.3.0" in deps and "universal-codex-tools==0.16.0" in deps
+        assert "mcp==2.3.0" in deps and "universal-codex-tools==0.17.0" in deps

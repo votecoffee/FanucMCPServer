@@ -9,14 +9,14 @@ Existing installations are updated only by running setup explicitly.
 
 ## Dependency and build
 
-The tested Python dependency is `universal-codex-tools==0.16.0`, imported through
+The tested Python dependency is `universal-codex-tools==0.17.0`, imported through
 `universal_tools.framework`. Its MCP dependency is exactly 2.3.0. The distribution
 has not been assumed available on a public package feed. Obtain the reviewed
 wheel from the framework build, verify it against `packaging/framework.lock.json`,
 and install it in the app's isolated environment before installing the MCP extra:
 
 ```powershell
-python -m pip install C:/Packages/universal_codex_tools-0.16.0-py3-none-any.whl
+python -m pip install C:/Packages/universal_codex_tools-0.17.0-py3-none-any.whl
 python -m pip install -c packaging/framework-requirements.txt -e ".[dev,mcp]"
 python -B -m pytest -q
 ```
@@ -84,13 +84,23 @@ workers. Framework trace spans contain fixed labels without app payloads and do
 not enable an exporter. Optional skill-resource snapshots are not enabled by this
 app's CLI or plugin and do not install or activate native Codex skills.
 
-Framework 0.16 also supplies optional Tasks, verified downstream Skills, live skill
-publication and extension lifecycle hooks. This app does not register those
-extensions or automatically wrap its existing jobs. Backup/recording jobs retain
-their current app-owned handles, cancellation and review/recovery contracts.
-Adopting Tasks requires an explicit authorized job adapter; the fourteen-tool
-front door does not relay downstream Tasks automatically. Skill publication does
-not establish native host activation or grant permissions.
+Framework 0.17 supplies the following optional profiles. They are available in the
+dependency, but this app does not register or activate them during installation:
+
+| Feature | Assessment for FanucMCPServer |
+| --- | --- |
+| Tasks and authorized notifications | Backup/recording jobs retain their app-owned handles, cancellation and review/recovery contracts. A future Task adapter must authorize every operation, reconcile ambiguous starts and verify actual job survival. URL acceptance is navigation, not approval or credentials. |
+| Verified Skills and live publication | The app uses its packaged standalone skill. Downstream discovery/publication would need explicit origin and content approval; native skill loading still belongs to the host. |
+| Resources, prompts and completions relay | No sources are configured. Any future source needs app-selected credentials, principal authorization, revision checks and explicit engineering context. The relay does not forward generic tools or Tasks. |
+| MCP Apps interfaces | No UI extension is composed. Existing tool results provide text; interactive resources and actual host rendering need separate acceptance. |
+| Remote OAuth and DPoP | The candidate host remains authenticated loopback. Remote endpoints, identity verification, credentials and TLS require an explicit deployment; protected MCP requests must not be retried automatically. |
+| Redis Tasks and native frontend replicas | The Redis extra is not installed. This retained-worker app host requires one owning process; jobs, journals, reservations and live controller sessions are not portable between replicas. |
+
+See the framework's [extension contract](https://github.com/votecoffee/CodexMCPBroker/blob/87157f88de4a5320d2712224216b1e6f18a0ec8d/docs/extension-development.md)
+and [deployment profiles](https://github.com/votecoffee/CodexMCPBroker/blob/87157f88de4a5320d2712224216b1e6f18a0ec8d/docs/deployment.md)
+for the assessed baseline. The fourteen-tool front door does not relay downstream
+extensions automatically. SDK 2.2 interoperability checks in the framework do not
+change this app's SDK 2.3.0 pin or establish controller acceptance.
 
 The **App framework** GUI exposes structural argument budgets in addition to byte
 limits: `max_argument_depth` (default 64, maximum 128) and `max_argument_nodes`

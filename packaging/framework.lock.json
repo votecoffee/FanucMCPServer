@@ -1,14 +1,17 @@
 {
   "package": "universal-codex-tools",
-  "version": "0.16.0",
-  "wheel": "universal_codex_tools-0.16.0-py3-none-any.whl",
-  "sha256": "316ebaf0b695e02d4c8a6a97befc07d30196b8c7e0863ca4b36795eda69c98fb",
+  "version": "0.17.0",
+  "wheel": "universal_codex_tools-0.17.0-py3-none-any.whl",
+  "sha256": "6387265e9353f69f2dd767e4431ab2c7f6df40dd090118592a01daa3b5946c6b",
   "dependencies": [
     "mcp==2.3.0",
     "jsonschema==4.26.0",
     "anyio==4.15.1",
     "PyYAML==6.0.3",
     "httpx==0.28.1",
+    "httpx2==2.13.1",
+    "PyJWT==2.15.1",
+    "cryptography==50.0.2",
     "opentelemetry-api==1.45.1"
   ]
 }

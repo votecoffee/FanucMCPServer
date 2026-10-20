@@ -42,7 +42,7 @@ Build in a Python environment with pip, setuptools and wheel. This step uses
 the package index to resolve dependency wheels for that Python/Windows version:
 
 ```powershell
-python -B scripts/build_robot_plugin.py --output C:/RobotTools/FanucPluginBundle --framework-wheel C:/Packages/universal_codex_tools-0.16.0-py3-none-any.whl
+python -B scripts/build_robot_plugin.py --output C:/RobotTools/FanucPluginBundle --framework-wheel C:/Packages/universal_codex_tools-0.17.0-py3-none-any.whl
 ```
 
 The framework wheel must match `packaging/framework.lock.json`; the builder
