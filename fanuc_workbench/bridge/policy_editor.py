@@ -52,7 +52,7 @@ def _commit(path, original, proposed):
 
 
 @dataclass(frozen=True)
-class BrokerRuntime:
+class HostRuntime:
     python: Path
     state: Path
 
@@ -61,7 +61,10 @@ class BrokerRuntime:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         python, state = Path(data["python"]), Path(data["state"])
         if not python.is_absolute() or not python.is_file() or not state.is_absolute() or not (state / "settings.json").is_file():
-            raise ValueError("Select an initialized broker runtime.json with an absolute Python and state path")
+            raise ValueError("Select an initialized FANUC app-host runtime.json with an absolute Python and state path")
+        application = json.loads((state / "fanuc-application.json").read_bytes())
+        if application.get("id") != "fanuc-mcp-server" or len(application.get("backends", [])) != 1:
+            raise ValueError("Select the FanucMCPServer app-host runtime")
         return cls(python.absolute(), state.resolve())
 
 
@@ -70,7 +73,7 @@ class PolicySnapshot:
     path: Path
     kind: str
     raw: bytes
-    broker: BrokerRuntime | None = None
+    host: HostRuntime | None = None
 
     @property
     def sha256(self):
@@ -92,41 +95,37 @@ class PolicyReview:
         return digest(self.proposed)
 
 
-# Run only in the explicitly selected broker runtime. Metadata validation never
-# starts the daemon. Registered policy writes require its actual administrative
-# locks and no retained FANUC context, including a durable recovery barrier.
-_BROKER_CODE = '''
+# Run only in the explicitly selected app-host runtime. Metadata validation never
+# starts the host. Settings saves require its administrative locks and no retained
+# work, including durable recovery barriers. The framework's internal daemon lock
+# retains its package-defined filename.
+_HOST_CODE = '''
 import hashlib,json,os,stat,sys,uuid
 from pathlib import Path
-from universal_tools.models import ServiceManifest,Settings
+from universal_tools.models import Settings
 request=json.load(sys.stdin)
-kind=request['kind']; document=request['document']
-model=(ServiceManifest if kind=='broker' else Settings).model_validate_json(json.dumps(document,allow_nan=False))
-if kind=='broker' and model.id!='fanuc-mcp-server':
-    raise ValueError('Select the FanucMCPServer service registration')
+document=request['document']
+Settings.model_validate_json(json.dumps(document,allow_nan=False))
 if request['action']=='save':
     from contextlib import ExitStack
     from universal_tools.daemon import InstanceLock
     from universal_tools.ownership import OwnershipJournal
     from universal_tools.models import atomic_json
     path=Path(request['path']).resolve(); state=Path(request['state']).resolve()
-    registered=path==(state/'services/fanuc-mcp-server.json').resolve()
-    if kind=='broker_limits' and path!=(state/'settings.json').resolve():
-        raise ValueError('Select the settings.json for this runtime')
+    if path!=(state/'settings.json').resolve():
+        raise ValueError('Select the settings.json for this app-host runtime')
     with ExitStack() as locks:
-        if registered or kind=='broker_limits':
-            locks.enter_context(InstanceLock(state/'registration.lock'))
-            locks.enter_context(InstanceLock(state/'broker.lock'))
-            if any(kind=='broker_limits' or row.get('service_id')=='fanuc-mcp-server' for row in OwnershipJournal(state/'ownership.sqlite3').entries()):
-                raise ValueError('Reconcile retained FANUC work or recovery before changing broker policy')
+        locks.enter_context(InstanceLock(state/'registration.lock'))
+        locks.enter_context(InstanceLock(state/'broker.lock'))
+        if OwnershipJournal(state/'ownership.sqlite3').entries():
+            raise ValueError('Reconcile retained work or recovery before changing app-host settings')
         original=path.read_bytes(); original_mode=stat.S_IMODE(path.stat().st_mode)
         if hashlib.sha256(original).hexdigest()!=request['original_sha256']:
             raise ValueError('The policy changed since loading; reload it before saving')
         before=json.loads(original)
-        allowed=({'enabled','allow_writes','allowed_write_tools','read_only_tools','max_argument_bytes',
-                  'timeout_seconds','session_mode','lease_seconds','resource_id'} if kind=='broker' else {'max_request_body_bytes','port','token'})
+        allowed={'max_request_body_bytes','port','token'}
         if any(before.get(key)!=document.get(key) for key in set(before)|set(document) if key not in allowed):
-            raise ValueError('Identity, transport and authentication are not policy controls')
+            raise ValueError('Only app-host request limit, port and token are editable')
         history=path.parent/'.fanuc-policy-history'; history.mkdir(mode=0o700,exist_ok=True)
         backup=history/(path.name+'.'+request['original_sha256']+'.'+uuid.uuid4().hex+'.bak')
         fd=os.open(backup,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
@@ -139,35 +138,35 @@ else:
 '''
 
 
-def _broker_call(runtime, kind, document, action="validate", **kwargs):
+def _host_call(runtime, kind, document, action="validate", **kwargs):
     if runtime is None:
-        raise ValueError("Select the broker runtime.json before editing its policy")
+        raise ValueError("Select the host runtime.json before editing its policy")
     environment = {key: value for key, value in os.environ.items() if key not in {"PYTHONPATH", "PYTHONHOME"}}
     environment.update(PYTHONNOUSERSITE="1", PYTHONDONTWRITEBYTECODE="1")
     try:
-        result = subprocess.run([str(runtime.python), "-B", "-c", _BROKER_CODE],
+        result = subprocess.run([str(runtime.python), "-B", "-c", _HOST_CODE],
             input=json.dumps({"kind": kind, "document": document, "action": action, "state": str(runtime.state), **kwargs}, allow_nan=False),
             env=environment, capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.TimeoutExpired):
-        raise ValueError("The selected broker runtime could not validate this policy within its deadline") from None
+        raise ValueError("The selected host runtime could not validate this policy within its deadline") from None
     if result.returncode:
         # Validation errors can echo credential inputs. Show only the last error
         # category; paths and full documents remain local and are not logged.
         if "already running" in result.stderr or "already held" in result.stderr:
-            raise ValueError("Stop the broker before changing its registered policy")
-        message = result.stderr.splitlines()[-1] if result.stderr else "Broker validation failed"
+            raise ValueError("Stop the host before changing its registered policy")
+        message = result.stderr.splitlines()[-1] if result.stderr else "Host validation failed"
         if message.startswith("ValueError:"):
             raise ValueError(message.removeprefix("ValueError: "))
-        raise ValueError("Broker policy validation/save failed; check supported values, stop the broker and reconcile retained work before saving")
+        raise ValueError("Host policy validation/save failed; check supported values, stop the host and reconcile retained work before saving")
     return json.loads(result.stdout)
 
 
-def validate_policy(document, kind, path, broker=None):
+def validate_policy(document, kind, path, host=None):
     encoded(document)  # Refuse non-finite/non-JSON values, including unknown metadata.
     if kind == "robot":
         BridgeConfig.from_document(document, path)
-    elif kind in {"broker", "broker_limits"}:
-        _broker_call(broker, kind, document)
+    elif kind == "host_settings":
+        _host_call(host, kind, document)
     elif kind == "application":
         try:
             from universal_tools.framework import ApplicationDefinition
@@ -180,11 +179,11 @@ def validate_policy(document, kind, path, broker=None):
         raise ValueError("Unknown policy kind")
 
 
-def load_policy(path, kind="robot", broker=None):
+def load_policy(path, kind="robot", host=None):
     path = Path(path).resolve(strict=True)
     raw = path.read_bytes()
-    snapshot = PolicySnapshot(path, kind, raw, broker)
-    validate_policy(snapshot.document, kind, path, broker)
+    snapshot = PolicySnapshot(path, kind, raw, host)
+    validate_policy(snapshot.document, kind, path, host)
     if path.read_bytes() != raw:
         raise ValueError("The policy changed while loading; load it again")
     return snapshot
@@ -206,12 +205,12 @@ def review_policy(snapshot, document):
             raise ValueError("Only access policy can be edited; publish backend code/identity changes through the app updater")
         if document != before:
             document["backends"][0]["revision"] = revision(document["backends"][0])
-    validate_policy(document, snapshot.kind, snapshot.path, snapshot.broker)
+    validate_policy(document, snapshot.kind, snapshot.path, snapshot.host)
     if snapshot.path.read_bytes() != snapshot.raw:
         raise ValueError("The policy changed since loading; reload it before review")
     before = snapshot.document
     proposed = snapshot.raw if document == before else encoded(document)
-    if snapshot.kind == "broker_limits":
+    if snapshot.kind == "host_settings":
         changed_token = before.get("token") != document.get("token")
         before["token"] = "<authentication token>"
         document["token"] = "<new authentication token>" if changed_token else "<authentication token>"
@@ -227,17 +226,17 @@ def save_policy(review):
     if review.proposed == snapshot.raw:
         return snapshot, None
     document = json.loads(review.proposed)
-    validate_policy(document, snapshot.kind, snapshot.path, snapshot.broker)
+    validate_policy(document, snapshot.kind, snapshot.path, snapshot.host)
     if snapshot.kind in {"robot", "application"}:
         history = snapshot.path.parent / ".fanuc-policy-history"
         history.mkdir(mode=0o700, exist_ok=True)
         with RobotLocks(history / "locks").acquire(str(snapshot.path)):
             backup = _commit(snapshot.path, snapshot.raw, review.proposed)
     else:
-        result = _broker_call(snapshot.broker, snapshot.kind, document, "save",
+        result = _host_call(snapshot.host, snapshot.kind, document, "save",
                               path=str(snapshot.path), original_sha256=snapshot.sha256)
         backup = Path(result["backup"])
-    saved = load_policy(snapshot.path, snapshot.kind, snapshot.broker)
+    saved = load_policy(snapshot.path, snapshot.kind, snapshot.host)
     if saved.document != document:
         raise ValueError("Saved policy differs from the reviewed proposal; inspect the file and retained backup")
     return saved, backup

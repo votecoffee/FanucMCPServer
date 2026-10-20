@@ -1,4 +1,4 @@
-"""Experimental app-owned stable MCP host; no Universal Tools plugin required.
+"""Experimental app-owned stable MCP host.
 
 Publication, serving and stdio proxying are explicit local administrative actions.
 None installs a plugin, changes a live registration or contacts a controller.
@@ -15,7 +15,7 @@ import shutil
 import sys
 import tempfile
 
-from fanuc_workbench.bridge.broker_server import service_manifest
+from fanuc_workbench.bridge.framework_backend import service_manifest
 from fanuc_workbench.bridge.service import RobotBridge
 
 
@@ -104,7 +104,7 @@ def publish(state: Path, config: Path, *, port=None, allow_writes=None, package=
     if state == package or state.is_relative_to(package):
         raise ValueError("Keep app state outside the deployed package to avoid recursive snapshots")
     if any((state / "services").glob("*.json")):
-        raise ValueError("Use a dedicated FANUC app state, separate from universal broker registrations")
+        raise ValueError("Use a dedicated FANUC app state, separate from other service registrations")
     state.mkdir(parents=True, exist_ok=True)
     publication = state / "fanuc-application.json"
     with InstanceLock(state / "fanuc-publication.lock"), RobotLocks(state / ".fanuc-policy-history/locks").acquire(str(publication)):

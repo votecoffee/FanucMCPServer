@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from fanuc_workbench.bridge.config import BridgeConfig, RobotAccess
-from fanuc_workbench.bridge.policy_editor import load_policy, review_policy, save_policy, _BROKER_CODE
+from fanuc_workbench.bridge.policy_editor import load_policy, review_policy, save_policy, _HOST_CODE
 from fanuc_workbench.bridge.policy_fields import (SERVER_FIELDS, PROFILE_FIELDS, CONNECTION_FIELDS,
     WRITE_FIELDS, HTTP_FIELDS, SNPX_FIELDS)
 from fanuc_workbench.core.models import RobotProfile
@@ -32,17 +32,17 @@ def test_controls_cover_every_runtime_policy_field():
     assert {item.key for item in (*CONNECTION_FIELDS, *WRITE_FIELDS, *HTTP_FIELDS)} == {
         item.name for item in fields(RobotAccess)} - {"profile", "snpx_read"}
     assert {item.key for item in SNPX_FIELDS} == {item.name for item in fields(SnpxReadPolicy)}
-    compile(_BROKER_CODE, "policy broker helper", "exec")
+    compile(_HOST_CODE, "policy host helper", "exec")
 
 
 @pytest.mark.parametrize("error", [OSError("private runtime error"), subprocess.TimeoutExpired("private command", 20)])
-def test_broker_runtime_failure_becomes_a_bounded_gui_error(tmp_path, monkeypatch, error):
-    from fanuc_workbench.bridge.policy_editor import BrokerRuntime, _broker_call
+def test_host_runtime_failure_becomes_a_bounded_gui_error(tmp_path, monkeypatch, error):
+    from fanuc_workbench.bridge.policy_editor import HostRuntime, _host_call
     def fail(*args, **kwargs):
         raise error
     monkeypatch.setattr(subprocess, "run", fail)
     with pytest.raises(ValueError, match="within its deadline") as caught:
-        _broker_call(BrokerRuntime(tmp_path / "python", tmp_path), "broker", {})
+        _host_call(HostRuntime(tmp_path / "python", tmp_path), "host_settings", {})
     assert "private" not in str(caught.value)
 
 

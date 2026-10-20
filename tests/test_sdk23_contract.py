@@ -5,23 +5,20 @@ import json
 from pathlib import Path
 import tomllib
 
-from fanuc_workbench.bridge.broker_server import create_server
+from fanuc_workbench.bridge.mcp_server import create_server
 from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.service import RobotBridge
 
 
-def test_sdk23_preserves_standalone_and_adapter_wire_definitions(tmp_path):
+def test_sdk23_preserves_standalone_wire_definitions(tmp_path):
     async def check():
         with RobotBridge(BridgeConfig(tmp_path / "state", tmp_path / "edits")) as bridge:
             rows = [tool.model_dump(by_alias=True, mode="json", exclude_none=True)
                     for tool in await create_server(bridge).list_tools()]
-            for adapter, expected in ((False, "6b9440fcc4a8df3f1ed2613d6ceb318b98db6a90ecd0f01c63225e558a5b2f66"),
-                                      (True, "7549293455f9e1cb0a17e6f2c11c2ffc3a2685dc44e3b0c5f7bf88cf53705b79")):
-                selected = [row for row in rows if adapter or row["name"] != "list_broker_capabilities"]
-                raw = json.dumps(sorted(selected, key=lambda row: row["name"]), sort_keys=True,
-                                 separators=(",", ":"), ensure_ascii=False).encode()
-                assert len(selected) == (49 if adapter else 48)
-                assert hashlib.sha256(raw).hexdigest() == expected
+            raw = json.dumps(sorted(rows, key=lambda row: row["name"]), sort_keys=True,
+                             separators=(",", ":"), ensure_ascii=False).encode()
+            assert len(rows) == 48
+            assert hashlib.sha256(raw).hexdigest() == "6b9440fcc4a8df3f1ed2613d6ceb318b98db6a90ecd0f01c63225e558a5b2f66"
     asyncio.run(check())
 
 

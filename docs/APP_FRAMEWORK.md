@@ -1,10 +1,11 @@
 # App-owned shared framework (experimental)
 
-The shared app framework is the direction for a stable app-owned MCP host with
-replaceable backends. Universal aggregation remains optional. FanucMCPServer
-retains its own standalone Codex plugin, desktop app, direct 48-tool MCP server
-and 49-tool aggregation adapter. No Universal Tools plugin is needed to use the
-framework package. Existing installations are not migrated by source updates.
+The shared app framework supplies a stable app-owned MCP host with replaceable
+backends. FanucMCPServer ships its own standalone Codex plugin, desktop app and
+direct 48-tool MCP server. Broker routing and registration are removed. The
+experimental app-owned host uses an internal 49-tool backend, including its
+discovery catalog; it does not expose a separate broker-adapter entrypoint.
+Existing installations are updated only by running setup explicitly.
 
 ## Dependency and build
 
@@ -29,7 +30,7 @@ incompatible SDK/native dependencies; do not downgrade that app's environment.
 
 ## Explicit candidate workflow
 
-Use a **new, private state directory**, separate from universal broker state:
+Use a **new, private state directory**, separate from any previous service registry:
 
 ```powershell
 python -B -m fanuc_workbench.bridge.framework_host --state C:/RobotTools/FanucAppState publish --config C:/RobotTools/robot-policy.json
@@ -52,7 +53,7 @@ use the same environment's absolute Python and these arguments:
 ```
 
 Start the app host explicitly before connecting. The proxy never starts the
-universal daemon or a missing app host. Each proxy receives independent affinity;
+unrelated daemon or a missing app host. Each proxy receives independent affinity;
 validate actual chat/frontend lifetimes before adoption. The packaged standalone
 plugin continues to use the existing direct entrypoint until separate host/profile
 acceptance. There is no automatic switch or second-plugin requirement.
@@ -77,7 +78,7 @@ approval arguments cannot authenticate a human.
 
 **Settings > Safeguards and policies > App framework** edits all host access policy
 fields in `fanuc-application.json`, validates and reviews a new revision, backs up
-the original and stages it without activation. **Host / broker settings** accepts
+the original and stages it without activation. **Host settings** accepts
 the app's `runtime.json` for global port/token/request-budget edits. The same
 stopped-host and retained-work restrictions apply to those global settings.
 
@@ -95,13 +96,11 @@ the direct server's bounded concurrent dispatcher remains available independentl
 
 ## Acceptance boundary
 
-Offline fixtures exercise the actual FANUC adapter through the pinned framework,
+Offline fixtures exercise the actual FANUC backend through the pinned framework,
 using synthetic controller transports: complete tool definitions/results, retained
 plans, confirmation, readback, competing clients, publication deferral/replacement,
 stable front-door schemas, stale/hash refusal and GUI policy changes. They do not
 establish physical-controller, native deployment or real Codex multi-chat acceptance.
-Latency measurements and complete native/media/workflow parity must be assessed before adopting
-this candidate. Optional aggregation of this framework host needs a separate nested
-policy/discovery/guidance assessment; the earlier direct aggregation adapter remains
-the assessed experimental route. No live plugin, registration or runtime pointer is
-changed by these tests.
+Latency measurements and complete native/media/workflow parity must be assessed
+before adopting this candidate. Source tests do not change a live plugin,
+registration or runtime pointer.

@@ -17,7 +17,7 @@ py -3 -m venv .venv
 ```
 
 Use the verified local framework wheel and tested dependency constraints in
-[the framework guide](docs/APP_FRAMEWORK.md). No universal aggregation plugin is
+[the framework guide](docs/APP_FRAMEWORK.md). No separate routing plugin is
 required, and development must use an isolated environment.
 
 Tests use synthetic files, simulated controller transports and local MCP

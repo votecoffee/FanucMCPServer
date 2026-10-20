@@ -66,8 +66,8 @@ SNPX_FIELDS = (
     F("word_ranges", "Allowed memory word ranges", "ranges", (), hint="One address,count pair per line, for example 1,2."),
     F("io_word_formats", "Group/analog decoding", "formats", {}, hint="One target=format per line, for example GI[1]=u16 or AI[1]=i16."),
 )
-BROKER_FIELDS = (
-    F("enabled", "Enable this broker service", "bool", True),
+HOST_FIELDS = (
+    F("enabled", "Enable this app service", "bool", True),
     F("allow_writes", "Permit the host write channel", "bool", False,
       hint="Local preparation, staging, jobs and reloads also use this channel. Robot write policy remains separate."),
     F("allowed_write_tools", "Allowed outer write tools", "nullable_lines", None,
@@ -80,7 +80,7 @@ BROKER_FIELDS = (
     F("lease_seconds", "Exclusive context lifetime (seconds)", "float", 900, 5, 86400),
     F("resource_id", "Cross-registration resource identity", "optional"),
 )
-BROKER_SERVER_FIELDS = (
+HOST_SERVER_FIELDS = (
     F("max_request_body_bytes", "Host HTTP request limit (bytes)", "int", 10485760, 1, 134217728),
     F("port", "Host loopback port", "int", 8768, 1024, 65535),
     F("token", "Host authentication token", "secret", hint="Changing this token requires reconnecting every host frontend."),
@@ -92,10 +92,10 @@ BUILT_IN_GUARDS = """These checks are part of the supported protocol rather than
 • Controller/API identity checks, native program-load checks and register metadata checks.
 • No motion/program execution, automatic write retry or automatic rollback.
 • Supported numeric bounds, protocol framing, payload/schema integrity and immutable feature hashes.
-• Broker authentication, literal loopback binding, context ownership and recovery barriers.
+• App-host authentication, literal loopback binding, context ownership and recovery barriers.
 
 The policy controls configure access, exact-list or broad supported-target scope, approval method, expiry and resource limits
 within those contracts. Editing local policy does not authorize a robot change or update an
 already loaded MCP/native session. Save, reconnect/reload deliberately, then retrieve fresh
-evidence and prepare a new change. Broker edits require a stopped broker and reconciled work.
+evidence and prepare a new change. Host edits require a stopped host and reconciled work.
 """

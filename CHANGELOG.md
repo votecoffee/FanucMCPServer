@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Removed Universal Tools broker registration, adapter entrypoints, routed skill
+  guidance and broker policy GUI pages. Setup supports only the standalone
+  plugin, direct MCP or runtime-only installation. Kept the shared framework and
+  app-owned host with internal discovery metadata and host policy controls.
+  Legacy broker runtimes are preserved for explicit reconciliation.
+
 - Made offline setup install the app's standalone Codex plugin by default, with
   no Universal Tools plugin requirement or automatic broker selection on fresh
   installs. Runtime-only and optional broker setup remain explicit choices;

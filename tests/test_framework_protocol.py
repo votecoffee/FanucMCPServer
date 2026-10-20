@@ -65,7 +65,7 @@ def test_app_host_frontends_preserve_ownership_forms_and_reload_without_reconnec
             assert data(await call("read_file", read_args))["sha256"] == digest(ORIGINAL)
             plan = data(await call("prepare_upload", {**read_args, "source_file": "MAIN.LS",
                 "expected_sha256": digest(ORIGINAL)}, "prepare-fixture"))
-            source = package / "bridge/broker_server.py"
+            source = package / "bridge/framework_backend.py"
             source.write_text(source.read_text().replace("    return server\n", '''    @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False))
     async def framework_fixture_read() -> dict:
         """Identify the new synthetic backend generation."""

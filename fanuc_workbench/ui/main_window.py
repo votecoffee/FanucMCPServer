@@ -136,15 +136,15 @@ class MainWindow(QMainWindow):
     def edit_safeguards(self):
         path = self.native_tab.config_path.text() or getattr(self, '_mcp_access_path', '')
         preferences = self.settings.preferences()
-        dialog = SafeguardsDialog(path, preferences.get('broker_runtime_path', ''), self)
+        dialog = SafeguardsDialog(path, preferences.get('host_runtime_path', ''), self)
         dialog.exec()
         if dialog.saved_policy_path:
             self._mcp_access_path = dialog.saved_policy_path
             self.native_tab.config_path.setText(dialog.saved_policy_path)
             self.settings.update_preferences(robot_policy_path=dialog.saved_policy_path)
             self.statusBar().showMessage('Policy saved. Reconnect MCP servers or explicitly reload the Native Controller policy to apply it.')
-        if getattr(dialog, 'loaded_broker_runtime_path', ''):
-            self.settings.update_preferences(broker_runtime_path=dialog.loaded_broker_runtime_path)
+        if getattr(dialog, 'loaded_host_runtime_path', ''):
+            self.settings.update_preferences(host_runtime_path=dialog.loaded_host_runtime_path)
 
     def _build_backup(self):
         w=QWidget(); l=QVBoxLayout(w); f=QFormLayout(); self.profile_label=QLabel('No robot configured'); self.dest=QLineEdit(str(Path.home()/'FanucBackups')); row=QWidget(); h=QHBoxLayout(row); h.setContentsMargins(0,0,0,0); h.addWidget(self.dest); b=QPushButton('Browse…'); b.clicked.connect(self.choose_backup_destination); h.addWidget(b)

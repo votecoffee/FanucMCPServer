@@ -2,7 +2,7 @@
 from pathlib import Path
 from functools import wraps
 
-from fanuc_workbench.bridge.broker_server import create_server
+from fanuc_workbench.bridge.framework_backend import create_server
 from fanuc_workbench.bridge.service import RobotBridge
 
 

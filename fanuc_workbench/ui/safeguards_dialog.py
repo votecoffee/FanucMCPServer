@@ -10,9 +10,9 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, 
     QFileDialog, QFormLayout, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QPlainTextEdit,
     QMessageBox, QPushButton, QScrollArea, QTabWidget, QVBoxLayout, QWidget)
 
-from fanuc_workbench.bridge.policy_editor import BrokerRuntime, load_policy, review_policy, save_policy
+from fanuc_workbench.bridge.policy_editor import HostRuntime, load_policy, review_policy, save_policy
 from fanuc_workbench.bridge.policy_fields import (SERVER_FIELDS, PROFILE_FIELDS, CONNECTION_FIELDS,
-    WRITE_FIELDS, HTTP_FIELDS, SNPX_FIELDS, BROKER_FIELDS, BROKER_SERVER_FIELDS, BUILT_IN_GUARDS)
+    WRITE_FIELDS, HTTP_FIELDS, SNPX_FIELDS, HOST_FIELDS, HOST_SERVER_FIELDS, BUILT_IN_GUARDS)
 
 
 def lines(value, kind):
@@ -51,7 +51,7 @@ class PolicyPane(QWidget):
 
     def __init__(self, kind, path="", parent=None):
         super().__init__(parent)
-        self.kind, self.broker = kind, None
+        self.kind, self.host = kind, None
         self.snapshot = self.reviewed = None
         self.draft, self.widgets, self.errors, self.raw_inputs = {}, {}, {}, {}
         self.snpx_cache = {}
@@ -95,7 +95,7 @@ class PolicyPane(QWidget):
     def load_document(self):
         self.invalidate_file()
         try:
-            self.snapshot = load_policy(Path(self.config_path.text()), self.kind, self.broker)
+            self.snapshot = load_policy(Path(self.config_path.text()), self.kind, self.host)
             self.draft = self.snapshot.document
             self.errors.clear(); self.raw_inputs.clear(); self.snpx_cache.clear()
             self.build_forms()
@@ -205,17 +205,16 @@ class PolicyPane(QWidget):
             self.robot.currentTextChanged.connect(self.build_robot)
             self.build_robot()
         elif self.kind == "application":
-            form = self.page("App host access", BROKER_FIELDS, ("backends", 0, "service"))
-            note = QLabel("App-owned framework host, independent of the universal broker. Saving stages a new policy revision. Finish and release retained work, then refresh the app host to apply it. Robot online-write permission remains separate.")
+            form = self.page("App host access", HOST_FIELDS, ("backends", 0, "service"))
+            note = QLabel("App-owned framework host. Saving stages a new policy revision. Finish and release retained work, then refresh the app host to apply it. Robot online-write permission remains separate.")
             note.setWordWrap(True); form.addRow(note)
-        else:
-            form = self.page("Broker service" if self.kind == "broker" else "Broker server", BROKER_FIELDS if self.kind == "broker" else BROKER_SERVER_FIELDS)
-            note = QLabel("Broker policy is separate from robot policy. Stop the broker and reconcile retained work before saving registered settings; refresh/reconnect after saving. Host server settings affect every registered app.")
+        elif self.kind == "host_settings":
+            form = self.page("Host server settings", HOST_SERVER_FIELDS)
+            note = QLabel("Stop the app host and reconcile retained work before saving settings; reconnect frontends after saving. Robot policy remains separate.")
             note.setWordWrap(True); form.addRow(note)
-            if self.kind == "broker_limits":
-                generate = QPushButton("Generate authentication token")
-                generate.clicked.connect(lambda: self.widgets[("token",)].setText(secrets.token_urlsafe(48)))
-                form.addRow(generate)
+            generate = QPushButton("Generate authentication token")
+            generate.clicked.connect(lambda: self.widgets[("token",)].setText(secrets.token_urlsafe(48)))
+            form.addRow(generate)
         self.tabs.addTab(self.preview, "Change review")
 
     def build_robot(self, *_):
@@ -292,7 +291,7 @@ class PolicyPane(QWidget):
         try:
             self.reviewed = review_policy(self.snapshot, self.draft)
             shown = json.loads(self.reviewed.proposed)
-            if self.kind == "broker_limits": shown["token"] = "<authentication token hidden>"
+            if self.kind == "host_settings": shown["token"] = "<authentication token hidden>"
             self.preview.setPlainText(f"File: {self.snapshot.path}\nOriginal SHA-256: {self.snapshot.sha256}\nProposed SHA-256: {self.reviewed.sha256}\n\n{self.reviewed.diff}\n\nComplete policy:\n{json.dumps(shown, indent=2)}")
             self.tabs.setCurrentWidget(self.preview); self.save_button.setEnabled(True)
             self.status.setText("Validated. Save changes only this local file and retains an exact original backup; it does not connect to a controller.")
@@ -313,11 +312,11 @@ class PolicyPane(QWidget):
 
 
 class SafeguardsDialog(QDialog):
-    def __init__(self, policy_path="", broker_runtime_path="", parent=None):
+    def __init__(self, policy_path="", host_runtime_path="", parent=None):
         super().__init__(parent)
         self.setWindowTitle("Safeguards and policies"); self.resize(1050, 850)
         self.saved_policy_path = ""
-        self.loaded_broker_runtime_path = ""
+        self.loaded_host_runtime_path = ""
         layout = QVBoxLayout(self)
         note = QLabel("Edit and review local settings. Saving does not modify any controller or elevate an already loaded MCP/native session.")
         note.setWordWrap(True); layout.addWidget(note)
@@ -325,48 +324,45 @@ class SafeguardsDialog(QDialog):
         self.robot_policy = PolicyPane("robot", policy_path); tabs.addTab(self.robot_policy, "Robot policy")
         self.robot_policy.saved.connect(self.remember_policy)
         self.application_policy = PolicyPane("application"); tabs.addTab(self.application_policy, "App framework")
-        broker_page = QWidget(); box = QVBoxLayout(broker_page)
-        row = QHBoxLayout(); self.broker_runtime_path = QLineEdit(broker_runtime_path)
-        row.addWidget(QLabel("Host / broker runtime.json")); row.addWidget(self.broker_runtime_path, 1)
+        host_page = QWidget(); box = QVBoxLayout(host_page)
+        row = QHBoxLayout(); self.host_runtime_path = QLineEdit(host_runtime_path)
+        row.addWidget(QLabel("App-host runtime.json")); row.addWidget(self.host_runtime_path, 1)
         browse = QPushButton("Browse…"); browse.clicked.connect(self.browse_runtime); row.addWidget(browse)
-        load = QPushButton("Load runtime"); load.clicked.connect(self.load_broker); row.addWidget(load); box.addLayout(row)
-        broker_tabs = QTabWidget(); box.addWidget(broker_tabs)
-        self.broker_policy = PolicyPane("broker"); broker_tabs.addTab(self.broker_policy, "FANUC service policy")
-        self.broker_limits = PolicyPane("broker_limits"); broker_tabs.addTab(self.broker_limits, "Host server settings")
-        self.broker_status = QLabel("Select an app-host or broker runtime to validate its policy contract. No server or controller is started.")
-        self.broker_status.setWordWrap(True); box.addWidget(self.broker_status)
-        self.broker_runtime_path.textChanged.connect(self.invalidate_broker)
-        tabs.addTab(broker_page, "Host / broker settings")
+        load = QPushButton("Load runtime"); load.clicked.connect(self.load_host); row.addWidget(load); box.addLayout(row)
+        host_tabs = QTabWidget(); box.addWidget(host_tabs)
+        self.host_settings = PolicyPane("host_settings"); host_tabs.addTab(self.host_settings, "Host server settings")
+        self.host_status = QLabel("Select the FANUC app-host runtime to validate its settings. No server or controller is started.")
+        self.host_status.setWordWrap(True); box.addWidget(self.host_status)
+        self.host_runtime_path.textChanged.connect(self.invalidate_host)
+        tabs.addTab(host_page, "Host settings")
         guards = QPlainTextEdit(BUILT_IN_GUARDS); guards.setReadOnly(True); tabs.addTab(guards, "Built-in checks")
         buttons = QDialogButtonBox(QDialogButtonBox.Close); buttons.rejected.connect(self.reject); layout.addWidget(buttons)
 
     def remember_policy(self, path):
         self.saved_policy_path = path
 
-    def invalidate_broker(self):
-        self.loaded_broker_runtime_path = ""
-        for pane in (self.broker_policy, self.broker_limits):
-            pane.broker = None; pane.invalidate_file()
+    def invalidate_host(self):
+        self.loaded_host_runtime_path = ""
+        self.host_settings.host = None; self.host_settings.invalidate_file()
 
     def browse_runtime(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Universal Tools runtime", "", "JSON runtime (*.json)")
-        if path: self.broker_runtime_path.setText(path); self.load_broker()
+        path, _ = QFileDialog.getOpenFileName(self, "FANUC app-host runtime", "", "JSON runtime (*.json)")
+        if path: self.host_runtime_path.setText(path); self.load_host()
 
-    def load_broker(self):
-        self.invalidate_broker()
+    def load_host(self):
+        self.invalidate_host()
         try:
-            runtime = BrokerRuntime.load(Path(self.broker_runtime_path.text()))
-            self.loaded_broker_runtime_path = str(Path(self.broker_runtime_path.text()).resolve())
-            for pane, path in ((self.broker_policy, runtime.state / "services/fanuc-mcp-server.json"),
-                               (self.broker_limits, runtime.state / "settings.json")):
-                pane.broker = runtime; pane.config_path.setText(str(path))
-                if path.exists(): pane.load_document()
-            self.broker_status.setText("Runtime loaded. Global settings require a stopped host and reconciled work. Use App framework for app publications, or FANUC service policy for broker registrations.")
+            runtime = HostRuntime.load(Path(self.host_runtime_path.text()))
+            self.loaded_host_runtime_path = str(Path(self.host_runtime_path.text()).resolve())
+            pane = self.host_settings
+            pane.host = runtime; pane.config_path.setText(str(runtime.state / "settings.json"))
+            pane.load_document()
+            self.host_status.setText("App-host runtime loaded. Global settings require a stopped host and reconciled work. Use App framework for its access policy.")
         except (OSError, ValueError, TypeError, KeyError) as error:
-            self.broker_status.setText(f"Could not load runtime: {error}")
+            self.host_status.setText(f"Could not load runtime: {error}")
 
     def reject(self):
-        panes = (self.robot_policy, self.application_policy, self.broker_policy, self.broker_limits)
+        panes = (self.robot_policy, self.application_policy, self.host_settings)
         if any(pane.snapshot and (pane.errors or pane.draft != pane.snapshot.document) for pane in panes):
             answer = QMessageBox.question(self, "Unsaved policy edits", "Discard unsaved policy edits?",
                                           QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel)

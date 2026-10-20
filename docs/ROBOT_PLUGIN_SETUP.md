@@ -29,11 +29,12 @@ it uninstalls the old headless distribution before installing the renamed wheel
 so both distributions do not own the same Python files. For the GUI, use a fresh
 environment or uninstall `fanuc-workbench` before installing `fanuc-mcp-server`.
 
-Existing runtime folders and active Codex registrations can keep their current
-paths. A new bundle registers under the new plugin identity only when
-`--register` is requested. It does not remove the old registration. After checking
-the renamed connection, remove the old registration before using both against
-the same controller. Compatible feature reloads retain their existing behavior.
+Existing standalone runtime folders and active Codex registrations can keep their
+current paths. Running setup registers the new plugin identity unless
+`--register none` or `--register mcp` is selected. It does not remove the old
+registration. After checking the renamed connection, disable the old registration
+before using both against the same controller. Compatible feature reloads retain
+their existing behavior.
 
 ## Build and install
 
@@ -47,7 +48,7 @@ python -B scripts/build_robot_plugin.py --output C:/RobotTools/FanucPluginBundle
 The framework wheel must match `packaging/framework.lock.json`; the builder
 checks its SHA-256, metadata and RECORD, then resolves dependencies using the
 committed framework constraints. See [app-owned framework hosting](APP_FRAMEWORK.md).
-The universal aggregation plugin remains optional.
+No separate broker plugin is used.
 
 Keep that bundle at a stable path. Install with the matching Python version;
 the setup script verifies file hashes and installs only from bundled wheels:
@@ -56,13 +57,12 @@ the setup script verifies file hashes and installs only from bundled wheels:
 py -3.14 -B C:/RobotTools/FanucPluginBundle/setup.py --runtime-dir C:/RobotTools/FanucRuntime
 ```
 
-Setup installs the app's own Codex plugin by default (`--register plugin`), even
-if a Universal Tools plugin is present. The shared framework is a Python package
-dependency and does not require a second Codex plugin. Use `--register auto` to
-retain a recorded route on upgrades; a fresh automatic install also selects the
-standalone plugin. Select `--register broker` explicitly for optional aggregation.
-Broker setup installs the app's route-aware skill separately and preserves app policy. See
-[Universal Tools integration](UNIVERSAL_BROKER.md) for prerequisites and limits.
+Setup installs the app's own Codex plugin by default (`--register plugin`). The
+shared framework is a Python package dependency and does not require a second
+Codex plugin. Broker registration, its runtime/write flags and automatic route
+selection have been removed. An old runtime recorded as a broker integration
+must first have its retained work reconciled, then use a new standalone runtime
+directory; setup refuses to mutate the old runtime or clear its recovery state.
 
 Use `--register mcp` for plain MCP registration, or `--register none` to install
 only the runtime. Do not register both forms in the same profile. Optional

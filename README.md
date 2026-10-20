@@ -75,12 +75,10 @@ connections.
 The default distribution includes the desktop dependencies. For a separate
 runtime without Qt, follow the [headless plugin bundle guide](docs/ROBOT_PLUGIN_SETUP.md).
 
-The standalone Codex plugin remains supported. An optional
-[Universal Tools integration](docs/UNIVERSAL_BROKER.md) uses the same services
-through CodexMCPBroker. Bundle setup installs the app's own plugin by default,
-without requiring or automatically selecting a universal plugin. Use
-`--register none` for runtime-only setup, `--register broker` for explicit optional
-aggregation, or `--register auto` to preserve a recorded integration route.
+Bundle setup installs the app's standalone Codex plugin by default. Use
+`--register none` for runtime-only setup or `--register mcp` for a direct MCP
+registration without a plugin. Broker routing is no longer supported; the shared
+framework remains an app dependency. See the [plugin guide](docs/ROBOT_PLUGIN_SETUP.md).
 For desktop use alone, omit the `mcp` extra or run `install_and_run.bat`.
 On Windows, that script also creates **Start > FanucMCPServer > FanucMCPServer**
 with the application icon for the current user. For a manual installation, run
@@ -145,7 +143,7 @@ Use **Help → Open desktop log folder** for local startup/error diagnostics and
 
 Use **Settings → Safeguards and policies…** for the full
 [chat-permissions editor](docs/SAFEGUARDS_GUI.md): online-write permission,
-per-robot targets/read scope, approval method, expiry, limits and optional broker
+per-robot targets/read scope, approval method, expiry, limits and app-host
 permissions. Changes require a validated review, retain the original policy and
 do not alter running sessions or contact a controller.
 
@@ -239,7 +237,6 @@ it requires a compatible controller service/options and never changes assignment
 - [Desktop connections, layouts, PLC imports and policy creation](docs/DESKTOP_GUIDE.md)
 - [MCP setup, tools and Python API](docs/ROBOT_BRIDGE.md)
 - [Headless plugin installation and upgrades](docs/ROBOT_PLUGIN_SETUP.md)
-- [Standalone plugin and Universal Tools routing](docs/UNIVERSAL_BROKER.md)
 - [Native controller configuration and verification limits](docs/ROBOT_NATIVE_API.md)
 - [Controller interfaces and software requirements](docs/CONTROLLER_INTERFACES.md)
 - [Optional allowlisted HTTP file reads](docs/HTTP_READS.md)

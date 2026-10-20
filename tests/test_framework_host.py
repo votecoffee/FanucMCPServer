@@ -17,7 +17,7 @@ pytest.importorskip("universal_tools.framework")
 from universal_tools.framework import ApplicationHost
 from universal_tools.models import atomic_json
 from fanuc_workbench.bridge import framework_host
-from fanuc_workbench.bridge.broker_server import create_server
+from fanuc_workbench.bridge.framework_backend import create_server
 from fanuc_workbench.bridge.policy_editor import load_policy, review_policy, save_policy
 from fanuc_workbench.bridge.service import RobotBridge
 from test_robot_bridge import MemoryRobot, ORIGINAL, PROPOSED, digest

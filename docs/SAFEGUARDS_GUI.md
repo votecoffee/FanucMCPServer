@@ -1,7 +1,7 @@
 # Chat permissions and safeguards
 
 Open **Settings > Safeguards and policies…** to edit existing robot policies and
-optional broker policies. **MCP access > All safeguards…** opens the same editor.
+app-owned host policies. **MCP access > All safeguards…** opens the same editor.
 Use **New policy…** when a robot policy does not exist. No controller connection
 is made by loading, reviewing or saving these local settings.
 
@@ -34,8 +34,8 @@ hosts, system/safety file writes, I/O forcing, motion or program execution.
 
 Store a PC-specific broad policy outside Git and select that same file in the
 desktop and MCP runtime. It applies to every chat using that policy after the
-MCP server reconnects; saving alone does not elevate existing sessions. A broker
-write channel is a separate setting when the optional broker route is in use.
+MCP server reconnects; saving alone does not elevate existing sessions. The
+experimental app host has a separate write channel when that host is used.
 
 The robot selector supports multiple robots, adding/renaming IDs and removing a
 robot from the draft. Target lists use one entry per line. SNPX ranges use
@@ -46,39 +46,25 @@ rewrite unrelated settings.
 
 ## App-owned framework
 
-The **App framework** tab edits `fanuc-application.json` using the same service
-controls as the broker section below. It preserves backend identity and artifacts
-and stages a new policy revision without activation. Finish/release retained work
-and explicitly refresh the app host. The **Host / broker settings** runtime
-selector also accepts the dedicated app host state for global port/token/request
-limits. See [the framework workflow](APP_FRAMEWORK.md).
+The **App framework** tab edits `fanuc-application.json`: service enablement,
+host write permission, exact outer-tool write scopes, reviewed read classifications,
+argument budgets, deadlines, retained-session mode, lease duration and resource
+identity. It preserves backend identity/artifacts and stages a new policy revision
+without activation. Finish/release retained work and explicitly refresh the app host.
+Local preparation, staging, jobs and reloads also use the host write channel.
+Robot online-write permission remains separate.
 
-## Optional broker
+The **Host settings** tab accepts only the FANUC app host's **runtime.json**.
+Click **Load runtime** to select its interpreter for schema validation. Remembered
+runtime paths are not executed automatically. Global controls cover the HTTP
+request budget, loopback port and authentication-token rotation. The token is
+masked and omitted from review text. Saves require a stopped host and reconciled
+retained work/recovery, using its administrative locks. The editor never stops
+processes, releases contexts or acknowledges recovery automatically.
 
-Select the installed broker's **runtime.json**, then click **Load broker runtime**.
-The broker's own interpreter validates its schema. It is never started by this
-editor. A remembered runtime path is not executed automatically.
-
-The **FANUC service policy** controls service enablement, broker write permission,
-exact outer-tool write scopes, reviewed legacy read classifications, argument
-budgets, deadlines, retained-session mode, lease duration and resource identity.
-Empty exact write allowlists and unrestricted legacy service-wide permission are
-distinct choices. The broker's write channel also covers local preparation,
-staging, job start/cancellation and worker reload. Robot online-write permission
-remains independent and is checked by the robot server.
-
-**Broker server settings** controls the HTTP request budget, loopback port and
-authentication-token rotation. The token is masked and omitted from review text.
-These settings affect all registered apps. Registered broker policy can be saved
-only while the broker is stopped and applicable retained work/recovery barriers
-are reconciled. The editor uses the broker's administrative locks and never
-stops processes, releases contexts or acknowledges recovery automatically.
-Changing a token/port requires reconnecting frontends. A staged service descriptor
-can be edited separately without registering it.
-
-FANUC uses an exclusive retained session for assessed broker workflows. Transient
-mode loses process-owned plans; shared mode does not isolate chat-owned plans.
-Changing a mode or a permission is not acceptance of that workflow.
+FANUC review plans use an exclusive retained session. Transient mode loses
+process-owned plans; shared mode does not isolate chat-owned plans. Changing a
+mode or permission does not establish acceptance. See [the framework workflow](APP_FRAMEWORK.md).
 
 ## Review, save and apply
 
@@ -90,11 +76,11 @@ Changing a mode or a permission is not acceptance of that workflow.
    `.fanuc-policy-history/` beside the file. No-change saves retain original bytes.
    An external edit invalidates the loaded snapshot instead of being overwritten.
 5. Reconnect the MCP server, or explicitly load the policy again in Native
-   Controller. Refresh/reconnect a stopped broker after its policy changes.
+   Controller. Refresh/reconnect a stopped app host after its policy changes.
    Retrieve fresh evidence and prepare new changes after a policy transition.
 
 Saving does not elevate an existing session or make a robot change. Save each
-policy separately; robot and broker files are not a grouped transaction. Closing
+policy separately; robot and app-host files are not a grouped transaction. Closing
 with unsaved edits offers cancel/discard. Store policies and their history outside
 the source checkout or in ignored local storage. Backups can contain private
 settings; the history directory is excluded from Git.
@@ -103,5 +89,5 @@ The **Built-in checks** page lists integrity requirements rather than permission
 switches: exact source/proposal hashes, single-use plans, commit preflight,
 verified readback, explicit per-request target/path validation, SFTP host-key verification,
 supported write classes, protocol bounds, authentication and recovery barriers.
-These remain mandatory. This editor changes app/broker policy, not the Codex
+These remain mandatory. This editor changes app policy, not the Codex
 host's own Full access/approval settings or the controller's safety configuration.

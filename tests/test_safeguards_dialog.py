@@ -135,13 +135,13 @@ def test_main_window_opens_safeguards_and_remembers_saved_policy(editor_policy, 
     called = []
     class Dialog:
         saved_policy_path = str(path)
-        loaded_broker_runtime_path = str(tmp_path / "runtime.json")
-        def __init__(self, selected, broker, parent): called.append(selected)
+        loaded_host_runtime_path = str(tmp_path / "runtime.json")
+        def __init__(self, selected, host, parent): called.append(selected)
         def exec(self): return QDialog.Rejected  # Saving a pane need not close the dialog.
     monkeypatch.setattr(main_window, "SafeguardsDialog", Dialog)
     action = next(action for action in window.settings_menu.actions() if action.text() == "Safeguards and policies…")
     action.trigger()
     assert called == [str(path)] and window.settings.preferences()["robot_policy_path"] == str(path)
-    assert window.settings.preferences()["broker_runtime_path"].endswith("runtime.json")
+    assert window.settings.preferences()["host_runtime_path"].endswith("runtime.json")
     assert window.native_tab.bridge is None
     window.close()
