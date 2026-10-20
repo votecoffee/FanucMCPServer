@@ -21,7 +21,8 @@ from fanuc_workbench.bridge.service import RobotBridge
 
 APPLICATION_ID = "fanuc-mcp-server"
 POLICY_KEYS = frozenset({"enabled", "allow_writes", "allowed_write_tools", "read_only_tools",
-    "max_argument_bytes", "timeout_seconds", "session_mode", "lease_seconds", "resource_id",
+    "max_argument_bytes", "max_argument_depth", "max_argument_nodes", "timeout_seconds",
+    "session_mode", "lease_seconds", "resource_id",
     "protocol_mode", "discovery_cache_ttl_seconds", "watch_catalog"})
 INSTRUCTIONS = (
     "Discover FANUC tools with search_tools and describe_tool. Acquire the exclusive "

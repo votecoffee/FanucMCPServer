@@ -9,14 +9,14 @@ Existing installations are updated only by running setup explicitly.
 
 ## Dependency and build
 
-The tested Python dependency is `universal-codex-tools==0.15.0`, imported through
+The tested Python dependency is `universal-codex-tools==0.16.0`, imported through
 `universal_tools.framework`. Its MCP dependency is exactly 2.3.0. The distribution
 has not been assumed available on a public package feed. Obtain the reviewed
 wheel from the framework build, verify it against `packaging/framework.lock.json`,
 and install it in the app's isolated environment before installing the MCP extra:
 
 ```powershell
-python -m pip install C:/Packages/universal_codex_tools-0.15.0-py3-none-any.whl
+python -m pip install C:/Packages/universal_codex_tools-0.16.0-py3-none-any.whl
 python -m pip install -c packaging/framework-requirements.txt -e ".[dev,mcp]"
 python -B -m pytest -q
 ```
@@ -83,6 +83,20 @@ The framework's HTTP SSE limits apply to HTTP backends; this app publishes stdio
 workers. Framework trace spans contain fixed labels without app payloads and do
 not enable an exporter. Optional skill-resource snapshots are not enabled by this
 app's CLI or plugin and do not install or activate native Codex skills.
+
+Framework 0.16 also supplies optional Tasks, verified downstream Skills, live skill
+publication and extension lifecycle hooks. This app does not register those
+extensions or automatically wrap its existing jobs. Backup/recording jobs retain
+their current app-owned handles, cancellation and review/recovery contracts.
+Adopting Tasks requires an explicit authorized job adapter; the fourteen-tool
+front door does not relay downstream Tasks automatically. Skill publication does
+not establish native host activation or grant permissions.
+
+The **App framework** GUI exposes structural argument budgets in addition to byte
+limits: `max_argument_depth` (default 64, maximum 128) and `max_argument_nodes`
+(default 100,000, maximum 1,000,000, including object keys). They are checked before
+schema validation, write claims and dispatch. Republishing preserves reviewed
+limits. These budgets do not narrow supported integer values or grant write access.
 
 New publications default to a disabled write channel and an empty exact write
 allowlist. Local staging, preparation, jobs and reloads also need that channel.

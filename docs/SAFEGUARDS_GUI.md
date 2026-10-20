@@ -48,7 +48,7 @@ rewrite unrelated settings.
 
 The **App framework** tab edits `fanuc-application.json`: service enablement,
 host write permission, exact outer-tool write scopes, reviewed read classifications,
-argument budgets, deadlines, retained-session mode, lease duration and resource
+argument byte/depth/node budgets, deadlines, retained-session mode, lease duration and resource
 identity. It preserves backend identity/artifacts and stages a new policy revision
 without activation. Finish/release retained work and explicitly refresh the app host.
 Local preparation, staging, jobs and reloads also use the host write channel.

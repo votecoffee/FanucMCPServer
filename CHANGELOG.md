@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Aligned source/packages with shared framework 0.16.0 and MCP SDK 2.3.0. Exposed
+  structural argument depth/node budgets in the GUI and preserved them across
+  publication. Optional Tasks/Skills remain unregistered; existing jobs, approval
+  and recovery contracts are unchanged. Installed integrations are not migrated.
+
 - Aligned source/packages with shared framework 0.15.0 while retaining MCP SDK
   2.3.0. Assessed modern frontends with the existing reviewed FANUC backend;
   require its legacy back-channel and reject unsupported downstream modern/watch
