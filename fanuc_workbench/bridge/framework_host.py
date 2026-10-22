@@ -184,6 +184,8 @@ def publish(state: Path, config: Path, *, port=None, allow_writes=None, package=
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state", required=True, type=Path)
+    parser.add_argument("--management-runtime", type=Path, help="Optional installer-owned plugin runtime pointer")
+    parser.add_argument("--management-registry", type=Path, default=os.environ.get("FANUC_MCP_MANAGEMENT_REGISTRY"))
     commands = parser.add_subparsers(dest="command", required=True)
     publish_parser = commands.add_parser("publish", help="Snapshot this app and stage a new publication; no activation")
     publish_parser.add_argument("--config", required=True, type=Path)
@@ -212,7 +214,9 @@ def main(argv=None):
         for backend in definition.backends:
             validate_backend_profile(backend.service)
         if args.command == "serve":
-            serve_application(state, publication)
+            from fanuc_workbench.bridge.management import report_service
+            with report_service(runtime=args.management_runtime, registry=args.management_registry):
+                serve_application(state, publication)
         else:
             create_surface(RemoteBackend(load_settings(state)), name=definition.display_name,
                            instructions=definition.instructions).run(transport="stdio")

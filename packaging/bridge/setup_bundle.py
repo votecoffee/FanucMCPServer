@@ -145,6 +145,8 @@ def main():
                        "allow_writes": False, "approval_mode": "elicitation", "max_file_bytes": 16777216,
                        "max_backup_files": 5000, "max_backup_bytes": 536870912}, stream, indent=2)
     settings = {"python": str(python), "config": str(config)}
+    if selected == "plugin":
+        settings["plugin_id"] = "fanuc-mcp-server@fanuc-mcp-server-local"
     checked = subprocess.run([str(python), "-B", "-m", "fanuc_workbench.bridge.doctor", "--config", str(config)],
                              env=environment, capture_output=True, text=True, check=True, timeout=60)
     doctor = json.loads(checked.stdout)

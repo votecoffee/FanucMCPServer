@@ -17,7 +17,8 @@ def main():
     python, config = Path(data["python"]), Path(data["config"])
     if not python.is_file() or not config.is_file():
         raise SystemExit("FanucMCPServer runtime/config is missing. Repair the local setup; no controller connection was attempted.")
-    arguments = [str(python), "-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", str(config)]
+    arguments = [str(python), "-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", str(config),
+                 "--management-runtime", str(settings)]
     # Windows CRT execv joins arguments without adding quotes. Preserve spaces
     # and embedded quotes using the same quoting rules as subprocess/CreateProcess.
     if os.name == "nt":

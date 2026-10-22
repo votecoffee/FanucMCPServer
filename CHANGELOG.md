@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Updated the shared framework to 0.18.0, retaining MCP SDK 2.3.0 and the standalone
+  plugin. Added cached, authenticated tray-manager reporting for owning MCP/host
+  processes, canonical plugin identity, component versions and local work/plan
+  counts. Restart stays disabled without a surviving app-owned supervisor; no
+  robot probe, automatic recovery, route switch or duplicate manager installation
+  occurs. Management startup failure does not interrupt the MCP service.
+
 - Updated the pinned shared framework to 0.17.0 with its complete required
   dependency lock, retaining MCP SDK 2.3.0 and the independently usable standalone
   plugin. Assessed optional Tasks/notifications, Skills, protocol relay, Apps,

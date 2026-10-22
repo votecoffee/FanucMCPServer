@@ -104,6 +104,20 @@ class RobotBridge:
             finally:
                 self._close_owner = None
 
+    def management_activity(self):
+        """Process-local counters only; never inspect journals or contact a robot.
+
+        This is reporting, not restart admission. Other processes, native leases
+        and uncertain effects remain unknown and cannot be cleared by these counts.
+        """
+        with self.requests.lock:
+            requests = len(self.requests.active)
+        with self.operations.jobs.lock:
+            jobs = len(self.operations.jobs.events)
+        with self._lock:
+            plans = len(self._plans) + len(self.comments.plans) + len(self.native.plans)
+        return {"active_operations": requests + jobs, "review_plans": plans}
+
     def __enter__(self):
         return self
 

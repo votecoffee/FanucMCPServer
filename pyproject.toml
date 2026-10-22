@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fanuc-mcp-server"
-version = "2.3.3"
+version = "2.4.0"
 description = "MCP server and desktop workbench for FANUC robot files, diagnostics, and reviewed changes."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +12,7 @@ dependencies = ["PySide6>=6.7", "XlsxWriter>=3.2", "reportlab>=4.2", "paramiko>=
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
-mcp = ["mcp==2.3.0", "universal-codex-tools==0.17.0"]
+mcp = ["mcp==2.3.0", "universal-codex-tools==0.18.0"]
 
 [project.scripts]
 fanuc-mcp-server = "fanuc_workbench.bridge.mcp_server:main"

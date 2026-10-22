@@ -7,16 +7,21 @@ experimental app-owned host uses an internal 49-tool backend, including its
 discovery catalog; it does not expose a separate broker-adapter entrypoint.
 Existing installations are updated only by running setup explicitly.
 
+Framework 0.18 adds [tray-manager reporting](SERVICE_MANAGEMENT.md). Only the
+owning service registers; proxies and backend workers do not. Restart remains
+disabled because there is no surviving app-owned supervisor and retained-worker
+activity is unknown. Installing this app does not install another manager.
+
 ## Dependency and build
 
-The tested Python dependency is `universal-codex-tools==0.17.0`, imported through
+The tested Python dependency is `universal-codex-tools==0.18.0`, imported through
 `universal_tools.framework`. Its MCP dependency is exactly 2.3.0. The distribution
 has not been assumed available on a public package feed. Obtain the reviewed
 wheel from the framework build, verify it against `packaging/framework.lock.json`,
 and install it in the app's isolated environment before installing the MCP extra:
 
 ```powershell
-python -m pip install C:/Packages/universal_codex_tools-0.17.0-py3-none-any.whl
+python -m pip install C:/Packages/universal_codex_tools-0.18.0-py3-none-any.whl
 python -m pip install -c packaging/framework-requirements.txt -e ".[dev,mcp]"
 python -B -m pytest -q
 ```

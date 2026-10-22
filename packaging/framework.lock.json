@@ -1,8 +1,8 @@
 {
   "package": "universal-codex-tools",
-  "version": "0.17.0",
-  "wheel": "universal_codex_tools-0.17.0-py3-none-any.whl",
-  "sha256": "6387265e9353f69f2dd767e4431ab2c7f6df40dd090118592a01daa3b5946c6b",
+  "version": "0.18.0",
+  "wheel": "universal_codex_tools-0.18.0-py3-none-any.whl",
+  "sha256": "0c1084b424f079957ebd3bec763e609564aaef64cd1fedee78b61a45bfbc24ac",
   "dependencies": [
     "mcp==2.3.0",
     "jsonschema==4.26.0",

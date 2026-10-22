@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 
 from fanuc_workbench.bridge.service import RobotBridge
@@ -327,12 +328,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="FanucMCPServer local MCP server (stdio)")
     parser.add_argument("--config", type=Path, default=configuration_environment(),
                         help="Bridge JSON file, or set FANUC_MCP_SERVER_CONFIG (legacy FANUC_WORKBENCH_CONFIG also accepted)")
+    parser.add_argument("--management-runtime", type=Path, help="Installer-owned plugin runtime pointer")
+    parser.add_argument("--management-registry", type=Path, default=os.environ.get("FANUC_MCP_MANAGEMENT_REGISTRY"),
+                        help="Optional private test registry; normally use the Windows user's manager registry")
     args = parser.parse_args()
     if args.config is None:
         parser.error("--config or FANUC_MCP_SERVER_CONFIG is required")
     bridge = RobotBridge.from_config(args.config)
     try:
-        create_server(bridge).run(transport="stdio")
+        from fanuc_workbench.bridge.management import report_service
+        server = create_server(bridge)
+        with report_service(bridge, runtime=args.management_runtime, registry=args.management_registry):
+            server.run(transport="stdio")
     finally:
         bridge.close()
 
