@@ -13,10 +13,12 @@ legacy commands remain compatible with the former FANUC Workbench name.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1022.173617** (America/New_York). App,
+The current source checkpoint is **26.1022.180303** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
+An explicit [direct standalone offline profile](docs/STANDALONE_OFFLINE.md)
+exposes saved-workspace analysis without extension or native launch routes.
 
 ## Table of Contents
 

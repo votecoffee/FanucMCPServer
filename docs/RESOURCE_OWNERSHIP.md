@@ -61,7 +61,8 @@ application Quit/Exit, saves user documents or closes attached software.
 
 | Path | Ownership and current source behavior | Remaining release requirement |
 | --- | --- | --- |
-| Installed plugin/plain MCP stdio | Installed-runtime supervisor, durable report-only launcher/worker records, retained handles, activation before MCP startup, opaque SDK streams, private job and EOF drain | Real startup/duplicate/EOF/owner-death, package and Codex acceptance |
+| Direct standalone offline | Explicit `--offline` dispatch allowlist, zero robots/writes, actual frontdoor identity audit and exclusive state lease; client owns Python/venv launch, no app-owned children or extension/native launch routes | Real direct SDK/cache/manager initialization, reads, EOF/crash/client-loss and identity acceptance |
+| Full installed plugin/plain MCP stdio | Installed-runtime supervisor, durable report-only launcher/worker records, retained handles, activation before MCP startup, opaque SDK streams, private job and EOF drain | Real startup/duplicate/EOF/owner-death, package and Codex acceptance |
 | App-host backend | New publications use the same supervisor; explicit registry allowlist propagation and exclusive state-directory lease; unmanaged older publications refuse startup pending explicit republish | Real host/retained-worker lifecycle and registry acceptance |
 | Feature/native RPC worker | Shared durable launch records, private Windows job, verified creation timestamp, retained handles, activation barrier, bounded inventory and uncertain-cleanup refusal | Real child-tree/owner-death and installed/native acceptance |
 | Offline MakeTP/PrintTP | Activated private tool worker contains compiler descendants; compiler intent/binding is durable; output is bounded and retained locally | Real timeout/child cleanup and native compiler acceptance |
@@ -74,6 +75,12 @@ Compiler and policy helpers use the common RPC lifetime implementation. The GUI
 refuses closure while private workers or uncertain cleanup remain. Do not install
 or enable the candidate on the strength of stub tests alone. Existing user-owned
 native software remains untouched while ownership is unestablished.
+
+The [direct standalone offline profile](STANDALONE_OFFLINE.md) excludes those
+worker/helper paths rather than treating their pending acceptance as evidence.
+Its frontdoor is client-owned; it does not create a post-launch private child
+claim for itself or enable manager PID termination. Its identity audit is a
+durable lifecycle receipt, not a second resource-recovery database.
 
 Stdio uses its own activation/pipe implementation because the framework's
 background launcher does not inherit SDK streams. The activation reader uses

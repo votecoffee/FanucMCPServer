@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "fanuc-mcp-server",
-  "version": "26.1022.173617",
+  "version": "26.1022.180303",
   "description": "FANUC robot files, backups, diagnostics and reviewed changes through shared Workbench services.",
   "extensions": {
     "com.openai": {

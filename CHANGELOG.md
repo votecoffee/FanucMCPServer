@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Added timestamp checkpoint `26.1022.180303` with an explicit direct
+  `--offline` profile: 15 saved-evidence tools, zero robots/writes, no extension,
+  native utility, worker, shared-host or protocol-preview routes. Refuse
+  incompatible policy before state creation and retain actual frontdoor identity
+  audit receipts. Optional supervised/shared profiles remain separate; installed
+  and native/runtime acceptance is still required before enabling a candidate.
+
 - Unified app, desktop/headless package and standalone plugin identities at
   timestamp checkpoint `26.1022.173617` (America/New_York). Preserve padded
   human display, canonical PEP 440/SemVer identities and bounded Windows file

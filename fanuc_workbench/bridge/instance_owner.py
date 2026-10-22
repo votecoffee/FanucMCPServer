@@ -16,9 +16,11 @@ _uncertain_leases = []
 
 
 @contextmanager
-def owned_mcp_bridge(config_path, *, factory=None):
+def owned_mcp_bridge(config_path, *, factory=None, validate=None):
     config_path = config_path.resolve()
     config = BridgeConfig.load(config_path)
+    if validate is not None:
+        validate(config)  # Refuse incompatible profiles before state/lease creation.
     lease = RobotLocks(config.state_dir / "mcp-owner").acquire("native-worker-owner")
     try:
         lease.__enter__()
