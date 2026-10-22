@@ -49,12 +49,14 @@ def build(source: Path, output: Path, framework_wheel: Path):
     if output.exists():
         raise FileExistsError("Choose a new output directory; existing bundles are preserved")
     if sys.platform != "win32":
-        raise ValueError("The current local plugin launcher targets Windows (py -3)")
+        raise ValueError("The managed local plugin stdio profile requires Windows")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.mkdir()
     plugin = output / "plugin"
     shutil.copytree(source / "plugins" / "fanuc-mcp-server", plugin,
                     ignore=shutil.ignore_patterns("runtime.json", "__pycache__", "*.pyc"))
+    # Immutable recipe stays hash-bound; setup emits runtime-specific mcp.json.
+    (plugin / "mcp.json").rename(plugin / "mcp.template.json")
     shutil.copyfile(source / "packaging" / "bridge" / "setup_bundle.py", output / "setup.py")
     wheels = plugin / "wheels"
     wheels.mkdir()

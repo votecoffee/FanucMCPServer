@@ -45,11 +45,12 @@ async def service_manifest(bridge: RobotBridge, python: Path, config: Path, *, a
     write_tools = sorted(tool.name for tool in tools
                          if not tool.annotations or tool.annotations.read_only_hint is not True)
     variables = sorted({name for access in bridge.config.robots.values()
-                        for name in (access.password_env, access.http_read_password_env) if name})
+                        for name in (access.password_env, access.http_read_password_env) if name}
+                       | {"FANUC_MCP_MANAGEMENT_REGISTRY"})
     return {"schema_version": 1, "id": "fanuc-mcp-server", "display_name": "FanucMCPServer",
         "description": "FANUC files, backups, diagnostics and reviewed changes through app-owned policy.",
         "transport": {"type": "stdio", "command": str(python.absolute()),
-            "args": ["-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", str(config.resolve())],
+            "args": ["-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--config", str(config.resolve())],
             "cwd": str(config.resolve().parent), "env_vars": variables},
         "session_mode": "exclusive", "resource_id": "fanuc-mcp-server", "lease_seconds": 900.0,
         "timeout_seconds": 60.0, "max_argument_bytes": 2 * 1024 * 1024,

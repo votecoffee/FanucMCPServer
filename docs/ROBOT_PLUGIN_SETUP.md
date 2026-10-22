@@ -77,12 +77,20 @@ and reuses it on later upgrades when `--config` is omitted. Missing saved
 configuration fails before runtime changes. Older runtimes without a recorded
 selection need `--config` once unless their default configuration exists.
 
-The local plugin contains `plugin.json`, `mcp.json`, a `fanuc-robot` skill and a
-stdlib launcher. The installer records absolute runtime/config paths in its
-local `runtime.json` before CLI installation. The launcher reads those paths;
-it does not install dependencies or contact a controller on its own. Configuration
+The local plugin keeps its own `plugin.json` and `fanuc-robot` skill. The bundle
+hashes an immutable `mcp.template.json`; setup emits `mcp.json` with the selected
+installed Python and `stdio_supervisor` entrypoint, plus its local `runtime.json`.
+The runtime marker records the generated connection SHA-256. Reinstall verifies
+the unchanged recipe and regenerates the connection, without relying on a global
+Python installation. The supervisor neither installs dependencies nor contacts a controller. Configuration
 and evidence live outside the plugin cache. Public marketplace submission and
 native Codex confirmation UI acceptance remain pending.
+
+The managed stdio profile requires Windows. Its SDK streams remain ordinary
+stdin/stdout pipes. A bounded private activation handshake establishes ledger
+identity and job membership before the MCP worker starts; activation does not
+prefetch MCP input. The framework background launcher is not substituted for
+SDK stdio. See [resource ownership and acceptance](RESOURCE_OWNERSHIP.md).
 
 The 0.8 host supports feature reload behind a stable MCP interface. See
 [ROBOT_EXTENSIONS.md](ROBOT_EXTENSIONS.md) for local staging, dependency isolation,

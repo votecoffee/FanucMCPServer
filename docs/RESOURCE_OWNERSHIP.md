@@ -30,6 +30,7 @@ without assignment or termination. The exact handle stays retained through
 teardown. Trusted feature code loads after containment; its subsequently launched
 descendants, including shell and Node children, inherit that job's restrictions.
 Job-close limits provide owner-death containment once attachment is established.
+Each private job admits at most 32 processes, including shell/Node descendants.
 
 Normal close first requests worker shutdown. Forced cleanup targets the private
 job and waits for its active process count to reach zero. Failed termination or
@@ -60,18 +61,27 @@ application Quit/Exit, saves user documents or closes attached software.
 
 | Path | Ownership and current source behavior | Remaining release requirement |
 | --- | --- | --- |
-| Plugin stdio launcher | Retained child handle, explicit non-inherited input writer, client EOF/parent-loss propagation, owning wait | Durable launch record, atomic startup containment and abnormal-exit reconciliation with the common API |
-| Direct/app-host backend | Exclusive state-directory lease through native drain | Durable owner identity and cross-process recovery integration |
+| Installed plugin/plain MCP stdio | Installed-runtime supervisor, durable report-only launcher/worker records, retained handles, activation before MCP startup, opaque SDK streams, private job and EOF drain | Real startup/duplicate/EOF/owner-death, package and Codex acceptance |
+| App-host backend | New publications use the same supervisor; explicit registry allowlist propagation and exclusive state-directory lease; unmanaged older publications refuse startup pending explicit republish | Real host/retained-worker lifecycle and registry acceptance |
 | Feature/native RPC worker | Shared durable launch records, private Windows job, verified creation timestamp, retained handles, activation barrier, bounded inventory and uncertain-cleanup refusal | Real child-tree/owner-death and installed/native acceptance |
 | Offline MakeTP/PrintTP | Activated private tool worker contains compiler descendants; compiler intent/binding is durable; output is bounded and retained locally | Real timeout/child cleanup and native compiler acceptance |
 | GUI ROBOGUIDE launch | Automatic launch refuses until native application/workcell ownership is accepted; backup handoff remains available and preserves existing folders | Explicit native ownership/dirty-state acceptance before enabling automatic launch; user-opened sessions remain protected |
 | Host-policy validation helper | Fixed metadata script in an owned activated worker using the selected interpreter; bounded IPC, durable records and redacted errors; never starts the host | Real selected-runtime/EOF/owner-death acceptance |
-| Build/install/doctor helpers | Explicit administrative commands; excluded from runtime startup | Adopt applicable ownership helpers and isolated acceptance before registration/install |
+| Doctor | Explicit administrative SDK client with a private registry; exercises the same supervised stdio entrypoint; default performs no controller probe | Real installed package/EOF acceptance |
+| Build/install helpers | Explicit administrative pip/CLI commands; not server-owned runtime/native resources | Package/registration checks in a disposable profile before installation |
 
 Compiler and policy helpers use the common RPC lifetime implementation. The GUI
 refuses closure while private workers or uncertain cleanup remain. Do not install
 or enable the candidate on the strength of stub tests alone. Existing user-owned
 native software remains untouched while ownership is unestablished.
+
+Stdio uses its own activation/pipe implementation because the framework's
+background launcher does not inherit SDK streams. The activation reader uses
+exact unbuffered bytes so the SDK's fd ownership cannot lose prefetched input.
+No MCP message or tool argument is interpreted by the relay. Report-only ancestor
+records prevent manager cleanup from terminating an MCP tree around an unresolved
+native barrier; abnormal loss still leaves domain journals and exact resource
+records for inspection. History is never cleared or replayed automatically.
 
 ## Durable ledger contract to integrate
 
@@ -93,7 +103,7 @@ There is no automatic restart, route switch, retry, rollback or unsaved-data los
 Pure unit tests use inert process objects, stub kernels and local synthetic files.
 They cover identity mismatch, bounded admission, retained uncertainty, cancellation,
 cleanup ordering, close-all behavior, attached-object preservation and bounded
-resource readers. They create no MCP server, job object or native application.
+resource readers. They start no MCP server or native application and create no OS job object.
 
 Subsequent isolated process tests must establish real EOF, startup failure,
 owner death, child/grandchild cleanup, console/shell teardown, dirty-state refusal,

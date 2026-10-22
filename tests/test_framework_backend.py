@@ -42,8 +42,9 @@ def test_app_backend_keeps_direct_schemas_and_exports_explicit_retained_policy(t
         descriptor = await service_manifest(bridge, Path(sys.executable), config)
         assert descriptor["session_mode"] == "exclusive"
         assert descriptor["allow_writes"] is False and descriptor["allowed_write_tools"] == []
-        assert descriptor["transport"]["env_vars"] == ["SYNTHETIC_FTP_PASSWORD"]
+        assert descriptor["transport"]["env_vars"] == ["FANUC_MCP_MANAGEMENT_REGISTRY", "SYNTHETIC_FTP_PASSWORD"]
         assert "--config" in descriptor["transport"]["args"]
+        assert "fanuc_workbench.bridge.stdio_supervisor" in descriptor["transport"]["args"]
         enabled = await service_manifest(bridge, Path(sys.executable), config, allow_writes=True)
         assert enabled["allow_writes"] is True and "commit_change" in enabled["allowed_write_tools"]
         assert "prepare_upload" in enabled["allowed_write_tools"]

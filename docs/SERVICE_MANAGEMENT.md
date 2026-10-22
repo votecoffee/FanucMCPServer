@@ -41,11 +41,15 @@ No package-feed or GitHub update check runs here.
 
 Status identifies per-chat stdio workers, shared app-host owners or explicitly
 marked validation workers. A per-chat worker is not a shared multi-chat server.
-The plugin launcher stays alive for its child and forwards stdin through an
-explicit pipe. Client EOF or loss of that owning launcher closes worker stdin;
-the worker then owns its normal request/job drain. The launcher never guesses
-a safe timeout or kills native work. A client can still force-terminate its
-process tree; such a record is offline rather than a clean stopped attestation.
+The installed Python stdio supervisor stays alive for its child and forwards
+opaque bytes through explicit pipes. Client EOF closes worker stdin and lets
+the child drain its domain work. A private activation handshake binds both
+launcher/worker identities before MCP starts. Unexpected supervisor death closes
+its private job and terminates contained workers; controller outcomes remain
+unverified until app receipts and native state are inspected. A client may also
+force-terminate its tree; such a record is offline rather than a clean stop.
+Stdio ancestors are report-only resources, so manager termination cannot bypass
+nested native recovery barriers. No user-attached application is terminated.
 Old detached instances cannot be safely retired from zero counters alone: their
 reporting-only endpoint cannot atomically fence admission or attest to uncertain
 effects. Do not bulk-kill names/PIDs or clear restart journals.
@@ -101,7 +105,7 @@ still require separate observation of replacement health.
 Use a dedicated registry for offline checks:
 
 ```powershell
-python -B -m fanuc_workbench.bridge.mcp_server --config C:/Test/empty-robot-policy.json --management-registry C:/Test/FanucRegistry
+python -B -m fanuc_workbench.bridge.stdio_supervisor --config C:/Test/empty-robot-policy.json --management-registry C:/Test/FanucRegistry --instance-role validation
 ```
 
 Alternatively set `FANUC_MCP_MANAGEMENT_REGISTRY` for a disposable launcher test.

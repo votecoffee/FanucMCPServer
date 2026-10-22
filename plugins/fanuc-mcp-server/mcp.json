@@ -4,7 +4,7 @@
     "fanuc-mcp-server": {
       "type": "stdio",
       "command": "py",
-      "args": ["-3", "${PLUGIN_ROOT}/server/launch.py"],
+      "args": ["-3", "-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--runtime", "${PLUGIN_ROOT}/runtime.json"],
       "cwd": "${PLUGIN_ROOT}"
     }
   }

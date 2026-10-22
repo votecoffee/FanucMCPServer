@@ -1,7 +1,8 @@
 # Shared-service and MCP coverage
 
 This mapping describes implementation coverage, not physical acceptance. The
-expanded development server exposes 48 tools. Unsupported native operations are
+expanded source catalog has 51 established tools and four staged job tools.
+Optional protocol features remain [gated](PROTOCOL_FEATURES.md). Unsupported native operations are
 reported through `capabilities`.
 
 | Existing area | Chat/API access | Boundary |

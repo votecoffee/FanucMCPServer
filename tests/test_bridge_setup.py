@@ -104,17 +104,16 @@ def test_plugin_launcher_handles_paths_with_spaces(tmp_path):
     from mcp.client.stdio import stdio_client
 
     root = tmp_path / 'Plugin With Spaces'
-    (root / 'server').mkdir(parents=True)
-    source = Path(__file__).resolve().parents[1] / 'plugins/fanuc-mcp-server/server/launch.py'
-    launcher = root / 'server/launch.py'
-    shutil.copyfile(source, launcher)
+    root.mkdir(parents=True)
     config = root / 'Config With Spaces.json'
     config.write_text(json.dumps({'state_dir':'state', 'source_dir':'edits', 'robots':{}}), encoding='utf-8')
     (root/'runtime.json').write_text(json.dumps({'python':sys.executable, 'config':str(config)}), encoding='utf-8')
 
     async def check():
-        params = StdioServerParameters(command=sys.executable, args=['-B',str(launcher)],
-                                      env={**os.environ, 'PYTHONDONTWRITEBYTECODE':'1'})
+        params = StdioServerParameters(command=sys.executable, args=['-B','-m','fanuc_workbench.bridge.stdio_supervisor','--runtime',str(root/'runtime.json')],
+                                      env={**os.environ, 'PYTHONDONTWRITEBYTECODE':'1',
+                                           'FANUC_MCP_MANAGEMENT_REGISTRY':str(tmp_path / 'private-registry'),
+                                           'FANUC_MCP_INSTANCE_ROLE':'validation'})
         async with stdio_client(params) as (reader,writer), ClientSession(reader,writer) as client:
             await client.initialize()
             assert len((await client.list_tools()).tools) == 55

@@ -9,6 +9,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import venv
 from pathlib import Path
 
@@ -46,6 +47,29 @@ def select_config(runtime, explicit, installation):
         if installation and not config.is_file():
             raise ValueError("This older runtime has no saved configuration selection; supply --config once to retain it")
     return config
+
+
+def plugin_connection(python, pointer, runtime):
+    return {"$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json", "mcpServers": {
+        "fanuc-mcp-server": {"type": "stdio", "command": str(python),
+            "args": ["-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--runtime", str(pointer)],
+            "cwd": str(runtime)}}}
+
+
+def generated_file(root, relative, payload):
+    path = root / relative
+    if (path.is_symlink() or (path.exists() and getattr(path.stat(), "st_file_attributes", 0) & 0x400)
+            or not path.resolve().is_relative_to(root.resolve())):
+        raise ValueError("Generated plugin state must remain an ordinary file inside this bundle")
+    fd, temporary = tempfile.mkstemp(prefix=".fanuc-setup-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 def register_plugin(codex, root, environment):
@@ -151,16 +175,19 @@ def main():
                              env=environment, capture_output=True, text=True, check=True, timeout=60)
     doctor = json.loads(checked.stdout)
     (runtime / "doctor.json").write_text(json.dumps(doctor, indent=2), encoding="utf-8")
-    (root / "plugin" / "runtime.json").write_text(json.dumps(settings, indent=2), encoding="utf-8")
+    generated_file(root, "plugin/runtime.json", json.dumps(settings, indent=2).encode())
+    connection = json.dumps(plugin_connection(python, root / "plugin" / "runtime.json", runtime), indent=2).encode()
+    generated_file(root, "plugin/mcp.json", connection)
     marker.write_text(json.dumps({"kind": "fanuc-mcp-server-runtime", "compatibility": compatibility(),
-                                 "config": str(config), **{key: installation[key] for key in
+                                 "config": str(config), "plugin_connection_sha256": hashlib.sha256(connection).hexdigest(),
+                                 **{key: installation[key] for key in
                                  ("registration",) if key in installation}}, indent=2), encoding="utf-8")
     if args.register != "none":
         if selected == "plugin":
             register_plugin(codex, root, environment)
         elif selected == "mcp":
             subprocess.run([codex, "mcp", "add", "fanuc-mcp-server", "--", str(python), "-B", "-m",
-                            "fanuc_workbench.bridge.mcp_server", "--config", str(config)], check=True, env=environment)
+                            "fanuc_workbench.bridge.stdio_supervisor", "--config", str(config)], check=True, env=environment)
         saved = json.loads(marker.read_text(encoding="utf-8"))
         saved["registration"] = selected
         marker.write_text(json.dumps(saved, indent=2), encoding="utf-8")

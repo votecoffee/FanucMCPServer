@@ -10,12 +10,12 @@ requires-python = ">=3.11"
 dependencies = ["mcp==2.3.0", "universal-codex-tools==0.20.0", "paramiko>=3.5", "XlsxWriter>=3.2", "reportlab>=4.2", "pywin32>=311; sys_platform == 'win32'"]
 
 [project.scripts]
-fanuc-mcp-server = "fanuc_workbench.bridge.mcp_server:main"
+fanuc-mcp-server = "fanuc_workbench.bridge.stdio_supervisor:main"
 fanuc-mcp-server-doctor = "fanuc_workbench.bridge.doctor:main"
 fanuc-mcp-server-extension = "fanuc_workbench.bridge.extensions_cli:main"
 fanuc-mcp-server-framework = "fanuc_workbench.bridge.framework_host:main"
 fanuc-mcp-server-guidance = "fanuc_workbench.bridge.guidance:main"
-fanuc-workbench-mcp = "fanuc_workbench.bridge.mcp_server:main"
+fanuc-workbench-mcp = "fanuc_workbench.bridge.stdio_supervisor:main"
 fanuc-workbench-doctor = "fanuc_workbench.bridge.doctor:main"
 fanuc-workbench-extension = "fanuc_workbench.bridge.extensions_cli:main"
 

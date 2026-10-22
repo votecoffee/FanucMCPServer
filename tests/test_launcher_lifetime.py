@@ -4,7 +4,6 @@ import ctypes
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import time
@@ -17,16 +16,14 @@ from universal_tools.management import ManagementClient, ManagementRegistry
 @pytest.mark.parametrize("parent_loss", [False, True])
 def test_launcher_owns_stdin_and_actual_worker_exit(tmp_path, parent_loss):
     root = tmp_path / "Plugin With Spaces"
-    (root / "server").mkdir(parents=True)
-    repo = Path(__file__).resolve().parents[1]
-    shutil.copyfile(repo / "plugins/fanuc-mcp-server/server/launch.py", root / "server/launch.py")
+    root.mkdir(parents=True)
     config = tmp_path / "empty.json"
     config.write_text('{"state_dir":"state","source_dir":"edits","robots":{}}')
     (root / "runtime.json").write_text(json.dumps({"python": sys.executable, "config": str(config)}))
     registry = tmp_path / "private-registry"
     environment = {**os.environ, "FANUC_MCP_MANAGEMENT_REGISTRY": str(registry),
                    "FANUC_MCP_INSTANCE_ROLE": "validation", "PYTHONDONTWRITEBYTECODE": "1"}
-    process = subprocess.Popen([sys.executable, "-B", str(root / "server/launch.py")],
+    process = subprocess.Popen([sys.executable, "-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--runtime", str(root / "runtime.json")],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         text=True, encoding="utf-8", env=environment, creationflags=subprocess.CREATE_NO_WINDOW)
     reader = ThreadPoolExecutor(max_workers=1)
@@ -69,11 +66,11 @@ def test_launcher_owns_stdin_and_actual_worker_exit(tmp_path, parent_loss):
         deadline = time.monotonic() + 5
         while True:
             current = next(row for row in client.registry.records()[0] if row.instance_id == record.instance_id)
-            if current.stopped:
+            if parent_loss or current.stopped:
                 break
             assert time.monotonic() < deadline
             time.sleep(.05)
-        assert client.inspect(current)["status"]["state"] == "stopped"
+        assert client.inspect(current)["status"]["state"] == ("offline" if parent_loss else "stopped")
     finally:
         if process.poll() is None:
             process.terminate()

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Added an installed-runtime stdio supervisor with durable report-only ancestor
+  records, bounded activation, opaque SDK byte relay and private job containment.
+  Generate the runtime connection from a hash-bound immutable bundle recipe;
+  explicitly propagate private registries through app-host environment allowlists.
+  Older unmanaged publications require explicit republish. Runtime acceptance
+  remains pending; no installed registration is migrated by source changes.
+
 - Routed offline MakeTP/PrintTP and host-policy helpers through activated owned
   workers with durable records, descendant teardown and bounded private logs.
   Refuse desktop closure during active/uncertain worker cleanup. Disable

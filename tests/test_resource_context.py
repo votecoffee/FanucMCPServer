@@ -56,6 +56,15 @@ def test_reservation_precedes_binding_and_uses_actual_supervisor(context):
     assert driver.terminations == []
 
 
+def test_stdio_transport_is_report_only_and_cannot_bypass_nested_native_barriers(context):
+    resources, driver, root, child = context
+    claim = resources.begin("stdio-worker")
+    claim.bind(root, 200)
+    claim.bind_bootstrap(child, 201)
+    assert all(resources.ledger.get(identifier).cleanup_mode == "report" for identifier in claim.identifiers)
+    assert driver.terminations == []
+
+
 def test_creation_mismatch_retains_a_barrier_without_terminating_replacement(context):
     resources, driver, root, _ = context
     claim = resources.begin("feature-worker")

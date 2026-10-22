@@ -1,8 +1,10 @@
 # FanucMCPServer MCP and Python API
 
 The GUI, local Python API and MCP adapter share controller, parser and analysis
-services. The server exposes 48 tools. Physical-controller acceptance remains
-pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
+services. The source catalog contains 51 established tools and four staged job
+tools. Their exposure does not enable optional protocol features; see
+[protocol feature gates](PROTOCOL_FEATURES.md). Physical-controller acceptance
+remains pending. See [the service coverage matrix](ROBOT_BRIDGE_COVERAGE.md).
 
 Write-list requirements below describe the default `write_scope: "allowlisted"`.
 For broad access on a trusted local installation, the operator can choose
@@ -40,7 +42,7 @@ Add a local stdio server in Codex MCP settings using this environment's absolute
 Scripts/python.exe path and these arguments:
 
 ```text
--B -m fanuc_workbench.bridge.mcp_server --config C:/path/to/FanucMCPServer/.local/robot_bridge.local.json
+-B -m fanuc_workbench.bridge.stdio_supervisor --config C:/path/to/FanucMCPServer/.local/robot_bridge.local.json
 ```
 
 Equivalent local configuration:
@@ -48,7 +50,7 @@ Equivalent local configuration:
 ```toml
 [mcp_servers.fanuc-mcp-server]
 command = "C:/path/to/FanucMCPServer/.venv/Scripts/python.exe"
-args = ["-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", "C:/path/to/FanucMCPServer/.local/robot_bridge.local.json"]
+args = ["-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--config", "C:/path/to/FanucMCPServer/.local/robot_bridge.local.json"]
 ```
 
 Restart the connection, then call list_robots and capabilities before network

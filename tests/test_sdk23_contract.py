@@ -4,13 +4,17 @@ import hashlib
 import json
 from pathlib import Path
 import tomllib
+import subprocess
 
 from fanuc_workbench.bridge.mcp_server import create_server
 from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.service import RobotBridge
 
 
-def test_sdk23_preserves_standalone_wire_definitions(tmp_path):
+def test_sdk23_preserves_standalone_wire_definitions(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Schema generation must never launch a worker or controller")
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
     async def check():
         with RobotBridge(BridgeConfig(tmp_path / "state", tmp_path / "edits")) as bridge:
             rows = [tool.model_dump(by_alias=True, mode="json", exclude_none=True)
@@ -32,3 +36,5 @@ def test_package_dependencies_pin_the_tested_framework_and_sdk():
     bridge = tomllib.loads((root / "packaging/bridge/pyproject.toml").read_text())["project"]
     for deps in (desktop["optional-dependencies"]["mcp"], bridge["dependencies"]):
         assert "mcp==2.3.0" in deps and "universal-codex-tools==0.20.0" in deps
+    for package in (desktop, bridge):
+        assert package["scripts"]["fanuc-mcp-server"] == "fanuc_workbench.bridge.stdio_supervisor:main"

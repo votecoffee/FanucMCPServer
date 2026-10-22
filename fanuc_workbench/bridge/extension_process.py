@@ -51,7 +51,8 @@ class WindowsJob:
         if not self.handle:
             raise OSError("Worker job could not be created")
         limits = Extended()
-        limits.basic.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        limits.basic.flags = 0x2000 | 0x8  # KILL_ON_JOB_CLOSE | ACTIVE_PROCESS
+        limits.basic.active = 32
         if not self.kernel.SetInformationJobObject(self.handle, 9, c.byref(limits), c.sizeof(limits)):
             self.close()
             raise OSError("Worker cleanup limit could not be set")
@@ -147,6 +148,9 @@ class RpcProcess:
             self.pid = boot.get("boot_pid")
             if boot.get("protocol") != 1 or type(self.pid) is not int or self.pid < 1:
                 raise ValueError("Worker bootstrap protocol failed")
+            # Apply ownership/creation/foreign-claim checks before granting a
+            # job handle any termination authority over the reported process.
+            self.resource_claim.bind_bootstrap(self.pid, boot.get("creation_time"))
             if os.name == "nt":
                 self.job = WindowsJob()
                 # A Windows venv launcher may have a second Python process.
@@ -155,7 +159,6 @@ class RpcProcess:
                 self.job.attach(self.pid, boot.get("creation_time"))
             elif os.getpgid(self.pid) != self.process.pid:
                 raise ValueError("Worker is outside its owned process group")
-            self.resource_claim.bind_bootstrap(self.pid, boot.get("creation_time"))
             workers.update(self.resource_id, "starting", pid=self.pid, creation_time=boot.get("creation_time"),
                            ledger_resources=self.resource_claim.identifiers)
             self._send({"command": "activate"})

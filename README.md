@@ -87,6 +87,10 @@ the [resource ownership matrix](docs/RESOURCE_OWNERSHIP.md); release acceptance 
 Offline compiler and host-policy helpers share the owned-worker lifecycle.
 ROBOGUIDE integration stages backups for a separately opened user session;
 automatic application launch remains unavailable pending ownership acceptance.
+Installed plugin/plain MCP connections use an owned stdio supervisor in the
+selected runtime. SDK byte streams are preserved, with report-only ancestor
+records and private worker containment. Real lifecycle and installed acceptance
+remain separate from source/unit checks.
 
 The packaged skill is a stable bootstrap for [current workflow guidance](docs/WORKFLOW_GUIDANCE.md).
 Ordinary guide readers and Skills-over-MCP share one maintained source and support
@@ -135,7 +139,7 @@ the following arguments, replacing the example paths:
 ```toml
 [mcp_servers.fanuc-mcp-server]
 command = "C:/path/to/FanucMCPServer/.venv/Scripts/python.exe"
-args = ["-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", "C:/path/to/FanucMCPServer/.local/robot_bridge.local.json"]
+args = ["-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--config", "C:/path/to/FanucMCPServer/.local/robot_bridge.local.json"]
 ```
 
 `fanuc-mcp-server --config <path>` is the equivalent stdio server command.

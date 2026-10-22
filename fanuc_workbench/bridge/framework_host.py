@@ -47,6 +47,13 @@ def validate_backend_profile(service):
         raise ValueError("FANUC backend requires the legacy wire profile for reviewed approval; modern frontends may connect through the app host")
 
 
+def validate_owned_entrypoint(service):
+    if (service.transport.type != "stdio"
+            or "fanuc_workbench.bridge.stdio_supervisor" not in service.transport.args
+            or "FANUC_MCP_MANAGEMENT_REGISTRY" not in service.transport.env_vars):
+        raise ValueError("Republish the reconciled FANUC backend with its owned stdio supervisor and explicit resource registry before serving")
+
+
 def revision(backend):
     from universal_tools.models import ServiceManifest
     # Hash the validated representation used by the host. JSON integers and
@@ -164,7 +171,7 @@ def publish(state: Path, config: Path, *, port=None, allow_writes=None, package=
             raise ValueError("Existing deployment changed; preserve it for inspection")
         entry = target / "worker.py"
         descriptor["transport"].update(command=str(Path(sys.executable).absolute()),
-            args=["-B", str(entry)], cwd=str(target))
+            args=["-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--entry", str(entry)], cwd=str(target))
         backend = {"service": descriptor, "artifact": {"path": str(entry), "sha256": digest(entry_bytes)}}
         backend["revision"] = revision(backend)
         document = {"schema_version": 1, "id": APPLICATION_ID, "display_name": "FanucMCPServer",
@@ -215,6 +222,7 @@ def main(argv=None):
             raise ValueError("Select a FANUC application state")
         for backend in definition.backends:
             validate_backend_profile(backend.service)
+            validate_owned_entrypoint(backend.service)
         from fanuc_workbench.bridge.guidance import WorkflowGuidance
         runtime = json.loads((state / "runtime.json").read_bytes())
         guide_state = Path(runtime.get("guidance_state", state / "workflow-guidance"))
@@ -223,7 +231,9 @@ def main(argv=None):
         guidance = WorkflowGuidance(guide_state)
         if args.command == "serve":
             from fanuc_workbench.bridge.management import report_service
-            with report_service(runtime=args.management_runtime, registry=args.management_registry, role="app-host"):
+            from fanuc_workbench.bridge.resource_context import registry_environment
+            with registry_environment(args.management_registry) as registry, report_service(
+                    runtime=args.management_runtime, registry=registry, role="app-host"):
                 serve_application(state, publication, skills=guidance)
         else:
             create_surface(RemoteBackend(load_settings(state)), name=definition.display_name,

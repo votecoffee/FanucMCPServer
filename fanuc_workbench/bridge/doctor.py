@@ -27,7 +27,7 @@ async def _diagnose(config: Path, probe: str | None, registry: str) -> dict:
     environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     environment.update(FANUC_MCP_MANAGEMENT_REGISTRY=registry, FANUC_MCP_INSTANCE_ROLE="validation")
     params = StdioServerParameters(command=sys.executable,
-                                   args=["-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", str(config.resolve())],
+                                   args=["-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--config", str(config.resolve())],
                                    env=environment)
     async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
         await session.initialize()

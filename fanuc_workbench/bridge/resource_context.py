@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import threading
+from contextlib import contextmanager
 
 
 APP_ID = "fanuc-mcp-server"
@@ -29,7 +30,8 @@ class ResourceContext:
         labels["policy-worker"] = "FANUC local host-policy worker"
         if kind not in labels:
             raise ValueError("Unknown FANUC owned resource kind")
-        record = self.owner.begin_launch(labels[kind], kind=kind, cleanup_mode="terminate")
+        mode = "report" if kind == "stdio-worker" else "terminate"
+        record = self.owner.begin_launch(labels[kind], kind=kind, cleanup_mode=mode)
         return ResourceClaim(self, record.resource_id, kind)
 
     def close(self):
@@ -39,6 +41,7 @@ class ResourceContext:
 class ResourceClaim:
     def __init__(self, context, identifier, kind):
         self.context, self.resource_id, self.kind = context, identifier, kind
+        self.cleanup_mode = "report" if kind == "stdio-worker" else "terminate"
         self.identifiers = [identifier]
         self.processes = {}
 
@@ -57,7 +60,7 @@ class ResourceClaim:
                 self.uncertain("Bootstrap creation identity changed before app activation")
                 raise ValueError("Bootstrap process identity changed")
             return record
-        record = self.context.owner.begin_launch("FANUC activated Python worker", kind=self.kind, cleanup_mode="terminate")
+        record = self.context.owner.begin_launch("FANUC activated Python worker", kind=self.kind, cleanup_mode=self.cleanup_mode)
         self.identifiers.append(record.resource_id)
         bound = self.context.owner.bind_process(record.resource_id, pid)
         if bound.process.created != str(expected_creation_time):
@@ -121,3 +124,20 @@ def close_resource_context():
     with _lock:
         if _context is not None:
             _context.close()
+
+
+@contextmanager
+def registry_environment(registry=None):
+    """Explicitly propagate the host's registry through the SDK's env allowlist."""
+    from universal_tools.management import default_registry
+    key = "FANUC_MCP_MANAGEMENT_REGISTRY"
+    previous = os.environ.get(key)
+    selected = Path(registry or previous or default_registry()).absolute()
+    os.environ[key] = str(selected)
+    try:
+        yield selected
+    finally:
+        if previous is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = previous
