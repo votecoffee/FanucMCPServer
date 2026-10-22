@@ -57,7 +57,7 @@ def test_installed_and_running_versions_remain_distinct(bridge_case, tmp_path, m
     reporting.refresh()
     versions = reporting.status().versions
     assert versions["plugin"].installed == "2.0.0" and versions["plugin"].running == "1.0.0"
-    assert versions["framework"].installed == "9.0.0" and versions["framework"].running == "0.18.0"
+    assert versions["framework"].installed == "9.0.0" and versions["framework"].running == "0.20.0"
     assert versions["framework"].available is None and not versions["framework"].update_pending
 
 

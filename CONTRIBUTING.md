@@ -11,7 +11,7 @@ Use Python 3.11 or newer. From the repository root on Windows:
 
 ```powershell
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install C:/Packages/universal_codex_tools-0.18.0-py3-none-any.whl
+.\.venv\Scripts\python.exe -m pip install C:/Packages/universal_codex_tools-0.20.0-py3-none-any.whl
 .\.venv\Scripts\python.exe -m pip install -c packaging/framework-requirements.txt -e ".[dev,mcp]"
 .\.venv\Scripts\python.exe -B -m pytest -q
 ```

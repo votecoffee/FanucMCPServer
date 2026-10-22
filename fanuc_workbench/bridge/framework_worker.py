@@ -29,3 +29,5 @@ def run(verify, config: Path):
     with owned_mcp_bridge(config) as bridge:
         bridge.requests = VerifiedRequests(bridge.requests, verify)
         create_server(bridge).run(transport="stdio")
+    from fanuc_workbench.bridge.resource_context import close_resource_context
+    close_resource_context()

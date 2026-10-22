@@ -14,6 +14,7 @@ from pathlib import Path
 from fanuc_workbench.bridge.extension_release import MAX_MESSAGE, MAX_REQUEST, json_bytes
 from fanuc_workbench.bridge.process_identity import creation_time
 from fanuc_workbench.bridge.owned_workers import workers
+from fanuc_workbench.bridge.resource_context import resource_context
 
 
 class WindowsJob:
@@ -119,18 +120,25 @@ class RpcProcess:
         self.reader = None
         self.pid = None
         self.cleanup_complete = False
+        self.resource_claim = None
+        self.native_worker = ready_fields.get("provider") == "frrobot"
         self.operation_timeout = operation_timeout
-        self.resource_id = workers.reserve(self, "native-worker" if ready_fields.get("provider") == "frrobot" else "feature-worker")
+        kind = "native-worker" if self.native_worker else "feature-worker"
+        self.resource_id = workers.reserve(self, kind)
         # Worker code is trusted local code; avoid accidentally forwarding secrets.
         allowed = {"SYSTEMROOT", "WINDIR", "PATH", "PATHEXT", "TEMP", "TMP", "LOCALAPPDATA",
-                   "APPDATA", "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "COMSPEC", "LANG", "LC_ALL"}
+                   "APPDATA", "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "COMSPEC", "LANG", "LC_ALL",
+                   "FANUC_MCP_MANAGEMENT_REGISTRY", "FANUC_MCP_INSTANCE_ROLE"}
         environment = {key: value for key, value in os.environ.items() if key.upper() in allowed}
         environment.update(PYTHONDONTWRITEBYTECODE="1", PYTHONNOUSERSITE="1", PYTHONUTF8="1")
         options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
         try:
+            self.resource_claim = resource_context().begin(kind)
             self.process = subprocess.Popen(command,
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 env=environment, cwd=cwd, close_fds=True, **options)
+            if os.name == "nt":
+                self.resource_claim.bind(self.process.pid, creation_time(self.process._handle))
             self.reader = threading.Thread(target=self._read, daemon=True, name="fanuc-feature-ipc")
             self.reader.start()
             boot = self._receive(startup_timeout)
@@ -145,7 +153,9 @@ class RpcProcess:
                 self.job.attach(self.pid, boot.get("creation_time"))
             elif os.getpgid(self.pid) != self.process.pid:
                 raise ValueError("Worker is outside its owned process group")
-            workers.update(self.resource_id, "starting", pid=self.pid, creation_time=boot.get("creation_time"))
+            self.resource_claim.bind_bootstrap(self.pid, boot.get("creation_time"))
+            workers.update(self.resource_id, "starting", pid=self.pid, creation_time=boot.get("creation_time"),
+                           ledger_resources=self.resource_claim.identifiers)
             self._send({"command": "activate"})
             ready = self._receive(startup_timeout)
             if (ready.get("protocol") != 1 or ready.get("ready") is not True or ready.get("pid") != self.pid
@@ -205,6 +215,9 @@ class RpcProcess:
             if not self.healthy:
                 raise RuntimeError("Extension worker is unavailable; reload extensions before another call")
             request_id = uuid.uuid4().hex
+            native_write = self.native_worker and operation_id == "write_register"
+            if native_write:
+                self.resource_claim.begin_native_write()  # Durable before any vendor dispatch.
             try:
                 sent, failures = threading.Event(), []
                 def write():
@@ -231,6 +244,9 @@ class RpcProcess:
             if set(response) != {"request_id", "result"}:
                 self._stop()
                 raise RuntimeError("Extension worker returned an invalid envelope")
+            result = response["result"]
+            if native_write and result.get("ok") is True and result.get("result", {}).get("status") == "verified":
+                self.resource_claim.verified_native_write(result["result"].get("value_sha256"))
             return response["result"]
 
     def _stop(self):
@@ -278,6 +294,8 @@ class RpcProcess:
                         self.reader.join(timeout=1)
                         if self.reader.is_alive():
                             raise RuntimeError("Worker IPC thread shutdown is uncertain")
+                    if getattr(self, "resource_claim", None) is not None:
+                        self.resource_claim.exited()
                     self.cleanup_complete = True
                     workers.release(self.resource_id)
                 finally:
@@ -285,6 +303,8 @@ class RpcProcess:
                         workers.update(self.resource_id, "uncertain")
             else:
                 workers.update(self.resource_id, "uncertain")
+                if getattr(self, "resource_claim", None) is not None:
+                    self.resource_claim.uncertain("Owned worker cleanup is unverified; inspect app receipts without retry")
 
     def close(self):
         with self.lock:

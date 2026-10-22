@@ -27,10 +27,11 @@ class WorkerInventory:
             identifier = uuid.uuid4().hex
             self.owners[identifier] = owner
             self.records[identifier] = {"resource_id": identifier, "kind": kind,
-                "ownership": "exclusive-app-launch", "state": "starting", "pid": None, "creation_time": None}
+                "ownership": "exclusive-app-launch", "state": "starting", "pid": None, "creation_time": None,
+                "ledger_resources": []}
             return identifier
 
-    def update(self, identifier, state, *, pid=None, creation_time=None):
+    def update(self, identifier, state, *, pid=None, creation_time=None, ledger_resources=None):
         if state not in {"starting", "running", "stopping", "uncertain"}:
             raise ValueError("Invalid private worker state")
         with self.lock:
@@ -38,6 +39,8 @@ class WorkerInventory:
             record["state"] = state
             if pid is not None:
                 record.update(pid=pid, creation_time=creation_time)
+            if ledger_resources is not None:
+                record["ledger_resources"] = list(ledger_resources)
 
     def release(self, identifier):
         with self.lock:
@@ -50,8 +53,8 @@ class WorkerInventory:
         with self.lock:
             return {"limit": self.limit, "active": len(self.records),
                     "uncertain": sum(row["state"] == "uncertain" for row in self.records.values()),
-                    "resources": [dict(row) for row in self.records.values()],
-                    "durable_recovery": "pending shared ownership-ledger integration"}
+                    "resources": [{**row, "ledger_resources": list(row["ledger_resources"])} for row in self.records.values()],
+                    "durable_recovery": "shared resource ledger; app-only reconciliation; no automatic recovery"}
 
 
 workers = WorkerInventory()

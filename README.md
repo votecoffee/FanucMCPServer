@@ -62,11 +62,11 @@ Install the desktop application and MCP adapter from source on Windows:
 git clone https://github.com/votecoffee/FanucMCPServer.git
 cd FanucMCPServer
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install C:/Packages/universal_codex_tools-0.18.0-py3-none-any.whl
+.\.venv\Scripts\python.exe -m pip install C:/Packages/universal_codex_tools-0.20.0-py3-none-any.whl
 .\.venv\Scripts\python.exe -m pip install -c packaging/framework-requirements.txt -e ".[mcp]"
 ```
 
-MCP packages pin **SDK 2.3.0** and **universal-codex-tools 0.18.0**. Obtain
+MCP packages pin **SDK 2.3.0** and **universal-codex-tools 0.20.0**. Obtain
 the verified framework wheel using the [framework guide](docs/APP_FRAMEWORK.md);
 public package-feed availability is not assumed. The separate app-owned host is
 experimental. Source/package upgrades do not migrate installed plugins or live
@@ -82,7 +82,7 @@ hold it through shutdown. A second standalone or app-host backend worker using
 that state is refused before service construction. Independent requests still
 share the owning worker's bounded dispatcher. See [worker ownership](docs/SERVICE_MANAGEMENT.md).
 Private feature/native workers also have a bounded inventory and creation-bound
-Windows handles. Durable recovery and remaining native launch paths are listed in
+Windows handles. RPC workers now use the shared durable ledger; remaining launch paths are listed in
 the [resource ownership matrix](docs/RESOURCE_OWNERSHIP.md); release acceptance is pending.
 
 The packaged skill is a stable bootstrap for [current workflow guidance](docs/WORKFLOW_GUIDANCE.md).

@@ -449,6 +449,8 @@ def main() -> None:
         parser.error("--config or FANUC_MCP_SERVER_CONFIG is required")
     from fanuc_workbench.bridge.instance_owner import owned_mcp_bridge
     from fanuc_workbench.bridge.management import report_service
+    from fanuc_workbench.bridge.resource_context import configure_resource_registry, close_resource_context
+    configure_resource_registry(args.management_registry)
     with owned_mcp_bridge(args.config) as bridge:
         server = create_server(bridge, frontend_identity=secrets.token_hex(32))
         with report_service(bridge, runtime=args.management_runtime, registry=args.management_registry, role=args.instance_role):
@@ -457,6 +459,7 @@ def main() -> None:
             finally:
                 # Keep management and the owner lease alive through native drain.
                 bridge.close()
+    close_resource_context()
 
 
 if __name__ == "__main__":

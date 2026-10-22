@@ -7,21 +7,21 @@ experimental app-owned host uses an internal 56-tool backend, including its
 discovery catalog; it does not expose a separate broker-adapter entrypoint.
 Existing installations are updated only by running setup explicitly.
 
-Framework 0.18 adds [tray-manager reporting](SERVICE_MANAGEMENT.md). Only the
+Framework 0.20 adds [tray-manager reporting](SERVICE_MANAGEMENT.md). Only the
 owning service registers; proxies and backend workers do not. Restart remains
 disabled because there is no surviving app-owned supervisor and retained-worker
 activity is unknown. Installing this app does not install another manager.
 
 ## Dependency and build
 
-The tested Python dependency is `universal-codex-tools==0.18.0`, imported through
+The source candidate pins `universal-codex-tools==0.20.0`, imported through
 `universal_tools.framework`. Its MCP dependency is exactly 2.3.0. The distribution
 has not been assumed available on a public package feed. Obtain the reviewed
 wheel from the framework build, verify it against `packaging/framework.lock.json`,
 and install it in the app's isolated environment before installing the MCP extra:
 
 ```powershell
-python -m pip install C:/Packages/universal_codex_tools-0.18.0-py3-none-any.whl
+python -m pip install C:/Packages/universal_codex_tools-0.20.0-py3-none-any.whl
 python -m pip install -c packaging/framework-requirements.txt -e ".[dev,mcp]"
 python -B -m pytest -q
 ```
@@ -72,7 +72,7 @@ authority to write or contact a controller. The backend retains the same shared
 services, proposal approval, expiry, preflight, readback and single-use plans.
 The FANUC backend still requires the legacy `2025-11-25` wire profile. Resolver
 approval handlers are staged, with modern downstream acceptance pending.
-Framework 0.18 can serve modern frontends and retain the original operation across
+Framework 0.20 can serve modern frontends and retain the original operation across
 owner/argument-bound form continuations while this backend stays legacy. Neither
 continuations nor hashes establish human approval; app review, target checks,
 single-use plans and readback still apply. Caller `clientInfo` and model arguments
@@ -90,7 +90,7 @@ not enable an exporter. The app exposes its canonical workflow guidance through
 ordinary readers and a Skills catalog. Native Codex skill activation remains a
 host-managed install/reload step.
 
-Framework 0.18 supplies the following optional profiles. See the app's
+Framework 0.20 supplies the following optional profiles. See the app's
 [feature status and release requirements](PROTOCOL_FEATURES.md) for source previews;
 installation does not activate candidate protocols:
 
@@ -103,8 +103,8 @@ installation does not activate candidate protocols:
 | Remote OAuth and DPoP | The candidate host remains authenticated loopback. Remote endpoints, identity verification, credentials and TLS require an explicit deployment; protected MCP requests must not be retried automatically. |
 | Redis Tasks and native frontend replicas | The Redis extra is not installed. This retained-worker app host requires one owning process; jobs, journals, reservations and live controller sessions are not portable between replicas. |
 
-See the framework's [extension contract](https://github.com/votecoffee/CodexMCPBroker/blob/7d8a0ccdc06598313061147ee8774837118a8861/docs/extension-development.md)
-and [deployment profiles](https://github.com/votecoffee/CodexMCPBroker/blob/7d8a0ccdc06598313061147ee8774837118a8861/docs/deployment.md)
+See the framework's [extension contract](https://github.com/votecoffee/CodexMCPBroker/blob/5b2cac50ca24d21a15b732e0424bb02fd794e1fb/docs/extension-development.md)
+and [deployment profiles](https://github.com/votecoffee/CodexMCPBroker/blob/5b2cac50ca24d21a15b732e0424bb02fd794e1fb/docs/deployment.md)
 for the assessed baseline. The fourteen-tool front door does not relay downstream
 extensions automatically. SDK 2.2 interoperability checks in the framework do not
 change this app's SDK 2.3.0 pin or establish controller acceptance.

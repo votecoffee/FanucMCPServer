@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Aligned source pins with reviewed framework 0.20.0 while retaining MCP SDK
+  2.3.0 and the app's independent plugin/native skills. Integrated shared durable
+  RPC launch records under the actual supervisor, exact creation binding and
+  native-write recovery barriers. Source/package checks do not migrate an
+  installation or establish remaining launch-path/native acceptance.
+
 - Bound private workers to verified Windows creation identities and retained
   handles; removed PID-based `taskkill` fallback. Added a 16-worker inventory,
   degraded status for uncertain cleanup, close-all handling and explicit COM

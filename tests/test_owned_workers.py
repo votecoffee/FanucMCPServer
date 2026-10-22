@@ -156,6 +156,7 @@ def test_unactivated_startup_uses_own_root_handle_without_taskkill(monkeypatch):
 def test_cancelled_construction_releases_admission_without_starting_any_worker(monkeypatch):
     inventory = WorkerInventory()
     monkeypatch.setattr(module, "workers", inventory)
+    monkeypatch.setattr(module, "resource_context", lambda: SimpleNamespace(begin=lambda kind: None))
     def interrupted(*args, **kwargs):
         raise KeyboardInterrupt("inert cancelled startup")
     monkeypatch.setattr(module.subprocess, "Popen", interrupted)

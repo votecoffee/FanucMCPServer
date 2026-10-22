@@ -1,7 +1,7 @@
 # MCP protocol feature status
 
 The standalone plugin remains the default route, using MCP SDK 2.3.0 and
-`universal-codex-tools==0.18.0`. The optional app-owned host has one native-owning
+`universal-codex-tools==0.20.0`. The optional app-owned host has one native-owning
 backend. It does not automatically relay extension protocols or switch routes.
 The read-only `capabilities` tool and doctor output include `protocol_features`.
 

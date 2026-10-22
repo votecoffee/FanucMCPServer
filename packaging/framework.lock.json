@@ -1,8 +1,8 @@
 {
   "package": "universal-codex-tools",
-  "version": "0.18.0",
-  "wheel": "universal_codex_tools-0.18.0-py3-none-any.whl",
-  "sha256": "0c1084b424f079957ebd3bec763e609564aaef64cd1fedee78b61a45bfbc24ac",
+  "version": "0.20.0",
+  "wheel": "universal_codex_tools-0.20.0-py3-none-any.whl",
+  "sha256": "a1b3777f8e8c1900e136a514d89ddb485a6bf4d69a525e3d24e1d04cd040efb3",
   "dependencies": [
     "mcp==2.3.0",
     "jsonschema==4.26.0",
@@ -13,5 +13,6 @@
     "PyJWT==2.15.1",
     "cryptography==50.0.2",
     "opentelemetry-api==1.45.1"
-  ]
+  ],
+  "source_revision": "5b2cac50ca24d21a15b732e0424bb02fd794e1fb"
 }

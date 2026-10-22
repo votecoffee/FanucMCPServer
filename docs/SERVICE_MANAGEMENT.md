@@ -1,7 +1,7 @@
 # Tray service reporting
 
 The standalone MCP process registers with the shared Windows MCP Service Manager
-for its lifetime. The app uses `universal-codex-tools==0.18.0` and MCP SDK 2.3.0.
+for its lifetime. The app uses `universal-codex-tools==0.20.0` and MCP SDK 2.3.0.
 Install the manager separately if desired; this app's installer does not install
 or start another manager, change routes or require a universal plugin.
 
@@ -25,7 +25,9 @@ not an assessment of other chats, controller state or unresolved native effects.
 Busy work reports **busy**; a stale/unavailable snapshot reports **degraded**.
 Status also reports the bounded private-worker inventory and its uncertain count.
 Uncertain cleanup reports **degraded** and retains the owner. The inventory is
-process-local; durable crash recovery is pending the shared ledger integration.
+a process-local cache. Framework 0.20 durable records preserve RPC launch intent,
+exact ownership and native recovery barriers independently of the endpoint.
+Other launch-path integration and process acceptance remain pending.
 The optional app-host owning process also registers, with **degraded** status
 because its retained-worker activity is unknown to this collector. Its stdio
 proxies and backend workers do not create duplicate owner registrations.
@@ -114,4 +116,4 @@ See the [resource ownership matrix](RESOURCE_OWNERSHIP.md) for exact handles,
 attached-object preservation and remaining launch-path acceptance. A stopped
 management record does not attest that every native resource was cleaned up.
 
-See the framework's [management contract](https://github.com/votecoffee/CodexMCPBroker/blob/7d8a0ccdc06598313061147ee8774837118a8861/docs/service-management.md).
+See the framework's [management contract](https://github.com/votecoffee/CodexMCPBroker/blob/5b2cac50ca24d21a15b732e0424bb02fd794e1fb/docs/service-management.md).
