@@ -21,7 +21,10 @@ def main() -> int:
             window = MainWindow()
             window.show()
             starting = False
-            return app.exec()
+            result = app.exec()
+            from fanuc_workbench.bridge.resource_context import close_resource_context
+            close_resource_context()
+            return result
         except Exception:
             session.report(*sys.exc_info(), startup=starting)
             return 1

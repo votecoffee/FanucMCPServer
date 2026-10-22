@@ -63,15 +63,15 @@ application Quit/Exit, saves user documents or closes attached software.
 | Plugin stdio launcher | Retained child handle, explicit non-inherited input writer, client EOF/parent-loss propagation, owning wait | Durable launch record, atomic startup containment and abnormal-exit reconciliation with the common API |
 | Direct/app-host backend | Exclusive state-directory lease through native drain | Durable owner identity and cross-process recovery integration |
 | Feature/native RPC worker | Shared durable launch records, private Windows job, verified creation timestamp, retained handles, activation barrier, bounded inventory and uncertain-cleanup refusal | Real child-tree/owner-death and installed/native acceptance |
-| Offline MakeTP/PrintTP | Explicit executables, isolated inputs/output and bounded output/time; currently tracks a root `Popen` | Common owned launch/tree teardown and durable compiler/descendant records |
-| GUI ROBOGUIDE launch | Explicit user action; existing path does not establish exclusive versus shared application ownership | Classify ownership, retain launch identity and apply dirty-workcell refusal/recovery; never close an already user-owned session |
-| Host-policy validation helper | Fixed metadata script, selected interpreter, bounded synchronous call; never starts the host | Common ownership record and cancellation/owner-death cleanup |
+| Offline MakeTP/PrintTP | Activated private tool worker contains compiler descendants; compiler intent/binding is durable; output is bounded and retained locally | Real timeout/child cleanup and native compiler acceptance |
+| GUI ROBOGUIDE launch | Automatic launch refuses until native application/workcell ownership is accepted; backup handoff remains available and preserves existing folders | Explicit native ownership/dirty-state acceptance before enabling automatic launch; user-opened sessions remain protected |
+| Host-policy validation helper | Fixed metadata script in an owned activated worker using the selected interpreter; bounded IPC, durable records and redacted errors; never starts the host | Real selected-runtime/EOF/owner-death acceptance |
 | Build/install/doctor helpers | Explicit administrative commands; excluded from runtime startup | Adopt applicable ownership helpers and isolated acceptance before registration/install |
 
-The compiler and ROBOGUIDE paths are not accepted as managed launch workflows
-by this source-only checkpoint. Do not install or enable the candidate on the
-strength of worker unit tests alone. Existing user-owned native software must
-remain untouched while ownership is unestablished.
+Compiler and policy helpers use the common RPC lifetime implementation. The GUI
+refuses closure while private workers or uncertain cleanup remain. Do not install
+or enable the candidate on the strength of stub tests alone. Existing user-owned
+native software remains untouched while ownership is unestablished.
 
 ## Durable ledger contract to integrate
 

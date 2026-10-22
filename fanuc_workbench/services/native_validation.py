@@ -9,6 +9,9 @@ from pathlib import Path
 import re
 import subprocess
 import threading
+import base64
+import sys
+import uuid
 
 from fanuc_workbench.extensions.programs_v1_1_0.validation import compare_native_listing,review_validation
 from fanuc_workbench.services.native_programs import validate_source
@@ -21,25 +24,70 @@ def _read(path,maximum):
 
 
 def _run(arguments,cwd,timeout):
-    """Drain merged output into a bounded buffer; no shell or interactive pause."""
-    process=subprocess.Popen(arguments,cwd=cwd,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
-                             creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
-    output=bytearray();truncated=False
+    """Use the private, job-contained offline tool worker; never lose its owner."""
+    if type(timeout) not in (int,float) or not 1<=timeout<=60: raise ValueError('Use compiler timeout 1..60 seconds')
+    from fanuc_workbench.bridge.extension_process import RpcProcess
+    bootstrap=Path(__file__).resolve().parents[1]/'bridge'/'native_tool_worker.py'
+    worker=RpcProcess([sys.executable,'-B',str(bootstrap)], {'provider':'native-tools'},
+                      operation_timeout=timeout+10)
+    try:
+        result=worker.call('run',{'arguments':arguments,'cwd':str(cwd),'timeout':timeout},{})
+        raw=base64.b64decode(result['output_base64'],validate=True)
+        if len(raw)>1024*1024: raise ValueError('Native tool output exceeds its byte bound')
+        return result['state'],raw
+    finally:
+        worker.close()
+
+
+def _run_process(arguments,cwd,timeout,*,contained=False):
+    """Only the activated owned tool worker calls this compiler launch path."""
+    if contained is not True: raise RuntimeError('Use the owned offline tool worker')
+    if (not isinstance(arguments,list) or not 1<=len(arguments)<=32
+            or any(not isinstance(value,str) or '\0' in value or len(value)>32768 for value in arguments)
+            or not Path(arguments[0]).is_absolute() or not Path(arguments[0]).is_file()
+            or Path(arguments[0]).name.lower() not in {'maketp.exe','printtp.exe'}):
+        raise ValueError('Use an explicit MakeTP/PrintTP executable and bounded argument list')
+    if type(timeout) not in (int,float) or not 1<=timeout<=60: raise ValueError('Use compiler timeout 1..60 seconds')
+    folder=Path(cwd).resolve(strict=True)
+    if not folder.is_dir(): raise ValueError('Use an existing isolated compiler directory')
+    log_path=folder/('native-tool-'+uuid.uuid4().hex+'.log')
+    from fanuc_workbench.bridge.resource_context import resource_context
+    from fanuc_workbench.bridge.process_identity import creation_time
+    claim=resource_context().begin('compiler-process')
+    process=None;output=bytearray();truncated=False;drain_errors=[]
     def drain():
         nonlocal truncated
-        while chunk:=process.stdout.read(4096):
-            remaining=1024*1024-len(output)
-            output.extend(chunk[:remaining])
-            if len(chunk)>remaining:
-                truncated=True;process.kill();break
-    thread=threading.Thread(target=drain,daemon=True);thread.start()
-    timed_out=False
-    try: process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired: timed_out=True;process.kill();process.wait()
-    thread.join(timeout=5)
-    if thread.is_alive(): raise RuntimeError('Compiler output pipe did not close')
-    process.stdout.close()
-    return {'returncode':process.returncode,'timed_out':timed_out,'output_truncated':truncated},bytes(output)
+        try:
+            with log_path.open('xb') as log:
+                while chunk:=process.stdout.read(4096):
+                    remaining=1024*1024-len(output)
+                    retained=chunk[:remaining]
+                    output.extend(retained);log.write(retained);log.flush()
+                    if len(chunk)>remaining:
+                        truncated=True;process.kill();break
+                log.flush();os.fsync(log.fileno())
+        except Exception as exc:
+            drain_errors.append(type(exc).__name__)
+    try:
+        # The activated tool worker is already inside its parent's private job;
+        # native descendants inherit containment before they execute.
+        process=subprocess.Popen(arguments,cwd=cwd,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                                 close_fds=True,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+        claim.bind(process.pid,creation_time(process._handle))
+        thread=threading.Thread(target=drain,daemon=True);thread.start()
+        timed_out=False
+        try: process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired: timed_out=True;process.kill();process.wait(timeout=5)
+        thread.join(timeout=5)
+        if thread.is_alive() or drain_errors: raise RuntimeError('Compiler output capture did not finish cleanly')
+        process.stdout.close()
+        claim.exited('Observed compiler root exit; containing tool-worker job owns remaining descendants')
+        return {'returncode':process.returncode,'timed_out':timed_out,'output_truncated':truncated,
+                'output_log':log_path.name},bytes(output)
+    except BaseException:
+        claim.uncertain('Offline compiler launch/capture is unverified; inspect preserved validation inputs and logs')
+        # The caller closes the containing owned worker job; no PID-tree scans.
+        raise
 
 
 def _snapshot_context(source,destination):

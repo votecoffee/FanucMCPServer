@@ -436,12 +436,30 @@ class IntegrationTab(QWidget):
 
 class RoboGuideTab(QWidget):
     def __init__(self,owner):
-        super().__init__();self.owner=owner;l=QVBoxLayout(self);n=QLabel('ROBOGUIDE integration uses a documented-safe handoff: stage a backup for a virtual controller and launch ROBOGUIDE. FanucMCPServer deliberately does not automate unverified private ROBOGUIDE UI/COM calls.');n.setWordWrap(True);l.addWidget(n);f=QFormLayout();self.exe=QLineEdit(str(discover_roboguide() or ''));row=QHBoxLayout();row.addWidget(self.exe);b=QPushButton('Browse…');b.clicked.connect(lambda:browse_file(self.exe,'ROBOGUIDE executable','Executable (*.exe)'));row.addWidget(b);rw=QWidget();rw.setLayout(row);f.addRow('ROBOGUIDE executable',rw);self.cell=QLineEdit();row=QHBoxLayout();row.addWidget(self.cell);b=QPushButton('Browse workcell…');b.clicked.connect(lambda:browse_file(self.cell,'ROBOGUIDE workcell'));row.addWidget(b);rw=QWidget();rw.setLayout(row);f.addRow('Optional workcell',rw);l.addLayout(f);row=QHBoxLayout();b=QPushButton('Stage active backup for ROBOGUIDE…');b.clicked.connect(self.stage);row.addWidget(b);b=QPushButton('Launch ROBOGUIDE');b.clicked.connect(self.launch);row.addWidget(b);row.addStretch();l.addLayout(row);self.log=QPlainTextEdit();self.log.setReadOnly(True);l.addWidget(self.log)
+        super().__init__()
+        self.owner=owner
+        layout=QVBoxLayout(self)
+        note=QLabel('Stage a backup for a virtual controller, then open ROBOGUIDE separately. Existing ROBOGUIDE sessions and workcells remain under your control.')
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        row=QHBoxLayout()
+        stage=QPushButton('Stage active backup for ROBOGUIDE…')
+        stage.clicked.connect(self.stage)
+        row.addWidget(stage)
+        launch=QPushButton('Open ROBOGUIDE separately')
+        launch.setEnabled(False)
+        launch.setToolTip('Open ROBOGUIDE from Windows, then use the staged backup.')
+        row.addWidget(launch)
+        row.addStretch()
+        layout.addLayout(row)
+        self.log=QPlainTextEdit()
+        self.log.setReadOnly(True)
+        layout.addWidget(self.log)
     def sync_workspace(self):pass
     def stage(self):
         if not self.owner.workspace:return
         d=QFileDialog.getExistingDirectory(self,'Staging destination',str(self.owner.workspace.parent));
         if d:self.log.appendPlainText('Staged: '+str(stage_backup_for_roboguide(self.owner.workspace,Path(d))))
     def launch(self):
-        try:launch_roboguide(Path(self.exe.text()) if self.exe.text() else None,Path(self.cell.text()) if self.cell.text() else None);self.log.appendPlainText('ROBOGUIDE launched.')
+        try:launch_roboguide()
         except Exception as e:QMessageBox.critical(self,'ROBOGUIDE launch failed',str(e))

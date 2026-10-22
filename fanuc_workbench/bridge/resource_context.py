@@ -25,6 +25,8 @@ class ResourceContext:
     def begin(self, kind):
         labels = {"feature-worker": "FANUC private feature worker", "native-worker": "FANUC private native API worker",
                   "stdio-worker": "FANUC stdio worker", "python-launcher": "FANUC Python launcher"}
+        labels.update({"native-tool-worker": "FANUC offline tool worker", "compiler-process": "FANUC offline compiler tool"})
+        labels["policy-worker"] = "FANUC local host-policy worker"
         if kind not in labels:
             raise ValueError("Unknown FANUC owned resource kind")
         record = self.owner.begin_launch(labels[kind], kind=kind, cleanup_mode="terminate")
@@ -84,7 +86,7 @@ class ResourceClaim:
             self.context.owner.resolve_recovery_barrier(identifier, record.revision,
                 "Native worker verified register readback; value SHA-256 " + sha256)
 
-    def exited(self):
+    def exited(self, evidence="App-owned IPC/job shutdown completed; independently verified recorded process exit"):
         for identifier in self.identifiers:
             record = self.context.ledger.get(identifier)
             if record.state in {"released", "terminated", "failed"}:
@@ -93,8 +95,7 @@ class ResourceClaim:
                 self.context.owner.set_recovery_barrier(identifier,
                     "Launch outcome lacks a bound process identity; inspect without guessing or replay")
                 raise RuntimeError("Launch identity is unresolved; durable reservation retained")
-            self.context.owner.reconcile(identifier, record.revision,
-                "App-owned IPC/job shutdown completed; independently verified recorded process exit")
+            self.context.owner.reconcile(identifier, record.revision, evidence)
 
 
 def configure_resource_registry(registry):

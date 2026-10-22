@@ -123,7 +123,9 @@ class RpcProcess:
         self.resource_claim = None
         self.native_worker = ready_fields.get("provider") == "frrobot"
         self.operation_timeout = operation_timeout
-        kind = "native-worker" if self.native_worker else "feature-worker"
+        kind = ("native-worker" if self.native_worker else
+                "native-tool-worker" if ready_fields.get("provider") == "native-tools" else
+                "policy-worker" if ready_fields.get("provider") == "host-policy" else "feature-worker")
         self.resource_id = workers.reserve(self, kind)
         # Worker code is trusted local code; avoid accidentally forwarding secrets.
         allowed = {"SYSTEMROOT", "WINDIR", "PATH", "PATHEXT", "TEMP", "TMP", "LOCALAPPDATA",

@@ -311,7 +311,17 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage('Wait for the native controller operation to finish before closing.')
             event.ignore()
             return
-        self.native_tab.shutdown()
+        try:
+            self.native_tab.shutdown()
+        except Exception:
+            self.statusBar().showMessage('Owned controller-worker cleanup needs inspection; the window remains open.')
+            event.ignore()
+            return
+        from fanuc_workbench.bridge.owned_workers import workers
+        if workers.snapshot()['active']:
+            self.statusBar().showMessage('Wait for owned tools to finish or inspect uncertain cleanup before closing.')
+            event.ignore()
+            return
         self.live_tab.save_watches()
         self.desktop_layout.save()
         super().closeEvent(event)

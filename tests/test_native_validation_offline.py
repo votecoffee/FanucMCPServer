@@ -96,11 +96,12 @@ def test_mismatched_readback_does_not_pass_and_existing_destination_is_protected
     with pytest.raises(FileExistsError): native_validation.validate_offline(path,destination,**options)
 
 
-def test_process_timeout_and_output_bounds_are_enforced_without_shell(tmp_path):
-    result,log=native_validation._run([sys.executable,'-c','import time; print("started",flush=True); time.sleep(10)'],tmp_path,.2)
-    assert result['timed_out'] and result['returncode']!=0
-    result,log=native_validation._run([sys.executable,'-c','import sys; sys.stdout.write("x"*1200000)'],tmp_path,5)
-    assert result['output_truncated'] and len(log)==1024*1024
+def test_native_tool_entry_does_not_accept_arbitrary_python_commands(tmp_path,monkeypatch):
+    def forbidden(*args,**kwargs):
+        pytest.fail('Native compiler validation must not launch arbitrary executables')
+    monkeypatch.setattr(native_validation.subprocess,'Popen',forbidden)
+    with pytest.raises(ValueError,match='explicit MakeTP/PrintTP'):
+        native_validation._run_process([sys.executable,'-c','print("inert")'],tmp_path,5,contained=True)
 
 
 def test_change_package_is_transitive_hash_bound_and_cannot_overwrite_existing_files(tmp_path):

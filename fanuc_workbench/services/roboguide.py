@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json,os,shutil,subprocess
+import json,os,shutil
 from pathlib import Path
 
 DEFAULT_CANDIDATES=[
@@ -15,12 +15,9 @@ def discover_roboguide()->Path|None:
 
 def stage_backup_for_roboguide(backup:Path,destination:Path)->Path:
     out=Path(destination)/f'{Path(backup).name}_ROBOGUIDE';
-    if out.exists():shutil.rmtree(out)
     shutil.copytree(backup,out)
     (out/'roboguide_handoff.json').write_text(json.dumps({'source_backup':str(backup),'instructions':'Create/open a virtual controller in ROBOGUIDE, then restore the selected FANUC backup files from this staged folder. FanucMCPServer does not automate unverified ROBOGUIDE UI/COM interfaces.'},indent=2),encoding='utf-8')
     return out
 
 def launch_roboguide(executable:Path|None=None,workcell:Path|None=None):
-    exe=Path(executable) if executable else discover_roboguide()
-    if not exe or not exe.is_file():raise FileNotFoundError('ROBOGUIDE executable not found. Set FANUC_ROBOGUIDE_EXE or browse to it.')
-    args=[str(exe)]+([str(workcell)] if workcell else []);return subprocess.Popen(args)
+    raise RuntimeError('Automatic ROBOGUIDE launch is unavailable until application ownership and dirty-workcell recovery are validated. Open ROBOGUIDE separately and use the staged backup; that session remains under your control.')

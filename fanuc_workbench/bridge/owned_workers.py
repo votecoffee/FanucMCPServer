@@ -19,7 +19,7 @@ class WorkerInventory:
         self.history = deque(maxlen=64)
 
     def reserve(self, owner, kind):
-        if kind not in {"feature-worker", "native-worker"}:
+        if kind not in {"feature-worker", "native-worker", "native-tool-worker", "policy-worker"}:
             raise ValueError("Unknown private worker kind")
         with self.lock:
             if len(self.owners) >= self.limit:

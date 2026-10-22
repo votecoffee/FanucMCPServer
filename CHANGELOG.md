@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Routed offline MakeTP/PrintTP and host-policy helpers through activated owned
+  workers with durable records, descendant teardown and bounded private logs.
+  Refuse desktop closure during active/uncertain worker cleanup. Disable
+  unaccepted ROBOGUIDE auto-launch, retaining manual backup handoff without
+  overwriting an existing handoff folder. Process/native acceptance is pending.
+
 - Aligned source pins with reviewed framework 0.20.0 while retaining MCP SDK
   2.3.0 and the app's independent plugin/native skills. Integrated shared durable
   RPC launch records under the actual supervisor, exact creation binding and

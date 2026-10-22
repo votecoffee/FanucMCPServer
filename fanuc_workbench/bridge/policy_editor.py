@@ -9,7 +9,6 @@ import json
 import os
 from pathlib import Path
 import stat
-import subprocess
 import uuid
 
 from fanuc_workbench.bridge.config import BridgeConfig
@@ -141,24 +140,23 @@ else:
 def _host_call(runtime, kind, document, action="validate", **kwargs):
     if runtime is None:
         raise ValueError("Select the host runtime.json before editing its policy")
-    environment = {key: value for key, value in os.environ.items() if key not in {"PYTHONPATH", "PYTHONHOME"}}
-    environment.update(PYTHONNOUSERSITE="1", PYTHONDONTWRITEBYTECODE="1")
+    from fanuc_workbench.bridge.extension_process import RpcProcess
+    bootstrap = Path(__file__).with_name("policy_worker.py")
+    worker = None
     try:
-        result = subprocess.run([str(runtime.python), "-B", "-c", _HOST_CODE],
-            input=json.dumps({"kind": kind, "document": document, "action": action, "state": str(runtime.state), **kwargs}, allow_nan=False),
-            env=environment, capture_output=True, text=True, timeout=20)
-    except (OSError, subprocess.TimeoutExpired):
-        raise ValueError("The selected host runtime could not validate this policy within its deadline") from None
-    if result.returncode:
-        # Validation errors can echo credential inputs. Show only the last error
-        # category; paths and full documents remain local and are not logged.
-        if "already running" in result.stderr or "already held" in result.stderr:
-            raise ValueError("Stop the host before changing its registered policy")
-        message = result.stderr.splitlines()[-1] if result.stderr else "Host validation failed"
-        if message.startswith("ValueError:"):
-            raise ValueError(message.removeprefix("ValueError: "))
-        raise ValueError("Host policy validation/save failed; check supported values, stop the host and reconcile retained work before saving")
-    return json.loads(result.stdout)
+        worker = RpcProcess([str(runtime.python), "-B", str(bootstrap)], {"provider": "host-policy"}, operation_timeout=20)
+        result = worker.call("policy", {"kind": kind, "document": document, "action": action,
+            "state": str(runtime.state), **kwargs}, {})
+    except (OSError, RuntimeError):
+        raise ValueError("The selected host runtime could not validate this policy within its deadline; inspect retained ownership") from None
+    finally:
+        if worker is not None:
+            worker.close()
+    if result.get("ok") is not True:
+        from fanuc_workbench.bridge.policy_worker import SAFE_ERRORS
+        message = result.get("message")
+        raise ValueError(message if message in SAFE_ERRORS else "Host policy validation/save failed; inspect retained work before saving")
+    return result["value"]
 
 
 def validate_policy(document, kind, path, host=None):

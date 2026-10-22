@@ -84,6 +84,9 @@ share the owning worker's bounded dispatcher. See [worker ownership](docs/SERVIC
 Private feature/native workers also have a bounded inventory and creation-bound
 Windows handles. RPC workers now use the shared durable ledger; remaining launch paths are listed in
 the [resource ownership matrix](docs/RESOURCE_OWNERSHIP.md); release acceptance is pending.
+Offline compiler and host-policy helpers share the owned-worker lifecycle.
+ROBOGUIDE integration stages backups for a separately opened user session;
+automatic application launch remains unavailable pending ownership acceptance.
 
 The packaged skill is a stable bootstrap for [current workflow guidance](docs/WORKFLOW_GUIDANCE.md).
 Ordinary guide readers and Skills-over-MCP share one maintained source and support
