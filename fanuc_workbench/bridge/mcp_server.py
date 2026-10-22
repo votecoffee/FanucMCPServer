@@ -356,6 +356,8 @@ def main() -> None:
     parser.add_argument("--management-runtime", type=Path, help="Installer-owned plugin runtime pointer")
     parser.add_argument("--management-registry", type=Path, default=os.environ.get("FANUC_MCP_MANAGEMENT_REGISTRY"),
                         help="Optional private test registry; normally use the Windows user's manager registry")
+    parser.add_argument("--instance-role", choices=("per-chat", "validation"),
+                        default=os.environ.get("FANUC_MCP_INSTANCE_ROLE", "per-chat"))
     args = parser.parse_args()
     if args.config is None:
         parser.error("--config or FANUC_MCP_SERVER_CONFIG is required")
@@ -363,7 +365,7 @@ def main() -> None:
     try:
         from fanuc_workbench.bridge.management import report_service
         server = create_server(bridge)
-        with report_service(bridge, runtime=args.management_runtime, registry=args.management_registry):
+        with report_service(bridge, runtime=args.management_runtime, registry=args.management_registry, role=args.instance_role):
             server.run(transport="stdio")
     finally:
         bridge.close()

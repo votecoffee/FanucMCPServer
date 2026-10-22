@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 
@@ -19,11 +20,31 @@ def main():
         raise SystemExit("FanucMCPServer runtime/config is missing. Repair the local setup; no controller connection was attempted.")
     arguments = [str(python), "-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", str(config),
                  "--management-runtime", str(settings)]
-    # Windows CRT execv joins arguments without adding quotes. Preserve spaces
-    # and embedded quotes using the same quoting rules as subprocess/CreateProcess.
-    if os.name == "nt":
-        arguments = [subprocess.list2cmdline([argument]) for argument in arguments]
-    os.execv(str(python), arguments)
+    # Keep the launcher alive for the actual runtime. Windows CRT exec overlay
+    # can detach launcher/stub descendants from the client's tracked process.
+    # An explicit non-inherited stdin writer gives the worker EOF even if this
+    # launcher dies, instead of leaving an unattended engineering process.
+    child = subprocess.Popen(arguments, stdin=subprocess.PIPE, close_fds=True,
+        **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
+
+    def input_pump():
+        try:
+            read = getattr(sys.stdin.buffer, "read1", sys.stdin.buffer.read)
+            while data := read(65536):
+                child.stdin.write(data)
+                child.stdin.flush()
+        except (BrokenPipeError, OSError, ValueError):
+            pass
+        finally:
+            try:
+                child.stdin.close()
+            except (BrokenPipeError, OSError):
+                pass
+
+    threading.Thread(target=input_pump, name="fanuc-stdin-owner", daemon=True).start()
+    # EOF is an admission fence, not proof that native work stopped. The runtime
+    # owns its normal bridge/job drain; never guess a timeout and kill its PID.
+    raise SystemExit(child.wait())
 
 
 if __name__ == "__main__":

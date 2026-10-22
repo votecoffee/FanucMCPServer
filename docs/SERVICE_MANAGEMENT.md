@@ -34,6 +34,17 @@ metadata is refreshed independently. Available versions stay unknown and
 update. The manager may additionally display its own local publisher inventory.
 No package-feed or GitHub update check runs here.
 
+Status identifies per-chat stdio workers, shared app-host owners or explicitly
+marked validation workers. A per-chat worker is not a shared multi-chat server.
+The plugin launcher stays alive for its child and forwards stdin through an
+explicit pipe. Client EOF or loss of that owning launcher closes worker stdin;
+the worker then owns its normal request/job drain. The launcher never guesses
+a safe timeout or kills native work. A client can still force-terminate its
+process tree; such a record is offline rather than a clean stopped attestation.
+Old detached instances cannot be safely retired from zero counters alone: their
+reporting-only endpoint cannot atomically fence admission or attest to uncertain
+effects. Do not bulk-kill names/PIDs or clear restart journals.
+
 The app component is the headless bridge distribution in a packaged runtime and
 the desktop distribution in an editable development environment. Installing a
 plugin does not establish a running chat connection. Existing processes load this

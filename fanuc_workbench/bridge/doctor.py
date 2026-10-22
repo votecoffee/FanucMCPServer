@@ -7,9 +7,16 @@ import json
 import os
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 async def diagnose(config: Path, probe: str | None = None) -> dict:
+    # Diagnostics are temporary validation workers, never live manager owners.
+    with TemporaryDirectory(prefix="fanuc-doctor-registry-") as registry:
+        return await _diagnose(config, probe, registry)
+
+
+async def _diagnose(config: Path, probe: str | None, registry: str) -> dict:
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
     from fanuc_workbench.bridge.config import BridgeConfig
@@ -18,6 +25,7 @@ async def diagnose(config: Path, probe: str | None = None) -> dict:
     if probe is not None and probe not in loaded.robots:
         raise ValueError("Probe requires a configured robot ID")
     environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    environment.update(FANUC_MCP_MANAGEMENT_REGISTRY=registry, FANUC_MCP_INSTANCE_ROLE="validation")
     params = StdioServerParameters(command=sys.executable,
                                    args=["-B", "-m", "fanuc_workbench.bridge.mcp_server", "--config", str(config.resolve())],
                                    env=environment)

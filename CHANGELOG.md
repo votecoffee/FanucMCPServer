@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Replaced the Windows exec-overlay launcher with an owning stdin-forwarding
+  parent that waits for the actual runtime. EOF and loss of the launcher close
+  the worker's input and permit app-owned draining, preventing detached stdio
+  children. Added explicit process roles and isolated test management registries.
+
 - Added a stable packaged FANUC bootstrap, one canonical runtime guide/reference
   tree, three hash/revision-bound read tools and real Skills-over-MCP catalogs on
   the standalone and app-owned frontends. Explicit data-only publication updates

@@ -122,7 +122,7 @@ class WorkflowGuidance(SkillCatalog):
             while True:
                 try:
                     await self.refresh()
-                except (OSError, ValueError):
+                except Exception:
                     pass  # Reads fail closed; never replace a valid view with an invalid candidate.
                 await asyncio.sleep(1)
         task = asyncio.create_task(watch())

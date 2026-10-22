@@ -9,4 +9,3 @@ explicit approval and client confirmation. R readback is exact; PR axes use the
 stated numerical tolerance with exact metadata. LS deployment never selects or
 runs a program. A failed native commit consumes its plan: inspect actual state
 and evidence before preparing another change. Do not retry or roll back blindly.
-

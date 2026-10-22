@@ -58,10 +58,13 @@ def plugin_version(runtime):
 class ServiceReporting:
     """One cached status per owner; the HTTP callback does no file/native I/O."""
 
-    def __init__(self, bridge=None, *, runtime=None, registry=None, interval=1.0):
+    def __init__(self, bridge=None, *, runtime=None, registry=None, interval=1.0, role="per-chat"):
         self.bridge = bridge
         self.runtime = Path(runtime) if runtime is not None else None
         self.interval = interval
+        if role not in {"per-chat", "app-host", "validation"}:
+            raise ValueError("Unknown service role")
+        self.role = role
         self.lock = threading.Lock()
         self.stopped = threading.Event()
         self.thread = None
@@ -98,14 +101,14 @@ class ServiceReporting:
                                                    available=None, update_pending=False)
         if self.bridge is None:
             status = ManagedStatus(state="degraded", message=(
-                "App host process is serving. Retained-worker activity is unknown; restart is disabled."),
+                "Shared app-host owner. Retained-worker activity is unknown; restart is disabled."),
                 versions=versions, restart_allowed=False, restart_reason=RESTART_REASON)
         else:
             activity = self.bridge.management_activity()
             active = activity["active_operations"]
             plans = activity["review_plans"]
             status = ManagedStatus(state="busy" if active else "running", active_operations=active,
-                message=f"Local process reporting: {active} active/queued operations; {plans} retained review plans.",
+                message=f"{self.role} stdio worker: {active} active/queued operations; {plans} retained review plans. Lifetime follows its client/launcher pipe.",
                 versions=versions, restart_allowed=False,
                 restart_reason=("Review plans are retained. " + RESTART_REASON) if plans else RESTART_REASON)
         with self.lock:

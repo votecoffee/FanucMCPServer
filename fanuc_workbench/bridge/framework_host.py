@@ -224,7 +224,7 @@ def main(argv=None):
         guidance = WorkflowGuidance(guide_state)
         if args.command == "serve":
             from fanuc_workbench.bridge.management import report_service
-            with report_service(runtime=args.management_runtime, registry=args.management_registry):
+            with report_service(runtime=args.management_runtime, registry=args.management_registry, role="app-host"):
                 serve_application(state, publication, skills=guidance)
         else:
             create_surface(RemoteBackend(load_settings(state)), name=definition.display_name,
