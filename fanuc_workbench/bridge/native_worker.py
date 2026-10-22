@@ -27,7 +27,9 @@ def main():
         if len(data) > 1024 * 1024 or not data.endswith(b"\n"):
             raise ValueError("Native request exceeds its bound")
         return json.loads(data)
-    send({"protocol": 1, "boot_pid": os.getpid()})
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from fanuc_workbench.bridge.process_identity import current_creation_time
+    send({"protocol": 1, "boot_pid": os.getpid(), "creation_time": current_creation_time()})
     if receive() != {"command": "activate"}:
         return
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -60,8 +62,16 @@ def main():
                     result["vendor_call"] = exc.details
             send({"request_id": request["request_id"], "result": result})
     finally:
-        robot = None
-        pythoncom.CoUninitialize()
+        try:
+            if robot is not None:
+                robot.close()
+            robot = None
+            # Release worker-owned COM proxies on this apartment's thread.
+            # This never quits a user-owned application or changes a controller.
+            import gc
+            gc.collect()
+        finally:
+            pythoncom.CoUninitialize()
 
 
 if __name__ == "__main__":

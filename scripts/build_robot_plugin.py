@@ -79,6 +79,7 @@ def build(source: Path, output: Path, framework_wheel: Path):
     shutil.copyfile(source / "docs" / "SERVICE_MANAGEMENT.md", docs / "SERVICE_MANAGEMENT.md")
     shutil.copyfile(source / "docs" / "WORKFLOW_GUIDANCE.md", docs / "WORKFLOW_GUIDANCE.md")
     shutil.copyfile(source / "docs" / "PROTOCOL_FEATURES.md", docs / "PROTOCOL_FEATURES.md")
+    shutil.copyfile(source / "docs" / "RESOURCE_OWNERSHIP.md", docs / "RESOURCE_OWNERSHIP.md")
     shutil.copyfile(source / "packaging" / "framework.lock.json", docs / "framework.lock.json")
     shutil.copyfile(source / "packaging" / "framework-requirements.txt", docs / "framework-requirements.txt")
     for name in ("DESKTOP_GUIDE.md", "ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md", "CONTROLLER_INTERFACES.md", "HTTP_READS.md", "SNPX_READS.md", "SNPX_DECODING.md", "SNPX_EVIDENCE.md", "SNPX_IO_EVIDENCE.md", "RECORDING_ANALYSIS.md", "RECORDING_EVIDENCE.md", "RECORDING_HANDSHAKE.md", "VQLOG_ANALYSIS.md", "ALARM_ANALYSIS.md", "ALARM_COMPARISON.md", "PROGRAM_DEPENDENCIES.md", "PROGRAM_DIAGNOSTICS.md", "REQUEST_CONCURRENCY.md", "COMMUNITY_INTEGRATIONS.md"):

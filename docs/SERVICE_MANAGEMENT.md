@@ -23,6 +23,9 @@ The snapshot reports admitted requests and queued/running local jobs, plus a cou
 of retained file, comment and native review plans. These are process-local counts,
 not an assessment of other chats, controller state or unresolved native effects.
 Busy work reports **busy**; a stale/unavailable snapshot reports **degraded**.
+Status also reports the bounded private-worker inventory and its uncertain count.
+Uncertain cleanup reports **degraded** and retains the owner. The inventory is
+process-local; durable crash recovery is pending the shared ledger integration.
 The optional app-host owning process also registers, with **degraded** status
 because its retained-worker activity is unknown to this collector. Its stdio
 proxies and backend workers do not create duplicate owner registrations.
@@ -106,5 +109,9 @@ Keep registries and receipts outside public Git. Tests use fake transports and
 separate registries for status, busy/stale denial, duplicate receipts, durable
 restart barriers and clean shutdown. They do not establish a safe live restart,
 controller acceptance or a particular chat host's reload behavior.
+
+See the [resource ownership matrix](RESOURCE_OWNERSHIP.md) for exact handles,
+attached-object preservation and remaining launch-path acceptance. A stopped
+management record does not attest that every native resource was cleaned up.
 
 See the framework's [management contract](https://github.com/votecoffee/CodexMCPBroker/blob/7d8a0ccdc06598313061147ee8774837118a8861/docs/service-management.md).

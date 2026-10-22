@@ -39,6 +39,26 @@ class Binding:
         return obj
 
 
+def test_close_releases_own_reference_without_closing_attached_user_object():
+    binding = Binding()
+    original = copy.deepcopy(binding.robot)
+    api = FrRobot('192.0.2.1', binding=binding, robot=binding.robot)
+    api.close()
+    api.close()
+    assert api.robot is None and binding.robot == original
+    assert binding.calls == [] and binding.puts == []
+
+
+def test_failed_attach_clears_only_own_reference_and_never_launches_a_replacement():
+    binding = Binding()
+    binding.dispatch = lambda *args: pytest.fail('Attached objects must never be replaced by a launch')
+    api = object.__new__(FrRobot)
+    with pytest.raises(KeyError):
+        api.__init__('192.0.2.1', binding=binding, robot={})
+    assert api.robot is None and not api.connection_owned
+    assert binding.calls == [] and binding.puts == []
+
+
 def test_native_reads_do_not_set_any_vendor_property():
     binding = Binding()
     api = FrRobot('192.0.2.1', binding=binding, robot=binding.robot)

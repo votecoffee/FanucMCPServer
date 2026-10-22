@@ -107,8 +107,10 @@ class ServiceReporting:
             activity = self.bridge.management_activity()
             active = activity["active_operations"]
             plans = activity["review_plans"]
-            status = ManagedStatus(state="busy" if active else "running", active_operations=active,
-                message=f"{self.role} stdio worker: {active} active/queued operations; {plans} retained review plans. Lifetime follows its client/launcher pipe.",
+            resources = activity["owned_resources"]
+            status = ManagedStatus(state="degraded" if resources["uncertain"] else ("busy" if active else "running"), active_operations=active,
+                message=f"{self.role} stdio worker: {active} active/queued operations; {plans} retained review plans; "
+                        f"{resources['active']}/{resources['limit']} owned workers, {resources['uncertain']} uncertain. Lifetime follows its client/launcher pipe.",
                 versions=versions, restart_allowed=False,
                 restart_reason=("Review plans are retained. " + RESTART_REASON) if plans else RESTART_REASON)
         with self.lock:

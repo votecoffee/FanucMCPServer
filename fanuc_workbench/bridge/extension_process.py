@@ -12,6 +12,8 @@ import uuid
 from pathlib import Path
 
 from fanuc_workbench.bridge.extension_release import MAX_MESSAGE, MAX_REQUEST, json_bytes
+from fanuc_workbench.bridge.process_identity import creation_time
+from fanuc_workbench.bridge.owned_workers import workers
 
 
 class WindowsJob:
@@ -20,6 +22,7 @@ class WindowsJob:
         import ctypes as c
         from ctypes import wintypes as w
         self.c = c
+        self.processes = []
         self.kernel = c.WinDLL("kernel32", use_last_error=True)
         class Basic(c.Structure):
             _fields_ = [("user", c.c_longlong), ("job_user", c.c_longlong), ("flags", w.DWORD),
@@ -36,6 +39,9 @@ class WindowsJob:
             ("OpenProcess", w.HANDLE, [w.DWORD, w.BOOL, w.DWORD]),
             ("AssignProcessToJobObject", w.BOOL, [w.HANDLE, w.HANDLE]),
             ("IsProcessInJob", w.BOOL, [w.HANDLE, w.HANDLE, c.POINTER(w.BOOL)]),
+            ("GetProcessTimes", w.BOOL, [w.HANDLE, *([c.POINTER(w.FILETIME)] * 4)]),
+            ("TerminateJobObject", w.BOOL, [w.HANDLE, w.UINT]),
+            ("QueryInformationJobObject", w.BOOL, [w.HANDLE, c.c_int, c.c_void_p, w.DWORD, c.c_void_p]),
             ("CloseHandle", w.BOOL, [w.HANDLE]),
         ]:
             function = getattr(self.kernel, name)
@@ -49,24 +55,56 @@ class WindowsJob:
             self.close()
             raise OSError("Worker cleanup limit could not be set")
 
-    def attach(self, pid):
+    def attach(self, pid, expected_creation_time):
         from ctypes import wintypes as w
+        if type(expected_creation_time) is not int or expected_creation_time <= 0:
+            raise ValueError("Worker bootstrap has no process creation identity")
         process = self.kernel.OpenProcess(0x1101, False, pid)  # query, set quota, terminate
         if not process:
             raise OSError("Worker process could not be attached")
         try:
+            if creation_time(process, kernel=self.kernel) != expected_creation_time:
+                raise ValueError("Worker process creation identity changed; no process was attached")
             member = w.BOOL()
             if not self.kernel.IsProcessInJob(process, self.handle, self.c.byref(member)):
                 raise OSError("Worker job membership is unavailable")
             if not member.value and not self.kernel.AssignProcessToJobObject(self.handle, process):
                 raise OSError(self.c.get_last_error(), "Worker process cleanup could not be attached")
+            self.processes.append(process)
+            process = None  # Retain the exact kernel identity through teardown.
         finally:
-            self.kernel.CloseHandle(process)
+            if process:
+                self.kernel.CloseHandle(process)
 
     def close(self):
         if self.handle:
-            self.kernel.CloseHandle(self.handle)
+            # Keep the job handle if termination cannot be established. Closing
+            # a root PID alone is not evidence that its descendants stopped.
+            if self.processes:
+                if not self.kernel.TerminateJobObject(self.handle, 1):
+                    raise OSError("Owned worker job could not be terminated")
+                class Accounting(self.c.Structure):
+                    _fields_ = [("user", self.c.c_longlong), ("kernel", self.c.c_longlong),
+                                ("period_user", self.c.c_longlong), ("period_kernel", self.c.c_longlong),
+                                ("faults", self.c.c_uint32), ("total", self.c.c_uint32),
+                                ("active", self.c.c_uint32), ("terminated", self.c.c_uint32)]
+                deadline = time.monotonic() + 2
+                while True:
+                    accounting = Accounting()
+                    if not self.kernel.QueryInformationJobObject(self.handle, 1, self.c.byref(accounting), self.c.sizeof(accounting), None):
+                        raise OSError("Owned worker job exit could not be verified")
+                    if not accounting.active:
+                        break
+                    if time.monotonic() >= deadline:
+                        raise RuntimeError("Owned worker tree exit is uncertain; ownership retained")
+                    time.sleep(.01)
+            if not self.kernel.CloseHandle(self.handle):
+                raise OSError("Owned worker job handle could not be closed")
             self.handle = None
+        for process in tuple(self.processes):
+            if not self.kernel.CloseHandle(process):
+                raise OSError("Owned worker process handle could not be closed")
+            self.processes.remove(process)
 
 
 class RpcProcess:
@@ -78,8 +116,11 @@ class RpcProcess:
         self.broken = False
         self.job = None
         self.process = None
+        self.reader = None
         self.pid = None
+        self.cleanup_complete = False
         self.operation_timeout = operation_timeout
+        self.resource_id = workers.reserve(self, "native-worker" if ready_fields.get("provider") == "frrobot" else "feature-worker")
         # Worker code is trusted local code; avoid accidentally forwarding secrets.
         allowed = {"SYSTEMROOT", "WINDIR", "PATH", "PATHEXT", "TEMP", "TMP", "LOCALAPPDATA",
                    "APPDATA", "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "COMSPEC", "LANG", "LC_ALL"}
@@ -89,7 +130,7 @@ class RpcProcess:
         try:
             self.process = subprocess.Popen(command,
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                env=environment, cwd=cwd, **options)
+                env=environment, cwd=cwd, close_fds=True, **options)
             self.reader = threading.Thread(target=self._read, daemon=True, name="fanuc-feature-ipc")
             self.reader.start()
             boot = self._receive(startup_timeout)
@@ -101,16 +142,20 @@ class RpcProcess:
                 # A Windows venv launcher may have a second Python process.
                 # Attach the real bootstrap, before it can load feature code;
                 # nesting both launcher and child can be denied by Windows.
-                self.job.attach(self.pid)
+                self.job.attach(self.pid, boot.get("creation_time"))
             elif os.getpgid(self.pid) != self.process.pid:
                 raise ValueError("Worker is outside its owned process group")
+            workers.update(self.resource_id, "starting", pid=self.pid, creation_time=boot.get("creation_time"))
             self._send({"command": "activate"})
             ready = self._receive(startup_timeout)
             if (ready.get("protocol") != 1 or ready.get("ready") is not True or ready.get("pid") != self.pid
                     or any(ready.get(key) != value for key, value in ready_fields.items())):
                 raise ValueError("Worker feature handshake failed")
-        except Exception:
+            workers.update(self.resource_id, "running")
+        except BaseException as exc:
             self.close()
+            if not isinstance(exc, Exception):
+                raise
             raise RuntimeError("Extension worker failed its startup or self-test; active features were not replaced") from None
 
     @property
@@ -191,49 +236,73 @@ class RpcProcess:
     def _stop(self):
         self.broken = True
         self.stopped.set()
-        if self.process is None:
-            return
+        workers.update(self.resource_id, "stopping")
         # Kill the owned tree before closing buffered pipes: a blocked writer
         # must be released before Python can acquire that pipe's buffer lock.
+        complete = False
         try:
+            if self.process is None:
+                complete = True
+                return
             if self.job is not None:
                 self.job.close()
             elif os.name != "nt":
+                if self.process.poll() is not None:
+                    raise RuntimeError("Worker group ownership after root exit is uncertain; no PID-based cleanup attempted")
                 try:
                     os.killpg(self.process.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
             elif self.process.poll() is None:
-                # Startup failed before activation/job attachment; only the owned bootstrap runs.
-                subprocess.run(["taskkill", "/PID", str(self.process.pid), "/T", "/F"],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5, check=False)
+                # Startup failed before activation: use Popen's retained kernel
+                # handle. Closing our IPC writer also releases the inert bootstrap.
+                self.process.kill()
             try:
                 self.process.wait(timeout=2)
             except subprocess.TimeoutExpired:
                 self.process.kill()
                 self.process.wait(timeout=2)
+            complete = True
         finally:
-            if self.process.stdin:
+            if complete:
                 try:
-                    self.process.stdin.close()
-                except OSError:
-                    pass
-            if self.process.stdout:
-                self.process.stdout.close()
+                    if self.process is not None:
+                        if self.process.stdin:
+                            try:
+                                self.process.stdin.close()
+                            except OSError:
+                                pass
+                        if self.process.stdout:
+                            self.process.stdout.close()
+                    if self.reader is not None:
+                        self.reader.join(timeout=1)
+                        if self.reader.is_alive():
+                            raise RuntimeError("Worker IPC thread shutdown is uncertain")
+                    self.cleanup_complete = True
+                    workers.release(self.resource_id)
+                finally:
+                    if not self.cleanup_complete:
+                        workers.update(self.resource_id, "uncertain")
+            else:
+                workers.update(self.resource_id, "uncertain")
 
     def close(self):
         with self.lock:
+            if self.stopped.is_set() and not self.cleanup_complete:
+                raise RuntimeError("Previous worker cleanup is uncertain; ownership retained for recovery")
             if not self.stopped.is_set():
-                if self.process is not None and self.healthy:
-                    try:
-                        self._send({"command": "shutdown"})
-                    except OSError:
-                        pass
-                    try:
-                        self.process.wait(timeout=.5)
-                    except subprocess.TimeoutExpired:
-                        pass
-                self._stop()
+                try:
+                    if self.process is not None and self.healthy:
+                        try:
+                            self._send({"command": "shutdown"})
+                        except (OSError, ValueError):
+                            pass
+                        try:
+                            self.process.wait(timeout=.5)
+                        except subprocess.TimeoutExpired:
+                            pass
+                finally:
+                    self._stop()
 
 
 class FeatureWorker(RpcProcess):

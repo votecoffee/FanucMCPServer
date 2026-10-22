@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Bound private workers to verified Windows creation identities and retained
+  handles; removed PID-based `taskkill` fallback. Added a 16-worker inventory,
+  degraded status for uncertain cleanup, close-all handling and explicit COM
+  proxy release without closing attached applications. Durable ownership-ledger,
+  remaining launch-path and real process acceptance remain pending.
+
 - Added an exclusive MCP worker lease per policy state directory, shared by the
   standalone entrypoint and app-host backend. Retain ownership through bridge
   drain and until process exit after drain failure; no automatic restart,

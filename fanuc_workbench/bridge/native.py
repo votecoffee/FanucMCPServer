@@ -318,13 +318,26 @@ class NativeChanges:
                 self.bridge._audit("native_reconnected", robot_id=robot_id, invalidated_native_plans=len(self.plans))
                 self.plans.clear()
             with self.client_lock:
-                client = self.clients.pop(robot_id, None)
+                client = self.clients.get(robot_id)
             if client:
                 client.close()
+                with self.client_lock:
+                    if self.clients.get(robot_id) is client:
+                        self.clients.pop(robot_id)
             return self.status(robot_id)
 
     def close(self):
         with self.client_lock:
-            clients, self.clients = list(self.clients.values()), {}
-        for client in clients:
-            client.close()
+            clients = list(self.clients.items())
+        failed = 0
+        for identifier, client in clients:
+            try:
+                client.close()
+            except Exception:
+                failed += 1  # Retain the failed owner and close the other clients.
+            else:
+                with self.client_lock:
+                    if self.clients.get(identifier) is client:
+                        self.clients.pop(identifier)
+        if failed:
+            raise RuntimeError(f"Native worker cleanup is uncertain for {failed} owned resource(s); ownership retained")

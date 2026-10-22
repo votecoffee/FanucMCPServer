@@ -39,7 +39,9 @@ def main():
             raise ValueError("Worker request exceeds its bound")
         return json.loads(line)
 
-    emit({"protocol": 1, "boot_pid": os.getpid()})
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from fanuc_workbench.bridge.process_identity import current_creation_time
+    emit({"protocol": 1, "boot_pid": os.getpid(), "creation_time": current_creation_time()})
     if receive() != {"command": "activate"}:
         return
     root = args.release.resolve()

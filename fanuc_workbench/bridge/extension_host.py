@@ -84,8 +84,16 @@ class Generation:
     retired: bool = False
 
     def close(self):
-        for worker in self.workers.values():
-            worker.close()
+        failed = 0
+        for identifier, worker in tuple(self.workers.items()):
+            try:
+                worker.close()
+            except Exception:
+                failed += 1
+            else:
+                self.workers.pop(identifier)
+        if failed:
+            raise RuntimeError("Retired feature worker cleanup is uncertain; failed owners retained")
 
 
 class ExtensionHost:
@@ -137,6 +145,7 @@ class ExtensionHost:
                 if self.closed:
                     raise ValueError("Extension host has closed")
             candidate = None
+            published = False
             try:
                 rows = self._registry()
                 fingerprint = self._fingerprint(rows)
@@ -189,19 +198,22 @@ class ExtensionHost:
                         self.bridge.native.plans.clear()
                     old, self.current = self.current, candidate
                     candidate = None
+                    published = True
                     if old is not None:
                         old.retired = True
                         if old.references:
                             self.retired.append(old)
                 if old is not None and not old.references:
-                    old.close()
+                    self._close_generation(old)
                 return {"status": "loaded" if initial else "reloaded", "invalidated_upload_plans": uploads,
                         "invalidated_native_plans": native,
                         "invalidated_comment_plans": comments, "controller_contacted": False,
                         "mcp_tools_changed": False, **self.status()}
             except Exception:
                 if candidate is not None:
-                    candidate.close()
+                    self._close_generation(candidate)
+                if published:
+                    raise ValueError("New feature generation is active but retired cleanup is uncertain; inspect ownership. No automatic rollback was attempted") from None
                 # Local metadata and exception text may contain private paths/data.
                 raise ValueError("Extension reload failed; active features and pending plans were preserved") from None
 
@@ -277,7 +289,17 @@ class ExtensionHost:
                         self.retired.remove(generation)
                     close = True
             if close:
-                generation.close()
+                self._close_generation(generation)
+
+    def _close_generation(self, generation):
+        try:
+            generation.close()
+        except Exception:
+            with self.lock:
+                generation.retired = True
+                if generation not in self.retired:
+                    self.retired.append(generation)
+            raise
 
     def _context(self, descriptor, arguments):
         contexts = {}
@@ -405,9 +427,17 @@ class ExtensionHost:
     def close(self):
         with self.reload_lock, self.lock:
             if self.closed:
+                if self.retired:
+                    raise RuntimeError("Previous feature cleanup is uncertain; retained owners require recovery")
                 return
             self.closed = True
             generations = [*self.retired, *([self.current] if self.current else [])]
             self.retired = []
+        failed = 0
         for generation in generations:
-            generation.close()
+            try:
+                self._close_generation(generation)
+            except Exception:
+                failed += 1
+        if failed:
+            raise RuntimeError("Feature cleanup is incomplete; retained owners require recovery")

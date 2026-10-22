@@ -81,6 +81,9 @@ MCP workers acquire an exclusive lease for their policy's state directory and
 hold it through shutdown. A second standalone or app-host backend worker using
 that state is refused before service construction. Independent requests still
 share the owning worker's bounded dispatcher. See [worker ownership](docs/SERVICE_MANAGEMENT.md).
+Private feature/native workers also have a bounded inventory and creation-bound
+Windows handles. Durable recovery and remaining native launch paths are listed in
+the [resource ownership matrix](docs/RESOURCE_OWNERSHIP.md); release acceptance is pending.
 
 The packaged skill is a stable bootstrap for [current workflow guidance](docs/WORKFLOW_GUIDANCE.md).
 Ordinary guide readers and Skills-over-MCP share one maintained source and support

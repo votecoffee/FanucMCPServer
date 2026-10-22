@@ -64,6 +64,7 @@ class WorkbenchOperations:
             self.bridge._access(robot_id)
         return {"runtime": {"gui_imported": any(name == "PySide6" or name.startswith("PySide6.") for name in sys.modules)},
                 "concurrency": self.bridge.requests.status(),
+                "resource_ownership": self.bridge.management_activity()["owned_resources"],
                 "analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],
                 "live_reads": ["R", "PR", "DI", "DO", "GI", "GO", "AI", "AO", "RI", "RO", "UI", "UO", "F"],
                 "sampling_provider": "auto: native FRRobot if enabled, otherwise files; explicit snpx: digital/group/analog I/O",

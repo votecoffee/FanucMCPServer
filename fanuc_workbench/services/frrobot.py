@@ -61,18 +61,28 @@ class ComBinding:
 
 class FrRobot:
     def __init__(self, host, *, binding=None, robot=None):
-        self.binding = binding or ComBinding()
-        self.robot = robot or self.binding.dispatch("FRRobot.FRCRobot")
-        if robot is None:
-            # Zero retries means no connection attempt in the installed API.
-            self.binding.call(self.robot, "ConnectEx", host, False, 2, 1000)
-        if not self.binding.get(self.robot, "IsConnected"):
-            raise RuntimeError("FANUC Robot Object is not connected")
-        if self.binding.get(self.robot, "IsOffline"):
-            raise ValueError("Native TCP access requires a connected controller, not an offline file object")
-        actual = self.binding.get(self.robot, "HostName")
-        if not isinstance(actual, str) or actual.casefold() != host.casefold():
-            raise ValueError("Vendor connection does not match the configured endpoint")
+        self.binding = binding if binding is not None else ComBinding()
+        self.connection_owned = robot is None
+        self.robot = None
+        try:
+            self.robot = robot if robot is not None else self.binding.dispatch("FRRobot.FRCRobot")
+            if self.connection_owned:
+                # Zero retries means no connection attempt in the installed API.
+                self.binding.call(self.robot, "ConnectEx", host, False, 2, 1000)
+            if not self.binding.get(self.robot, "IsConnected"):
+                raise RuntimeError("FANUC Robot Object is not connected")
+            if self.binding.get(self.robot, "IsOffline"):
+                raise ValueError("Native TCP access requires a connected controller, not an offline file object")
+            actual = self.binding.get(self.robot, "HostName")
+            if not isinstance(actual, str) or actual.casefold() != host.casefold():
+                raise ValueError("Vendor connection does not match the configured endpoint")
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self):
+        """Release this adapter's proxy; never Quit/Exit an attached application."""
+        self.robot = None
 
     def _get(self, obj, name, *args):
         return self.binding.get(obj, name, *args)

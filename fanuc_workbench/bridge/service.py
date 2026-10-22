@@ -98,8 +98,14 @@ class RobotBridge:
                 self.operations.jobs.close()
                 with self._connection_condition:
                     self._connection_condition.wait_for(lambda: self._active_robot_operations == 0)
-                self.native.close()
-                self.extensions.close()
+                failed = 0
+                for owner in (self.native, self.extensions):
+                    try:
+                        owner.close()
+                    except Exception:
+                        failed += 1
+                if failed:
+                    raise RuntimeError("Owned resource cleanup is incomplete; inspect retained ownership before recovery")
                 self._closed = True
             finally:
                 self._close_owner = None
@@ -116,7 +122,8 @@ class RobotBridge:
             jobs = len(self.operations.jobs.events)
         with self._lock:
             plans = len(self._plans) + len(self.comments.plans) + len(self.native.plans)
-        return {"active_operations": requests + jobs, "review_plans": plans}
+        from fanuc_workbench.bridge.owned_workers import workers
+        return {"active_operations": requests + jobs, "review_plans": plans, "owned_resources": workers.snapshot()}
 
     def __enter__(self):
         return self
