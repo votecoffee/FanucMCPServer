@@ -235,7 +235,7 @@ def test_same_mcp_session_loads_summary_with_48_tools_and_checks_artifact_hashes
             assert result['items'][0]['adjacent_changes'] == 1 and not result['controller_contacted']
             assert (await call('list_operations', {}))['total'] == baseline_total + 3
             assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools
-            assert len(tools) == 48
+            assert len(tools) == 51
             assert (await session.call_tool('run_read_operation', {**request,
                 'arguments': {**arguments, 'path': '../outside.json'}})).is_error
             assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).is_error

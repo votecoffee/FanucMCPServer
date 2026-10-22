@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added a stable packaged FANUC bootstrap, one canonical runtime guide/reference
+  tree, three hash/revision-bound read tools and real Skills-over-MCP catalogs on
+  the standalone and app-owned frontends. Explicit data-only publication updates
+  connected clients without replacing worker code; stale pins and invalid
+  publications fail closed. Native skill activation remains host acceptance.
+
 - Updated the shared framework to 0.18.0, retaining MCP SDK 2.3.0 and the standalone
   plugin. Added cached, authenticated tray-manager reporting for owning MCP/host
   processes, canonical plugin identity, component versions and local work/plan

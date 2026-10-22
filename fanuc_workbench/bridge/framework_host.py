@@ -177,7 +177,10 @@ def publish(state: Path, config: Path, *, port=None, allow_writes=None, package=
             raise ValueError("Policy changed while publishing; retry after local edits finish")
         initialize(state, selected_port)  # Authenticated, literal-loopback settings; never starts a host.
         atomic_json(publication, document)
-        atomic_json(state / "runtime.json", {"python": str(Path(sys.executable).absolute()), "state": str(state)})
+        from fanuc_workbench.bridge.config import BridgeConfig
+        guidance_state = BridgeConfig.load(config).state_dir / "workflow-guidance"
+        atomic_json(state / "runtime.json", {"python": str(Path(sys.executable).absolute()), "state": str(state),
+                                           "guidance_state": str(guidance_state.resolve())})
     return publication
 
 
@@ -213,13 +216,19 @@ def main(argv=None):
             raise ValueError("Select a FANUC application state")
         for backend in definition.backends:
             validate_backend_profile(backend.service)
+        from fanuc_workbench.bridge.guidance import WorkflowGuidance
+        runtime = json.loads((state / "runtime.json").read_bytes())
+        guide_state = Path(runtime.get("guidance_state", state / "workflow-guidance"))
+        if not guide_state.is_absolute():
+            raise ValueError("Guidance state must be an absolute app-owned directory")
+        guidance = WorkflowGuidance(guide_state)
         if args.command == "serve":
             from fanuc_workbench.bridge.management import report_service
             with report_service(runtime=args.management_runtime, registry=args.management_registry):
-                serve_application(state, publication)
+                serve_application(state, publication, skills=guidance)
         else:
             create_surface(RemoteBackend(load_settings(state)), name=definition.display_name,
-                           instructions=definition.instructions).run(transport="stdio")
+                           instructions=definition.instructions, skills=guidance).run(transport="stdio")
 
 
 if __name__ == "__main__":

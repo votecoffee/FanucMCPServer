@@ -30,7 +30,7 @@ def capability_catalog(bridge: RobotBridge) -> dict:
 def create_server(bridge: RobotBridge):
     from mcp.types import ToolAnnotations
 
-    server = standalone_server(bridge)
+    server = standalone_server(bridge, skills=False)
 
     @server.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False))
     async def list_app_capabilities() -> dict:

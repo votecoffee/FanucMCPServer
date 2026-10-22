@@ -2,8 +2,8 @@
 
 The shared app framework supplies a stable app-owned MCP host with replaceable
 backends. FanucMCPServer ships its own standalone Codex plugin, desktop app and
-direct 48-tool MCP server. Broker routing and registration are removed. The
-experimental app-owned host uses an internal 49-tool backend, including its
+direct 51-tool MCP server. Broker routing and registration are removed. The
+experimental app-owned host uses an internal 52-tool backend, including its
 discovery catalog; it does not expose a separate broker-adapter entrypoint.
 Existing installations are updated only by running setup explicitly.
 

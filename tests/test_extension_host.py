@@ -338,5 +338,5 @@ def test_same_mcp_session_discovers_new_operation_without_tool_schema_changes(tm
             assert before == [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
             stale = await session.call_tool('run_read_operation', {'operation_id': 'demo.read', 'arguments': {'value': 'old'}, 'revision': original['revision']})
             assert stale.is_error
-            assert len(before) == 48
+            assert len(before) == 51
     asyncio.run(scenario())

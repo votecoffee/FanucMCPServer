@@ -15,6 +15,9 @@ def test_sdk23_preserves_standalone_wire_definitions(tmp_path):
         with RobotBridge(BridgeConfig(tmp_path / "state", tmp_path / "edits")) as bridge:
             rows = [tool.model_dump(by_alias=True, mode="json", exclude_none=True)
                     for tool in await create_server(bridge).list_tools()]
+            guides = {"list_workflows", "read_workflow", "read_workflow_reference"}
+            assert len(rows) == 51 and guides <= {row["name"] for row in rows}
+            rows = [row for row in rows if row["name"] not in guides]
             raw = json.dumps(sorted(rows, key=lambda row: row["name"]), sort_keys=True,
                              separators=(",", ":"), ensure_ascii=False).encode()
             assert len(rows) == 48

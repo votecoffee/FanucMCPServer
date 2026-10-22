@@ -239,5 +239,5 @@ def test_same_mcp_session_loads_alarm_feature_and_handles_large_page_with_48_too
             assert (await session.call_tool('run_read_operation', {**request, 'revision': 'stale'})).is_error
             (Path(imported['root']) / 'alarm.txt').write_text('changed')
             assert (await session.call_tool('run_read_operation', request)).is_error
-            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 48
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 51
     asyncio.run(scenario())

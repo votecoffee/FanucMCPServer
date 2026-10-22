@@ -264,7 +264,7 @@ def test_same_mcp_session_adds_inspection_and_rolls_back_with_48_tools(tmp_path)
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
             tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
-            assert len(tools) == 48
+            assert len(tools) == 51
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)

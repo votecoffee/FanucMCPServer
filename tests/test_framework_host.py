@@ -116,7 +116,7 @@ def test_actual_fanuc_framework_retains_plans_approval_results_and_frontend_sche
         async with ApplicationHost(state, publication) as host:
             owner, foreign = host.client(), host.client()
             before = [row.model_dump(by_alias=True, mode="json") for row in await host.create_server().list_tools()]
-            assert len(before) == 14 and len(direct_tools) == 49
+            assert len(before) == 14 and len(direct_tools) == 52
             for name, definition in direct_tools.items():
                 described = data(await owner.invoke("describe_tool", {"tool_id": "fanuc-mcp-server/" + name}))
                 assert described["definition"] == definition
