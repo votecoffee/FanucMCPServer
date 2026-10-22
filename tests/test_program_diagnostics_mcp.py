@@ -59,7 +59,7 @@ def test_same_mcp_session_reloads_all_six_capabilities_and_can_roll_back(tmp_pat
             assert not result['preserved_checks_pass']
             result,_=await operation('dependencies',paths=['MAIN.LS','CHILD.LS'],entry_programs=['MAIN'])
             assert result['reachable_programs']==2
-            assert len(tools)==51 and [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]==tools
+            assert len(tools)==55 and [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]==tools
             assert (await session.call_tool('run_read_operation',{**request,'revision':'stale'})).is_error
             assert (await session.call_tool('run_read_operation',{**request,'arguments':{**request['arguments'],'paths':['../MAIN.LS']}})).is_error
             install_builtin(tmp_path/'state/extensions','programs')

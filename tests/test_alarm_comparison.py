@@ -227,5 +227,5 @@ def test_same_mcp_session_loads_compares_rolls_back_and_checks_both_artifacts(tm
                 path.write_bytes(b'changed')
                 assert (await session.call_tool('run_read_operation', request)).is_error
                 path.write_bytes(data)
-            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 51
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 55
     asyncio.run(scenario())

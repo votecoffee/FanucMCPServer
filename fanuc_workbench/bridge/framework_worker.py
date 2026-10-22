@@ -3,7 +3,7 @@ from pathlib import Path
 from functools import wraps
 
 from fanuc_workbench.bridge.framework_backend import create_server
-from fanuc_workbench.bridge.service import RobotBridge
+from fanuc_workbench.bridge.instance_owner import owned_mcp_bridge
 
 
 class VerifiedRequests:
@@ -26,6 +26,6 @@ class VerifiedRequests:
 
 def run(verify, config: Path):
     verify()
-    with RobotBridge.from_config(config) as bridge:
+    with owned_mcp_bridge(config) as bridge:
         bridge.requests = VerifiedRequests(bridge.requests, verify)
         create_server(bridge).run(transport="stdio")

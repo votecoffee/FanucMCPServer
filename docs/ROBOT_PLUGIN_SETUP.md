@@ -99,6 +99,11 @@ in named environment variables, not JSON, command-line arguments or chat.
 Reload endpoint-only edits as described below. Other configuration changes
 require a new MCP process.
 
+Only one MCP worker can own a policy state directory. A second plugin/direct
+connection using it is refused until the existing owner finishes shutdown.
+Use one installed registration and the owning connection's concurrent request
+support; see [worker admission and lifetime](SERVICE_MANAGEMENT.md).
+
 For ROBOGUIDE, use the virtual controller's actual local TCP listener address and
 FTP port. A workcell's saved real-robot synchronization address is a different
 destination. Discover listeners from the running virtual controller or its

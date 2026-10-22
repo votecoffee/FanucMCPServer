@@ -38,7 +38,8 @@ async def _diagnose(config: Path, probe: str | None, registry: str) -> dict:
         capabilities = await session.call_tool("capabilities", {})
         if capabilities.is_error:
             raise RuntimeError("Runtime capability check failed")
-        runtime = json.loads(capabilities.content[0].text)["runtime"]
+        reported = json.loads(capabilities.content[0].text)
+        runtime = reported["runtime"]
         names = [tool.name for tool in tools.tools]
         result = {"status": "ok", "python": sys.version.split()[0], "mcp": importlib.metadata.version("mcp"),
                   "tool_count": len(names), "tools": names, "configured_robots": sorted(loaded.robots),
@@ -48,6 +49,7 @@ async def _diagnose(config: Path, probe: str | None, registry: str) -> dict:
                   "controller_contacted": probe is not None, "gui_imported": runtime["gui_imported"],
                   "caller_gui_imported": any(x.startswith("PySide6") for x in sys.modules),
                   "client_confirmation_ui": "verify separately in your chat client"}
+        result["protocol_features"] = reported.get("protocol_features", {})
         if probe is not None:
             checked = await session.call_tool("probe_robot", {"robot_id": probe})
             if checked.is_error:

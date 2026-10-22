@@ -137,7 +137,7 @@ def test_same_mcp_session_loads_vqlog_without_new_tools_or_controller_access(tmp
             result = (await call('run_read_operation', request))['result']
             assert result['records_total'] == 2 and result['source_sha256'] == hashlib.sha256(data).hexdigest()
             assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools
-            assert len(tools) == 51
+            assert len(tools) == 55
             bad = {**request, 'arguments': {**arguments, 'path': '../outside.txt'}}
             assert (await session.call_tool('run_read_operation', bad)).is_error
             assert (await call('capabilities', {}))['controller_access']['read_only']

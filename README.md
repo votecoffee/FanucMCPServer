@@ -77,10 +77,19 @@ from cached local state, with restart disabled until an app-owned supervisor can
 enforce safe quiescence across chats. Setup preserves the standalone plugin and
 does not install another manager.
 
+MCP workers acquire an exclusive lease for their policy's state directory and
+hold it through shutdown. A second standalone or app-host backend worker using
+that state is refused before service construction. Independent requests still
+share the owning worker's bounded dispatcher. See [worker ownership](docs/SERVICE_MANAGEMENT.md).
+
 The packaged skill is a stable bootstrap for [current workflow guidance](docs/WORKFLOW_GUIDANCE.md).
 Ordinary guide readers and Skills-over-MCP share one maintained source and support
 explicit guide publication without reconnecting. Native skill metadata still
 requires the host's normal install/reload lifecycle.
+
+The next protocol features are [staged for validation](docs/PROTOCOL_FEATURES.md).
+Tasks, discovery caching and artifact resources are disabled in normal startup;
+their presence in source does not establish client or controller acceptance.
 
 The default distribution includes the desktop dependencies. For a separate
 runtime without Qt, follow the [headless plugin bundle guide](docs/ROBOT_PLUGIN_SETUP.md).
@@ -200,7 +209,7 @@ and retain an actionable report when the toolchain is incomplete.
 The desktop exposes these tools at **Search / Analysis → Program diagnostics**,
 including opt-in triggered captures from existing native reads. The optional
 reloadable `workbench.programs` 1.1.0 release adds six read analyses through the
-operation catalog while retaining the 51 permanent MCP tools and original release.
+operation catalog while retaining the established tool schemas and original release.
 
 ## Capabilities and limits
 
@@ -214,7 +223,7 @@ operation catalog while retaining the 51 permanent MCP tools and original releas
 | Native controller API | R/PR/I/O reads, position, tasks, alarms and program metadata; reviewed R/PR value changes and LS deployment |
 | Experimental SNPX | Optional digital/group/analog I/O samples with explicit word decoding and raw assigned-word reads over TCP; controller compatibility remains unverified |
 | Offline SNPX analysis | Reloadable word decoding/comparison, frame inspection and named I/O payload checks with explicit read-order assumptions |
-| Extensions | 51 stable MCP tools, a versioned operation catalog and reloadable feature workers, including 20 workspace analyses |
+| Extensions | 51 established tools, four staged job tools, a versioned operation catalog and reloadable feature workers, including 20 workspace analyses |
 | Visual Line Tracking | Optional reloadable VQLOG event analysis, filters, timelines and explicit tick-period assumptions |
 | Alarm logs | Optional reloadable text alarm records, recurrence and two-log code/text comparison with explicit clocks and retained unrecognized lines |
 | Desktop workflows | Remembered robot selection, saved adjustable columns/panes/tabs with layout reset, fleet backups, in-app scheduling, commissioning baselines, PLC handshake analysis, projects and ROBOGUIDE handoff packages |

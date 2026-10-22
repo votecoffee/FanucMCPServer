@@ -229,6 +229,6 @@ def test_same_mcp_session_bundles_upgrades_inspects_and_rolls_back(bridge_case, 
             install_release(config.state_dir / 'extensions', releases / 'recording')
             await call('reload_extensions', {})
             assert (await session.call_tool('run_read_operation', request)).is_error
-            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 51
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 55
     asyncio.run(scenario())
     assert robot.connects == robot.uploads == 0

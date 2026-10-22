@@ -40,10 +40,9 @@ def digest(raw):
 
 
 def validate_backend_profile(service):
-    # The current FANUC handlers use request-bound imperative elicitation. A
-    # modern frontend can resume it through the framework while this downstream
-    # connection retains its legacy back-channel. Modern downstream discovery
-    # requires a separate resolver-based approval integration.
+    # Keep the accepted downstream profile until the app-owned resolver change
+    # passes modern positive/negative continuation and owner-isolation checks.
+    # Source support alone does not authorize changing a deployed wire profile.
     if service.protocol_mode != "legacy" or service.watch_catalog:
         raise ValueError("FANUC backend requires the legacy wire profile for reviewed approval; modern frontends may connect through the app host")
 

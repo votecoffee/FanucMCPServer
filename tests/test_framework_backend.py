@@ -36,7 +36,7 @@ def test_app_backend_keeps_direct_schemas_and_exports_explicit_retained_policy(t
     async def check(bridge):
         direct = {tool.name: tool.model_dump(by_alias=True) for tool in await direct_server(bridge).list_tools()}
         backend = {tool.name: tool.model_dump(by_alias=True) for tool in await create_server(bridge).list_tools()}
-        assert len(direct) == 51 and len(backend) == 52
+        assert len(direct) == 55 and len(backend) == 56
         assert {name: backend[name] for name in direct} == direct
         assert backend["list_app_capabilities"]["annotations"]["readOnlyHint"] is True
         descriptor = await service_manifest(bridge, Path(sys.executable), config)

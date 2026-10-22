@@ -255,5 +255,5 @@ def test_same_mcp_session_reloads_inspector_and_checks_artifact_paths_and_large_
                 'arguments': {**request['arguments'], 'paths': ['../outside.LS']}})).is_error
             (Path(imported['root']) / 'main.LS').write_text('changed')
             assert (await session.call_tool('run_read_operation', request)).is_error
-            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 51
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 55
     asyncio.run(scenario())

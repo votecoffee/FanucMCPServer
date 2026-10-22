@@ -65,7 +65,7 @@ with RobotBridge.from_config(Path(sys.argv[1]), lambda _: backend) as bridge:
                 assert denied.is_error
             else:
                 from mcp.shared.exceptions import MCPError
-                with pytest.raises(MCPError, match='Elicitation not supported'):
+                with pytest.raises(MCPError, match='Elicitation not supported|elicitation capability'):
                     await session.call_tool('commit_change', args)
             assert not marker.exists()
             if supports_confirmation:

@@ -57,7 +57,7 @@ def test_packaged_guide_and_supporting_files_match_native_skill_manifests(tmp_pa
                     via_tool = data(await client.call_tool("read_workflow_reference", {"workflow_id": "fanuc-robot",
                         "revision": catalog["revision"], "path": reference["path"], "expected_sha256": reference["sha256"]}))
                     assert via_tool["text"].encode() == content
-                assert len((await client.list_tools()).tools) == 51
+                assert len((await client.list_tools()).tools) == 55
     asyncio.run(scenario())
 
 

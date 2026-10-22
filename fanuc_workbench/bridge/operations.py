@@ -236,12 +236,12 @@ class WorkbenchOperations:
         return {key: value for key, value in item.items() if key != "files"} | {"file_count": len(paths)}
 
     def start_backup(self, robot_id: str, paths: list[str] | None = None, max_depth: int = 8,
-                     attempt_ascii: bool = True) -> dict:
+                     attempt_ascii: bool = True, *, job_id=None, task_binding=None) -> dict:
         with self.bridge._lock:
-            return self._start_backup(robot_id, paths, max_depth, attempt_ascii)
+            return self._start_backup(robot_id, paths, max_depth, attempt_ascii, job_id=job_id, task_binding=task_binding)
 
     def _start_backup(self, robot_id: str, paths: list[str] | None, max_depth: int,
-                      attempt_ascii: bool) -> dict:
+                      attempt_ascii: bool, *, job_id=None, task_binding=None) -> dict:
         access = self.bridge._access(robot_id)
         if not 0 <= max_depth <= 16:
             raise ValueError("max_depth must be between 0 and 16")
@@ -264,7 +264,8 @@ class WorkbenchOperations:
                         maximum_total_bytes=self.bridge.config.max_backup_bytes,
                         maximum_files=self.bridge.config.max_backup_files,
                         checkpoint=context.check, validate_path=lambda p: self.bridge._path(robot_id, p),
-                        redact_errors=True, progress=lambda info: context.progress(info.get("message", "Capturing")))
+                        redact_errors=True, progress=lambda info: context.progress(info.get("message", "Capturing"),
+                            completed=info.get("completed_files"), total=info.get("total_files"), stage=info.get("phase")))
                     manifest = json.loads((root / "backup_manifest.json").read_text(encoding="utf-8"))
                     result = {"complete": not manifest["warnings"] and not any(row.get("error") for row in manifest["records"]),
                               "warnings": manifest["warnings"], "records": len(manifest["records"])}
@@ -279,7 +280,7 @@ class WorkbenchOperations:
             self.bridge._audit("backup_finished", job_id=context.identifier, robot_id=robot_id, **result)
             return result
 
-        return self.jobs.start("backup", robot_id, work)
+        return self.jobs.start("backup", robot_id, work, job_id=job_id, task_binding=task_binding)
 
     def analyze(self, artifact_id: str, kind: str, offset=0, limit=100, query="") -> dict:
         return self.bridge.extensions.legacy_analysis(artifact_id, kind, offset, limit, query)
@@ -373,12 +374,13 @@ class WorkbenchOperations:
                     "file_transports": transports}
 
     def start_watch(self, robot_id: str, expressions: list[str], samples: int = 10,
-                    interval_seconds: float = 2.0, cycle_signal: str = "") -> dict:
+                    interval_seconds: float = 2.0, cycle_signal: str = "", *, job_id=None, task_binding=None) -> dict:
         with self.bridge._lock:
-            return self._start_watch(robot_id, expressions, samples, interval_seconds, cycle_signal)
+            return self._start_watch(robot_id, expressions, samples, interval_seconds, cycle_signal,
+                                     job_id=job_id, task_binding=task_binding)
 
     def _start_watch(self, robot_id: str, expressions: list[str], samples: int,
-                     interval_seconds: float, cycle_signal: str) -> dict:
+                     interval_seconds: float, cycle_signal: str, *, job_id=None, task_binding=None) -> dict:
         self.bridge._access(robot_id)
         self._watch_specs(expressions)
         if not 1 <= samples <= 300 or not math.isfinite(interval_seconds) or not 2 <= interval_seconds <= 60:
@@ -394,12 +396,14 @@ class WorkbenchOperations:
                 with self.bridge._robot_lock(robot_id, timeout=self.bridge.config.robot_lock_timeout_seconds,
                                              cancel_event=context.cancel):
                     for index in range(samples):
-                        context.progress(f"Sample {index + 1}/{samples}")
+                        context.progress(f"Reading sample {index + 1}/{samples}", stage="sampling")
                         remaining = max(0, interval_seconds - (time.monotonic() - self._last_sample_time(robot_id)))
                         if context.cancel.wait(remaining):
                             context.check()
                         data = self.sample(robot_id, expressions, checkpoint=context.check)
                         sample_ids.append(data["artifact_id"])
+                        context.progress(f"Captured sample {index + 1}/{samples}", completed=index + 1,
+                                         total=samples, stage="samples_captured")
                         sample = Sample(data["timestamp"], data["values"], data["errors"])
                         trend.add(sample)
                         timeline.add(sample)
@@ -416,7 +420,7 @@ class WorkbenchOperations:
                 self.jobs.update(context.identifier, artifact_id=artifact["artifact_id"])
             return {"artifact_id": artifact["artifact_id"], "samples": len(trend.samples), "profile_seconds": profile_cycle(cycle.events)}
 
-        return self.jobs.start("watch", robot_id, work)
+        return self.jobs.start("watch", robot_id, work, job_id=job_id, task_binding=task_binding)
 
     def snapshot(self, workspace_id: str, note: str = "") -> dict:
         root = self.store.verify(workspace_id)

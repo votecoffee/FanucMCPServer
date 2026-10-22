@@ -74,7 +74,7 @@ with RobotBridge.from_config(Path(sys.argv[1]),lambda profile:robots[profile.hos
                 'revision':descriptor['revision'],'arguments':{}})
             assert not status.is_error and json.loads(status.content[0].text)['result']['recent']
             assert before==[tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
-            assert len(before)==51
+            assert len(before)==55
     asyncio.run(scenario())
     audit=[json.loads(line) for line in (tmp_path/'state/audit.jsonl').read_text().splitlines()]
     writes=[row for row in audit if row['action']=='upload_started']

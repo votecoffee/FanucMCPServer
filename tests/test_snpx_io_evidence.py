@@ -285,5 +285,5 @@ def test_same_mcp_session_loads_io_checker_and_rolls_back_with_the_same_48_tools
             install_release(tmp_path / 'state/extensions', releases / 'snpx_v1_2_0')
             await call('reload_extensions', {})
             assert (await session.call_tool('run_read_operation', request)).is_error
-            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 51
+            assert [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools] == tools and len(tools) == 55
     asyncio.run(scenario())

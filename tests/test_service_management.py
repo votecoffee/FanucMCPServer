@@ -144,7 +144,7 @@ def test_real_stdio_owner_reports_and_clean_exit_stops_registration(tmp_path):
             env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as client:
             await client.initialize()
-            assert len((await client.list_tools()).tools) == 51
+            assert len((await client.list_tools()).tools) == 55
             rows = ManagementClient(registry).snapshot()["services"]
             assert len(rows) == 1 and rows[0]["status"]["state"] == "running"
             assert rows[0]["plugin_id"] is None and not rows[0]["status"]["restart_allowed"]

@@ -45,6 +45,30 @@ Old detached instances cannot be safely retired from zero counters alone: their
 reporting-only endpoint cannot atomically fence admission or attest to uncertain
 effects. Do not bulk-kill names/PIDs or clear restart journals.
 
+## Exclusive worker admission
+
+The standalone entrypoint and experimental app-host backend acquire the same OS
+lease under the configured `state_dir/mcp-owner` before constructing their
+bridge. The limit is **one MCP worker per state directory**, including aliases
+of that directory. Extra connections fail with an ownership message; they do not
+wait in a startup queue, attach to the existing worker or select another route.
+Use the owning client's bounded concurrent requests. Multi-chat shared hosting
+remains a separate, explicit deployment choice.
+
+The lease stays held through bridge/job/native shutdown, independent of tray
+availability and launcher survival. If draining fails, the lease is retained
+until process exit. A lock file's presence does not mean a process is alive;
+admission uses the OS lock, without deleting files or testing a remembered PID.
+The lease does not provide restart supervision, force-stop blocked native calls
+or prove the outcome of an interrupted write. Different policy state directories
+are independent. Older runtimes without this lease must be stopped separately
+before adopting this version; this change cannot fence their processes.
+
+Source regression cases cover duplicate admission, state aliases, construction
+failure and drain failure using inert objects. Process EOF, parent-loss, multiple
+launcher and shutdown acceptance must also pass in isolated registries before
+release. No release or installation is implied by source changes.
+
 The app component is the headless bridge distribution in a packaged runtime and
 the desktop distribution in an editable development environment. Installing a
 plugin does not establish a running chat connection. Existing processes load this

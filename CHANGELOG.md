@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Added an exclusive MCP worker lease per policy state directory, shared by the
+  standalone entrypoint and app-host backend. Retain ownership through bridge
+  drain and until process exit after drain failure; no automatic restart,
+  duplicate owner or PID-based cleanup. Process acceptance remains pending.
+
+- Staged explicit backup/recording Tasks, bounded job notifications, stage/unit
+  progress, resolver-based approval and hash-bound artifact resource views.
+  Tasks, caching and resource views remain disabled in normal startup pending
+  app-owned acceptance; the downstream legacy-profile guard remains in place.
+  Added a read-only feature status report and documented release requirements.
+
 - Replaced the Windows exec-overlay launcher with an owning stdin-forwarding
   parent that waits for the actual runtime. EOF and loss of the launcher close
   the worker's input and permit app-owned draining, preventing detached stdio

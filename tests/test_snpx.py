@@ -380,7 +380,7 @@ def test_mcp_catalog_reads_snpx_without_adding_tools(controller, tmp_path):
         async with stdio_client(params) as (reader, writer), ClientSession(reader, writer) as session:
             await session.initialize()
             tools = [tool.model_dump(by_alias=True) for tool in (await session.list_tools()).tools]
-            assert len(tools) == 51
+            assert len(tools) == 55
 
             async def call(name, arguments):
                 response = await session.call_tool(name, arguments)
