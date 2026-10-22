@@ -1,1 +1,1 @@
-__version__ = "2.6.0"
+from fanuc_workbench.version import DISPLAY_VERSION as __version__, PACKAGE_VERSION as __package_version__

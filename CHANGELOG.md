@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Unified app, desktop/headless package and standalone plugin identities at
+  timestamp checkpoint `26.1022.173617` (America/New_York). Preserve padded
+  human display, canonical PEP 440/SemVer identities and bounded Windows file
+  mappings; stamp only during explicit release preparation. Report loaded app
+  versions independently of installed metadata and bind installer/bundle records
+  to the same checkpoint. Build both app wheels from fresh staging and reject
+  stale or changed package payloads. Framework/SDK pins and feature/schema versions stay
+  independent; native/runtime acceptance remains separately required.
+
 - Added an installed-runtime stdio supervisor with durable report-only ancestor
   records, bounded activation, opaque SDK byte relay and private job containment.
   Generate the runtime connection from a hash-bound immutable bundle recipe;

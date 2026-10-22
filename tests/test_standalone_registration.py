@@ -24,7 +24,8 @@ def test_installer_registers_only_standalone_routes(tmp_path, monkeypatch, selec
     def run(command, **kwargs):
         assert "universal_tools" not in command and command[1:3] != ["plugin", "list"]
         if command[:3] == ["codex", "mcp", "add"]: calls.append("mcp")
-        return SimpleNamespace(stdout=json.dumps({"tool_count": 48, "configured_robots": []}))
+        return SimpleNamespace(stdout=json.dumps({"tool_count": 48, "configured_robots": [],
+            "app_version": setup.versions.DISPLAY_VERSION, "package_version": setup.versions.PACKAGE_VERSION}))
     monkeypatch.setattr(setup.subprocess, "run", run)
     argv = ["setup.py", "--runtime-dir", str(runtime), "--config", str(config)]
     if selected is not None: argv += ["--register", selected]
@@ -35,6 +36,7 @@ def test_installer_registers_only_standalone_routes(tmp_path, monkeypatch, selec
     marker = json.loads((runtime / "installation.json").read_bytes())
     assert marker.get("registration") == (None if route == "none" else route)
     assert marker["config"] == str(config.resolve())
+    assert marker["release"] == setup.versions.release_metadata()
 
 
 @pytest.mark.parametrize("removed", [["--register", "broker"], ["--register", "auto"],

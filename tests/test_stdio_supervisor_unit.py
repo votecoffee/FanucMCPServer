@@ -106,7 +106,7 @@ def test_bundle_recipe_remains_verifiable_after_generating_runtime_connection(tm
     plugin.mkdir()
     recipe = (root / "plugins/fanuc-mcp-server/mcp.json").read_bytes()
     (plugin / "mcp.template.json").write_bytes(recipe)
-    (tmp_path / "BUNDLE_MANIFEST.json").write_text(json.dumps({"compatibility": setup.compatibility(), "files": [
+    (tmp_path / "BUNDLE_MANIFEST.json").write_text(json.dumps({"release": setup.versions.release_metadata(), "compatibility": setup.compatibility(), "files": [
         {"path": "plugin/mcp.template.json", "sha256": hashlib.sha256(recipe).hexdigest(), "bytes": len(recipe)}]}))
     setup.verify_bundle(tmp_path)
     connection = setup.plugin_connection(Path("C:/Test/python.exe"), plugin / "runtime.json", tmp_path)

@@ -17,6 +17,7 @@ import threading
 from fanuc_workbench.bridge.extension_process import WindowsJob
 from fanuc_workbench.bridge.process_identity import creation_time
 from fanuc_workbench.bridge.resource_context import configure_resource_registry, resource_context, close_resource_context
+from fanuc_workbench.version import add_version_argument
 
 
 _uncertain = []
@@ -131,6 +132,7 @@ def supervise(command, context, source, destination, *, environment=None, popen=
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    add_version_argument(parser)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--runtime", type=Path)
     mode.add_argument("--config", type=Path)

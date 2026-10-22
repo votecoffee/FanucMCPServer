@@ -18,6 +18,7 @@ from fanuc_workbench.services.monitoring import (WATCH_RE, Sample, WatchSpec, Wo
                                                TrendRecorder, TimelineRecorder, CycleRecorder, profile_cycle)
 from fanuc_workbench.services.snapshots import capture_snapshot, compare_snapshots
 from fanuc_workbench.services.backup import BackupService
+from fanuc_workbench.version import release_metadata
 
 
 class ScopedReadBackend(RobotBackend):
@@ -62,7 +63,8 @@ class WorkbenchOperations:
     def capabilities(self, robot_id: str | None = None) -> dict:
         if robot_id is not None:
             self.bridge._access(robot_id)
-        return {"runtime": {"gui_imported": any(name == "PySide6" or name.startswith("PySide6.") for name in sys.modules)},
+        return {"runtime": {"release": release_metadata(),
+                            "gui_imported": any(name == "PySide6" or name.startswith("PySide6.") for name in sys.modules)},
                 "concurrency": self.bridge.requests.status(),
                 "resource_ownership": self.bridge.management_activity()["owned_resources"],
                 "analyses": list(ANALYSES), "backups": ["full_roots", "selected_files", "ascii_companions"],

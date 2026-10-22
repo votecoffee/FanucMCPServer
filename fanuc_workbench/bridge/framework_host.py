@@ -17,6 +17,7 @@ import tempfile
 
 from fanuc_workbench.bridge.framework_backend import service_manifest
 from fanuc_workbench.bridge.service import RobotBridge
+from fanuc_workbench.version import add_version_argument, release_metadata
 
 
 APPLICATION_ID = "fanuc-mcp-server"
@@ -186,12 +187,14 @@ def publish(state: Path, config: Path, *, port=None, allow_writes=None, package=
         from fanuc_workbench.bridge.config import BridgeConfig
         guidance_state = BridgeConfig.load(config).state_dir / "workflow-guidance"
         atomic_json(state / "runtime.json", {"python": str(Path(sys.executable).absolute()), "state": str(state),
+                                           "release": release_metadata(),
                                            "guidance_state": str(guidance_state.resolve())})
     return publication
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    add_version_argument(parser)
     parser.add_argument("--state", required=True, type=Path)
     parser.add_argument("--management-runtime", type=Path, help="Optional installer-owned plugin runtime pointer")
     parser.add_argument("--management-registry", type=Path, default=os.environ.get("FANUC_MCP_MANAGEMENT_REGISTRY"))

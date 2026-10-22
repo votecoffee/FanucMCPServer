@@ -7,6 +7,7 @@ import sys
 from uuid import uuid4
 
 from fanuc_workbench.identity import APP_NAME, application_icon
+from fanuc_workbench.version import add_version_argument
 
 
 def _windows_shell():
@@ -64,6 +65,7 @@ def remove_start_menu_shortcut(*, programs_directory: Path | None = None) -> Pat
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    add_version_argument(parser)
     parser.add_argument("--remove", action="store_true", help="Remove the Start menu shortcut")
     args = parser.parse_args(argv)
     try:

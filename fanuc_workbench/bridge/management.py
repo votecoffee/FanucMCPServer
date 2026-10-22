@@ -17,6 +17,7 @@ from universal_tools import __version__ as FRAMEWORK_VERSION
 from universal_tools.management import ComponentVersion, ManagedService, ManagedStatus, RestartResult
 
 from fanuc_workbench import __version__ as APP_VERSION
+from fanuc_workbench.version import display_if_timestamp
 
 
 PLUGIN_ID = "fanuc-mcp-server@fanuc-mcp-server-local"
@@ -52,7 +53,7 @@ def plugin_version(runtime):
     if (manifest.get("name") != "fanuc-mcp-server" or not isinstance(version, str)
             or not 1 <= len(version) <= 128):
         raise ValueError("Invalid installed plugin metadata")
-    return version
+    return display_if_timestamp(version)
 
 
 class ServiceReporting:
@@ -72,7 +73,7 @@ class ServiceReporting:
         self.distribution = ("fanuc-mcp-server-bridge" if installed_version("fanuc-mcp-server-bridge") != "unknown"
                              else "fanuc-mcp-server")
         self.running = {
-            "app": installed_version(self.distribution) if self.distribution.endswith("-bridge") else APP_VERSION,
+            "app": APP_VERSION,
             "framework": FRAMEWORK_VERSION,
             "sdk": installed_version("mcp"),
         }
@@ -89,7 +90,8 @@ class ServiceReporting:
         return RestartResult(outcome="blocked", message=RESTART_REASON)
 
     def refresh(self):
-        versions = {key: ComponentVersion(installed=installed_version(distribution), running=self.running[key],
+        versions = {key: ComponentVersion(installed=(display_if_timestamp(installed_version(distribution))
+                                                   if key == "app" else installed_version(distribution)), running=self.running[key],
                                          available=None, update_pending=False)
                     for key, distribution in (("app", self.distribution), ("framework", "universal-codex-tools"),
                                               ("sdk", "mcp"))}

@@ -25,6 +25,11 @@ sessions. Running the suite does not establish controller or commissioning
 acceptance. Add focused regression coverage for behavior changes and update the
 README, relevant guides and changelog when public behavior changes.
 
+For release work, follow [release versioning](docs/RELEASE_VERSIONING.md): select
+one America/New_York timestamp, stamp it once and reuse its display/canonical
+identities through all builds and checks. Never derive a new version at startup,
+change dependency pins as part of a version-only update or overwrite old receipts.
+
 ## Public repository hygiene
 
 Keep reusable code and general documentation in Git. Put private work outside the

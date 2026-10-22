@@ -79,7 +79,8 @@ def test_setup_remembers_custom_configuration_across_upgrade(tmp_path, monkeypat
     calls = []
     def run(command, **kwargs):
         calls.append(command)
-        return SimpleNamespace(stdout=json.dumps({'tool_count': 48, 'configured_robots': 2}))
+        return SimpleNamespace(stdout=json.dumps({'tool_count': 48, 'configured_robots': 2,
+            'app_version': module.versions.DISPLAY_VERSION, 'package_version': module.versions.PACKAGE_VERSION}))
     monkeypatch.setattr(module.subprocess, 'run', run)
     runtime = tmp_path / 'stable runtime'
     config = tmp_path / 'custom robot policy.json'
@@ -97,6 +98,8 @@ def test_setup_remembers_custom_configuration_across_upgrade(tmp_path, monkeypat
     assert json.loads((root / 'plugin/runtime.json').read_text())['config'] == str(config.resolve())
     assert config.read_bytes() == original and not (runtime / 'robot_bridge.local.json').exists()
     assert json.loads((runtime / 'installation.json').read_text())['kind'] == 'fanuc-mcp-server-runtime'
+    assert json.loads((runtime / 'installation.json').read_text())['release'] == module.versions.release_metadata()
+    assert json.loads((root / 'plugin/runtime.json').read_text())['release'] == module.versions.release_metadata()
     removals = [i for i, cmd in enumerate(calls) if 'uninstall' in cmd]
     if legacy_name:
         assert len(removals) == 1 and calls[removals[0]][-1] == 'fanuc-workbench-bridge'
@@ -123,3 +126,19 @@ def test_config_selection_handles_first_install_legacy_and_explicit_override(tmp
     assert module.select_config(runtime, default, {**legacy, 'config': 'missing.json'}) == default.resolve()
     with pytest.raises(ValueError, match='supplied configuration'):
         module.select_config(runtime, tmp_path / 'missing.json', {})
+
+
+@pytest.mark.parametrize('reported,accepted', [('26.102.30405', True), ('26.0102.030405', True), ('26.102.30406', False)])
+def test_plugin_response_uses_numeric_identity_comparison(tmp_path, monkeypatch, reported, accepted):
+    module = load_setup()
+    bundle(tmp_path / 'bundle', '26.102.30405')
+    def run(command, **kwargs):
+        if command[1:4] == ['plugin', 'marketplace', 'list']:
+            return SimpleNamespace(stdout='{"marketplaces":[]}')
+        return SimpleNamespace(stdout=json.dumps({'version': reported}))
+    monkeypatch.setattr(module.subprocess, 'run', run)
+    if accepted:
+        module.register_plugin('inert-codex', tmp_path / 'bundle', {})
+    else:
+        with pytest.raises(ValueError, match='different from this bundle'):
+            module.register_plugin('inert-codex', tmp_path / 'bundle', {})

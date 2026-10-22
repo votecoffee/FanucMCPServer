@@ -4,9 +4,13 @@ import sys
 
 from fanuc_workbench.desktop_runtime import DesktopSession
 from fanuc_workbench.identity import APP_NAME, application_icon
+from fanuc_workbench import __version__
 
 
 def main() -> int:
+    if sys.argv[1:] == ["--version"]:
+        print(f"{APP_NAME} {__version__}")
+        return 0
     with DesktopSession() as session:
         starting = True
         try:
@@ -16,6 +20,7 @@ def main() -> int:
 
             app = QApplication(sys.argv)
             app.setApplicationName(APP_NAME)
+            app.setApplicationVersion(__version__)
             app.setOrganizationName("Local")
             app.setWindowIcon(QIcon(str(application_icon())))
             window = MainWindow()

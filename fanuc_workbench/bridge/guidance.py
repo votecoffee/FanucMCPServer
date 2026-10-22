@@ -22,6 +22,7 @@ from universal_tools.skill_catalog import SkillCatalog, SkillParams
 
 from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.storage import RobotLocks, atomic_json
+from fanuc_workbench.version import add_version_argument
 
 
 APP_ID = "fanuc-mcp-server"
@@ -230,6 +231,7 @@ def publish(state, source, expected_revision):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Publish data-only FANUC workflow guidance; no controller contact")
+    add_version_argument(parser)
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--source", type=Path, default=ROOT)
     parser.add_argument("--expected-revision", required=True)

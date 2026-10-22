@@ -16,6 +16,10 @@ GUI/shared services and `fanuc-mcp-server-bridge` for the headless runtime.
 Commands are `fanuc-mcp-server`, `fanuc-mcp-server-gui` (GUI distribution),
 `fanuc-mcp-server-doctor` and `fanuc-mcp-server-extension`.
 
+App, bridge distribution and plugin releases share the fixed timestamp described
+in [release versioning](RELEASE_VERSIONING.md). The plugin/cache and wheel version
+is its canonical numeric identity; installer metadata also retains padded display.
+
 `fanuc_workbench` Python imports and the `fanuc_workbench.plugins` SDK entry-point
 group retain their names for compatibility. The old `fanuc-workbench*` commands
 remain aliases. `FANUC_MCP_SERVER_CONFIG` is the preferred configuration variable;

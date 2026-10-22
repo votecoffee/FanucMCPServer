@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from fanuc_workbench.version import DISPLAY_VERSION, PACKAGE_VERSION, add_version_argument
 
 
 async def diagnose(config: Path, probe: str | None = None) -> dict:
@@ -41,7 +42,8 @@ async def _diagnose(config: Path, probe: str | None, registry: str) -> dict:
         reported = json.loads(capabilities.content[0].text)
         runtime = reported["runtime"]
         names = [tool.name for tool in tools.tools]
-        result = {"status": "ok", "python": sys.version.split()[0], "mcp": importlib.metadata.version("mcp"),
+        result = {"status": "ok", "app_version": DISPLAY_VERSION, "package_version": PACKAGE_VERSION,
+                  "python": sys.version.split()[0], "mcp": importlib.metadata.version("mcp"),
                   "tool_count": len(names), "tools": names, "configured_robots": sorted(loaded.robots),
                   "writes_enabled": loaded.allow_writes, "read_only": loaded.read_only,
                   "write_scope": loaded.write_scope,
@@ -63,6 +65,7 @@ async def _diagnose(config: Path, probe: str | None, registry: str) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Check local FANUC bridge setup and MCP protocol")
+    add_version_argument(parser)
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--probe", help="Optional explicit robot ID for a read-only connection probe")
     args = parser.parse_args()

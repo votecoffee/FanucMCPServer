@@ -127,7 +127,7 @@ def test_bundle_verifier_rejects_tampering_and_external_paths(tmp_path):
     spec.loader.exec_module(module)
     payload = tmp_path / 'payload.whl'
     payload.write_bytes(b'wheel')
-    manifest = {'compatibility': module.compatibility(), 'files': [
+    manifest = {'release': module.versions.release_metadata(), 'compatibility': module.compatibility(), 'files': [
         {'path': payload.name, 'sha256': hashlib.sha256(payload.read_bytes()).hexdigest()}]}
     marker = tmp_path / 'BUNDLE_MANIFEST.json'
     marker.write_text(json.dumps(manifest), encoding='utf-8')

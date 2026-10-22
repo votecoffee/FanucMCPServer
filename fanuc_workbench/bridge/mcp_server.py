@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fanuc_workbench.bridge.service import RobotBridge
 from fanuc_workbench.identity import APP_NAME, configuration_environment
+from fanuc_workbench.version import DISPLAY_VERSION, add_version_argument
 
 
 def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_identity=None, protocol_preview=False):
@@ -38,6 +39,7 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
         skill_options = {}
     server = FanucServer(
         APP_NAME,
+        version=DISPLAY_VERSION,
         frontend_identity=frontend_identity,
         enable_discovery_cache=protocol_preview,
         **skill_options,
@@ -437,6 +439,7 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="FanucMCPServer local MCP server (stdio)")
+    add_version_argument(parser)
     parser.add_argument("--config", type=Path, default=configuration_environment(),
                         help="Bridge JSON file, or set FANUC_MCP_SERVER_CONFIG (legacy FANUC_WORKBENCH_CONFIG also accepted)")
     parser.add_argument("--management-runtime", type=Path, help="Installer-owned plugin runtime pointer")

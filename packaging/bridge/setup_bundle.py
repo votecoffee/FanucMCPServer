@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import platform
@@ -14,12 +15,22 @@ import venv
 from pathlib import Path
 
 
+_version_path = Path(__file__).resolve().with_name("release_version.py")
+if not _version_path.is_file():  # Source checkout; bundles carry their own hash-bound copy.
+    _version_path = Path(__file__).resolve().parents[2] / "fanuc_workbench/version.py"
+_version_spec = importlib.util.spec_from_file_location("fanuc_setup_version", _version_path)
+versions = importlib.util.module_from_spec(_version_spec)
+_version_spec.loader.exec_module(versions)
+
+
 def compatibility():
     return {"python": list(sys.version_info[:2]), "platform": sys.platform, "machine": platform.machine()}
 
 
 def verify_bundle(root):
     manifest = json.loads((root / "BUNDLE_MANIFEST.json").read_text(encoding="utf-8"))
+    if manifest.get("release") != versions.release_metadata():
+        raise ValueError("Bundle release identity differs from its fixed release stamp")
     if manifest["compatibility"] != compatibility():
         raise ValueError("This bundle's dependency wheels require a matching Python version, OS and architecture")
     for item in manifest["files"]:
@@ -98,7 +109,7 @@ def register_plugin(codex, root, environment):
                                    check=True, env=environment, capture_output=True, text=True)
         result = json.loads(installed.stdout)
         expected = json.loads((root / "plugin" / "plugin.json").read_text(encoding="utf-8"))["version"]
-        if result.get("version") != expected:
+        if not versions.same_version(result.get("version"), expected):
             raise ValueError("Codex reported a plugin version different from this bundle")
         print(json.dumps(result, indent=2))
     except BaseException:
@@ -168,17 +179,21 @@ def main():
             json.dump({"state_dir": "evidence", "source_dir": "edits", "robots": {},
                        "allow_writes": False, "approval_mode": "elicitation", "max_file_bytes": 16777216,
                        "max_backup_files": 5000, "max_backup_bytes": 536870912}, stream, indent=2)
-    settings = {"python": str(python), "config": str(config)}
+    settings = {"python": str(python), "config": str(config), "release": versions.release_metadata()}
     if selected == "plugin":
         settings["plugin_id"] = "fanuc-mcp-server@fanuc-mcp-server-local"
     checked = subprocess.run([str(python), "-B", "-m", "fanuc_workbench.bridge.doctor", "--config", str(config)],
                              env=environment, capture_output=True, text=True, check=True, timeout=60)
     doctor = json.loads(checked.stdout)
+    if (not versions.same_version(doctor.get("app_version"), versions.DISPLAY_VERSION)
+            or not versions.same_version(doctor.get("package_version"), versions.PACKAGE_VERSION)):
+        raise ValueError("Installed doctor identity differs from this fixed release")
     (runtime / "doctor.json").write_text(json.dumps(doctor, indent=2), encoding="utf-8")
     generated_file(root, "plugin/runtime.json", json.dumps(settings, indent=2).encode())
     connection = json.dumps(plugin_connection(python, root / "plugin" / "runtime.json", runtime), indent=2).encode()
     generated_file(root, "plugin/mcp.json", connection)
     marker.write_text(json.dumps({"kind": "fanuc-mcp-server-runtime", "compatibility": compatibility(),
+                                 "release": versions.release_metadata(),
                                  "config": str(config), "plugin_connection_sha256": hashlib.sha256(connection).hexdigest(),
                                  **{key: installation[key] for key in
                                  ("registration",) if key in installation}}, indent=2), encoding="utf-8")
@@ -191,7 +206,7 @@ def main():
         saved = json.loads(marker.read_text(encoding="utf-8"))
         saved["registration"] = selected
         marker.write_text(json.dumps(saved, indent=2), encoding="utf-8")
-    print(json.dumps({"status": "installed", "runtime": str(runtime), "config": str(config),
+    print(json.dumps({"status": "installed", "release": versions.release_metadata(), "runtime": str(runtime), "config": str(config),
                       "registration": selected,
                       "tools": doctor["tool_count"],
                       "configured_robots": doctor["configured_robots"], "controller_contacted": False}, indent=2))

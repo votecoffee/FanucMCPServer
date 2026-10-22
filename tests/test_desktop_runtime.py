@@ -10,6 +10,7 @@ import tomllib
 import pytest
 
 from fanuc_workbench import __version__, app, desktop_runtime
+from fanuc_workbench.version import canonical_timestamp
 
 
 def test_exception_log_is_utf8_rotates_and_restores_process_hook(tmp_path):
@@ -101,7 +102,7 @@ def test_log_locations_are_user_local_and_module_version_matches_package(monkeyp
     monkeypatch.setenv('XDG_STATE_HOME', str(tmp_path / 'state'))
     assert desktop_runtime.desktop_log_directory() == tmp_path / 'state' / 'FanucMCPServer' / 'logs'
     metadata = tomllib.loads((Path(__file__).resolve().parents[1] / 'pyproject.toml').read_text())
-    assert __version__ == metadata['project']['version']
+    assert canonical_timestamp(__version__) == metadata['project']['version']
 
 
 @pytest.mark.parametrize('mode', ['startup', 'callback'])

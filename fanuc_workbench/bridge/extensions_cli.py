@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.extension_release import install_release, load_registry
+from fanuc_workbench.version import add_version_argument
 
 
 BUILTINS = {'analysis': 'analysis', 'vqlog': 'vqlog', 'snpx': 'snpx_v1_3_0', 'recording': 'recording_v1_2_0', 'alarms': 'alarms_v1_1_0', 'programs': 'programs', 'program-logic': 'programs_v1_1_0'}
@@ -23,6 +24,7 @@ def install_builtin(root: Path, name: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Stage trusted local FanucMCPServer feature releases (no robot contact)")
+    add_version_argument(parser)
     parser.add_argument("--config", type=Path, required=True)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="Read the selected local registry without activating code")

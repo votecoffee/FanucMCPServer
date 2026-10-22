@@ -10,12 +10,34 @@ import json
 import os
 import platform
 import re
+import runpy
 import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 from pathlib import Path
+
+
+def verify_release(source):
+    versions = runpy.run_path(str(source / "fanuc_workbench/version.py"))
+    release = versions["release_metadata"]()
+    for relative in ("pyproject.toml", "packaging/bridge/pyproject.toml"):
+        if tomllib.loads((source / relative).read_text())["project"]["version"] != release["package_version"]:
+            raise ValueError("App distribution version differs from the fixed release stamp")
+    plugin = json.loads((source / "plugins/fanuc-mcp-server/plugin.json").read_text())
+    if plugin["version"] != release["plugin_version"]:
+        raise ValueError("Plugin version differs from the canonical release identity")
+    return release
+
+
+def verify_bridge_version(wheel, release):
+    with zipfile.ZipFile(wheel) as archive:
+        name = next(name for name in archive.namelist() if name.endswith(".dist-info/METADATA"))
+        metadata = BytesParser().parsebytes(archive.read(name))
+        if metadata["Name"] != "fanuc-mcp-server-bridge" or metadata["Version"] != release["package_version"]:
+            raise ValueError("Built bridge metadata differs from the fixed release identity")
 
 
 def verify_framework_wheel(source: Path, wheel: Path):
@@ -45,6 +67,7 @@ def verify_framework_wheel(source: Path, wheel: Path):
 
 
 def build(source: Path, output: Path, framework_wheel: Path):
+    release = verify_release(source)
     verify_framework_wheel(source, framework_wheel)
     if output.exists():
         raise FileExistsError("Choose a new output directory; existing bundles are preserved")
@@ -58,6 +81,7 @@ def build(source: Path, output: Path, framework_wheel: Path):
     # Immutable recipe stays hash-bound; setup emits runtime-specific mcp.json.
     (plugin / "mcp.json").rename(plugin / "mcp.template.json")
     shutil.copyfile(source / "packaging" / "bridge" / "setup_bundle.py", output / "setup.py")
+    shutil.copyfile(source / "fanuc_workbench/version.py", output / "release_version.py")
     wheels = plugin / "wheels"
     wheels.mkdir()
     shutil.copyfile(framework_wheel, wheels / framework_wheel.name)
@@ -72,6 +96,7 @@ def build(source: Path, output: Path, framework_wheel: Path):
         subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", str(wheels), str(stage)],
                        check=True, env=environment)
     own = next(wheels.glob("fanuc_mcp_server_bridge-*.whl"))
+    verify_bridge_version(own, release)
     subprocess.run([sys.executable, "-m", "pip", "download", "--only-binary=:all:", "--find-links", str(wheels), "--constraint", str(source / "packaging/framework-requirements.txt"), "--dest", str(wheels), str(own)],
                    check=True, env=environment)
     docs = output / "docs"
@@ -82,6 +107,7 @@ def build(source: Path, output: Path, framework_wheel: Path):
     shutil.copyfile(source / "docs" / "WORKFLOW_GUIDANCE.md", docs / "WORKFLOW_GUIDANCE.md")
     shutil.copyfile(source / "docs" / "PROTOCOL_FEATURES.md", docs / "PROTOCOL_FEATURES.md")
     shutil.copyfile(source / "docs" / "RESOURCE_OWNERSHIP.md", docs / "RESOURCE_OWNERSHIP.md")
+    shutil.copyfile(source / "docs" / "RELEASE_VERSIONING.md", docs / "RELEASE_VERSIONING.md")
     shutil.copyfile(source / "packaging" / "framework.lock.json", docs / "framework.lock.json")
     shutil.copyfile(source / "packaging" / "framework-requirements.txt", docs / "framework-requirements.txt")
     for name in ("DESKTOP_GUIDE.md", "ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md", "CONTROLLER_INTERFACES.md", "HTTP_READS.md", "SNPX_READS.md", "SNPX_DECODING.md", "SNPX_EVIDENCE.md", "SNPX_IO_EVIDENCE.md", "RECORDING_ANALYSIS.md", "RECORDING_EVIDENCE.md", "RECORDING_HANDSHAKE.md", "VQLOG_ANALYSIS.md", "ALARM_ANALYSIS.md", "ALARM_COMPARISON.md", "PROGRAM_DEPENDENCIES.md", "PROGRAM_DIAGNOSTICS.md", "REQUEST_CONCURRENCY.md", "COMMUNITY_INTEGRATIONS.md"):
@@ -98,10 +124,10 @@ def build(source: Path, output: Path, framework_wheel: Path):
     entries = [{"path": path.relative_to(output).as_posix(), "bytes": path.stat().st_size,
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
                for path in sorted(output.rglob("*")) if path.is_file()]
-    manifest = {"compatibility": {"python": list(sys.version_info[:2]), "platform": sys.platform,
+    manifest = {"release": release, "compatibility": {"python": list(sys.version_info[:2]), "platform": sys.platform,
                                    "machine": platform.machine()}, "files": entries}
     (output / "BUNDLE_MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    return {"bundle": str(output), "files": len(entries), "wheels": len(list(wheels.glob("*.whl"))),
+    return {"bundle": str(output), "release": release, "files": len(entries), "wheels": len(list(wheels.glob("*.whl"))),
             "bytes": sum(row["bytes"] for row in entries)}
 
 

@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+from fanuc_workbench.version import add_version_argument
 
 from fanuc_workbench.services.program_analysis import (trace_logic,explain_wait,triggered_captures,
     semantic_compare,dependency_review)
@@ -12,6 +13,7 @@ from fanuc_workbench.services.native_validation import validate_offline,review_v
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
+    add_version_argument(parser)
     parser.add_argument('--workspace',type=Path,default=Path.cwd())
     commands=parser.add_subparsers(dest='command',required=True)
     trace=commands.add_parser('trace');trace.add_argument('paths',nargs='+');trace.add_argument('--view',default='instructions',choices=['instructions','accesses','signals','edges','issues'])
