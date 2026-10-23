@@ -1,5 +1,20 @@
 # Desktop workflows
 
+## Run from the checkout
+
+After installing the desktop, double-click `RunGUI.cmd` in the repository root
+or run it from PowerShell:
+
+```powershell
+.\RunGUI.cmd
+```
+
+The launcher uses `.venv\Scripts\pythonw.exe`, opens the GUI without a console,
+and returns after starting it. Startup errors are recorded in the desktop log
+described below. To use a custom desktop environment, set `FANUC_GUI_PYTHON` to
+its absolute `pythonw.exe` path. The launcher does not install dependencies or
+update the MCP plugin.
+
 ## Start menu shortcut
 
 On Windows, `install_and_run.bat` installs the desktop dependencies, creates a

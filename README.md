@@ -81,6 +81,11 @@ a plugin. Both CMDs forward quoted paths and propagate failure exit codes.
 `FANUC_INSTALL_PYTHON` optionally selects an absolute Python executable instead
 of `py -3`. See [plugin setup](docs/ROBOT_PLUGIN_SETUP.md) for the bundle build.
 
+After installing the desktop, double-click [RunGUI.cmd](RunGUI.cmd) in the repo
+root, or run `.\RunGUI.cmd`. It opens the GUI using `.venv` without reinstalling.
+For a custom desktop environment, set `FANUC_GUI_PYTHON` to its absolute
+`pythonw.exe` path before running the command.
+
 ### Dependencies
 
 - Python 3.11 or newer and Git for a source installation.
