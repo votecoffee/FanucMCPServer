@@ -66,6 +66,16 @@ def verify_framework_wheel(source: Path, wheel: Path):
     return lock
 
 
+def copy_installer_services(source, output):
+    # Regular packages take precedence over installed/editable namespaces. A
+    # namespace-only bundle could accidentally load an older global installer.
+    for relative in ("__init__.py", "version.py", "bridge/__init__.py", "bridge/stable_launcher.py",
+                     "services/__init__.py", "services/stable_install.py"):
+        destination = output / "fanuc_workbench" / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / "fanuc_workbench" / relative, destination)
+
+
 def build(source: Path, output: Path, framework_wheel: Path):
     release = verify_release(source)
     verify_framework_wheel(source, framework_wheel)
@@ -84,10 +94,7 @@ def build(source: Path, output: Path, framework_wheel: Path):
     shutil.copyfile(source / "fanuc_workbench/version.py", output / "release_version.py")
     # Stdlib-only installer services; setup can prepare a runtime without loading
     # packages from the checkout or executing the selected MCP/native profile.
-    for relative in ("version.py", "bridge/stable_launcher.py", "services/stable_install.py"):
-        destination = output / "fanuc_workbench" / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source / "fanuc_workbench" / relative, destination)
+    copy_installer_services(source, output)
     wheels = plugin / "wheels"
     wheels.mkdir()
     shutil.copyfile(framework_wheel, wheels / framework_wheel.name)

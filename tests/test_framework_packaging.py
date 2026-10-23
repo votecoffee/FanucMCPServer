@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 import runpy
 import zipfile
+import subprocess
+import sys
 
 import pytest
 
@@ -46,3 +48,18 @@ def test_framework_intake_refuses_unreviewed_or_inconsistent_wheel(tmp_path, def
     wheel = wheel_case(tmp_path, defect)
     if defect == "outer_hash": wheel.write_bytes(wheel.read_bytes() + b"changed")
     with pytest.raises(ValueError): verify(tmp_path, wheel)
+
+
+def test_bundle_installer_imports_its_verified_package_before_global_installations(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    builder = runpy.run_path(str(root / "scripts/build_robot_plugin.py"))
+    bundle = tmp_path / "Bundle with spaces 工具"
+    builder["copy_installer_services"](root, bundle)
+    shadow = tmp_path / "old global package"
+    (shadow / "fanuc_workbench").mkdir(parents=True)
+    (shadow / "fanuc_workbench/__init__.py").write_text("raise RuntimeError('wrong global installer imported')\n")
+    code = ("import sys;sys.path[:0]=sys.argv[1:];"
+            "from fanuc_workbench.services import stable_install;"
+            "from pathlib import Path;assert Path(stable_install.__file__).is_relative_to(sys.argv[1])")
+    result = subprocess.run([sys.executable, "-I", "-B", "-c", code, str(bundle), str(shadow)], capture_output=True, timeout=15)
+    assert result.returncode == 0, result.stderr
