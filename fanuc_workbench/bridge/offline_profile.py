@@ -41,14 +41,14 @@ def analyze(bridge, artifact_id, kind, offset=0, limit=100, query=""):
 
 
 @contextmanager
-def lifetime_receipt(bridge, context=None):
+def lifetime_receipt(bridge, context=None, *, profile=PROFILE):
     # This is the actual surviving MCP process. The client owns its launch;
     # never misrepresent a post-launch self record as pre-launch containment.
     if context is None:
         from fanuc_workbench.bridge.resource_context import resource_context
         context = resource_context()
     owner = {"owner_id": context.owner.owner_id, "identity": context.owner.identity.model_dump(mode="json"),
-             "ownership": "client-owned-frontdoor", "profile": PROFILE}
+            "ownership": "client-owned-frontdoor", "profile": profile}
     bridge._audit("offline_owner_started", **owner)
     try:
         yield

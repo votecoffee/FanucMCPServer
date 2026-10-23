@@ -5,6 +5,11 @@ controller connections, extension code execution or native utilities. It shares
 the application's existing local artifact and analysis services. It is not a
 sandbox against a client or operator with local shell access.
 
+For explicitly pinned local MakeTP/PrintTP compilation, the separate
+[local-native candidate profile](LOCAL_NATIVE_VALIDATION.md) retains the same
+zero-robot/controller-write refusal. The 15-tool `--offline` profile itself is
+unchanged and cannot enable those tools through arguments or environment.
+
 Create a dedicated private policy with no robots and writes disabled:
 
 ```json

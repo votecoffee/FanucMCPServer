@@ -44,8 +44,15 @@ class ProgramDiagnosticsPanel(QWidget):
         self.configuration=self.file_row(form,'Robot INI','INI (*.ini)',relative=False)
         self.robot_context=QLineEdit();row=QHBoxLayout();row.addWidget(self.robot_context,1);browse=QPushButton('Browse…');browse.clicked.connect(self.choose_context);row.addWidget(browse);form.addRow('Offline robot context',row)
         self.version=QLineEdit();self.version.setPlaceholderText('Explicit compatible core, for example V8.33-1');form.addRow('WinOLPC version',self.version)
+        self.components=QLineEdit();self.components.setPlaceholderText('Explicit supporting files, separated by semicolons')
+        row=QHBoxLayout();row.addWidget(self.components,1);browse=QPushButton('Select files…')
+        def choose_components():
+            paths,_=QFileDialog.getOpenFileNames(self,'Select reviewed supporting files',str(Path.home()),'All files (*)')
+            if paths:self.components.setText('; '.join(paths))
+        browse.clicked.connect(choose_components);row.addWidget(browse);form.addRow('Supporting components',row)
+        self.component_evidence=QLineEdit();self.component_evidence.setPlaceholderText('Vendor manifest, wrapper or other source used to select the files');form.addRow('Component selection source',self.component_evidence)
         self.compile_button=QPushButton('Run isolated MakeTP → PrintTP validation…');self.compile_button.clicked.connect(self.compile);form.addRow(self.compile_button)
-        note=QLabel('Copies the robot context and rebinds output paths into a new local directory. Preserves diagnostics and checks printed LS. Controller deployment is a separate reviewed operation.');note.setWordWrap(True);form.addRow(note)
+        note=QLabel('Copies the robot context and rebinds output paths into a new local directory. Pins the selected supporting files; dependency completeness and native compatibility remain unverified until tested. Preserves diagnostics and checks printed LS. Controller deployment is a separate reviewed operation.');note.setWordWrap(True);form.addRow(note)
         self.tools.addTab(compiler,'Native offline compiler')
         capture=QWidget();form=QFormLayout(capture)
         self.task_name=QLineEdit();self.task_name.setPlaceholderText('Exact task name from Native Controller status');form.addRow('Native task',self.task_name)
@@ -152,7 +159,8 @@ class ProgramDiagnosticsPanel(QWidget):
             from fanuc_workbench.extensions.programs_v1_1_0.diagnostics import selected_bytes
             selected_bytes(root,paths[0],1024*1024)
             source=root/paths[0]
-            options={'maketp':Path(self.maketp.text()),'printtp':Path(self.printtp.text()),'configuration':Path(self.configuration.text()),'robot_context':Path(self.robot_context.text()),'version':self.version.text().strip()}
+            options={'maketp':Path(self.maketp.text()),'printtp':Path(self.printtp.text()),'configuration':Path(self.configuration.text()),'robot_context':Path(self.robot_context.text()),'version':self.version.text().strip(),
+                'components':[Path(value) for value in self.split(self.components)],'component_evidence':self.component_evidence.text().strip()}
             destination=self.destination('Create new isolated compiler validation directory')
             if destination:self.run(lambda:validate_offline(source,destination,**options))
         except Exception as exc:self.report.setPlainText(str(exc))

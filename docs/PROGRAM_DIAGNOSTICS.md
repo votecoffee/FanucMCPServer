@@ -132,11 +132,15 @@ configuration must agree. It does not run SetRobot, change installed tools or
 load/select/run a controller program.
 
 The configuration's `Path` selects the WinOLPC profile directory; relative values
-resolve beside the original configuration. The job checks and hashes its
-`asc2bint.dll` (MakeTP) and `bin2asct.dll` (PrintTP) components. Missing components
+resolve beside the original configuration. Supply explicit supporting files and
+the source used to select them with `components` / `component_evidence` (CLI:
+repeat `--component` and supply `--component-evidence`; GUI: **Supporting
+components** and **Component selection source**). The job hashes those files
+without assuming fixed translator filenames. Missing explicitly selected files
 produce a preserved `toolchain_unavailable` report and diagnostic log without
-invoking either tool. Launcher executables alone do not establish a complete
-toolchain. Install or select a compatible complete profile before retrying.
+invoking either tool. Launcher imports, configuration and file pins do not prove
+dependency completeness or native compatibility. Verify the chosen vendor
+distribution separately; inspect uncertainty before preparing another attempt.
 WinOLPC's staging output uses a separate `compiler-output/` directory inside the
 job, so its internal file copies cannot collide with the preserved inputs or
 requested TP/LS outputs.

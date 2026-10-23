@@ -23,6 +23,14 @@ def main(argv=None):
     deps=commands.add_parser('dependencies');deps.add_argument('paths',nargs='+');deps.add_argument('--entry',nargs='+',required=True);deps.add_argument('--inventory');deps.add_argument('--view',choices=['requirements','missing','issues'],default='requirements')
     package=commands.add_parser('package');package.add_argument('paths',nargs='+');package.add_argument('--entry',nargs='+',required=True);package.add_argument('--inventory');package.add_argument('--destination',type=Path,required=True);package.add_argument('--allow-incomplete',action='store_true')
     compiler=commands.add_parser('compile');compiler.add_argument('source',type=Path);compiler.add_argument('--destination',type=Path,required=True);compiler.add_argument('--maketp',type=Path,required=True);compiler.add_argument('--printtp',type=Path,required=True);compiler.add_argument('--configuration',type=Path,required=True);compiler.add_argument('--robot-context',type=Path,required=True);compiler.add_argument('--version',required=True);compiler.add_argument('--timeout',type=float,default=30)
+    toolchain=commands.add_parser('toolchain',help='Capture a local toolchain hash manifest without executing tools')
+    for name in ('maketp','printtp','configuration','robot-context'):
+        toolchain.add_argument('--'+name,type=Path,required=True)
+    toolchain.add_argument('--version',required=True);toolchain.add_argument('--destination',type=Path,required=True)
+    for command in (compiler,toolchain):
+        command.add_argument('--component',dest='components',type=Path,action='append',required=True,
+                             help='Explicit supporting file; repeat for the reviewed dependency set')
+        command.add_argument('--component-evidence',required=True,help='Source for selecting these supporting files; compatibility is unverified')
     review=commands.add_parser('validation');review.add_argument('source_path');review.add_argument('report_path');review.add_argument('--compiled-path');review.add_argument('--readback-path')
     for command in (trace,capture,compare,deps):
         command.add_argument('--offset',type=int,default=0);command.add_argument('--limit',type=int,default=20)
@@ -37,7 +45,14 @@ def main(argv=None):
     elif args.command=='compare': result=semantic_compare(root,args.before_path,args.after_path,offset=args.offset,limit=args.limit)
     elif args.command=='dependencies': result=dependency_review(root,args.paths,entry_programs=args.entry,inventory_path=args.inventory,view=args.view,offset=args.offset,limit=args.limit)
     elif args.command=='package': result=build_change_package(root,args.paths,args.destination,entry_programs=args.entry,inventory_path=args.inventory,allow_incomplete=args.allow_incomplete)
-    elif args.command=='compile': result=validate_offline(args.source,args.destination,maketp=args.maketp,printtp=args.printtp,configuration=args.configuration,robot_context=args.robot_context,version=args.version,timeout=args.timeout)
+    elif args.command=='compile': result=validate_offline(args.source,args.destination,maketp=args.maketp,printtp=args.printtp,configuration=args.configuration,robot_context=args.robot_context,version=args.version,components=args.components,component_evidence=args.component_evidence,timeout=args.timeout)
+    elif args.command=='toolchain':
+        from fanuc_workbench.services.local_native import capture_toolchain
+        import hashlib
+        result=capture_toolchain(maketp=args.maketp,printtp=args.printtp,configuration=args.configuration,robot_context=args.robot_context,version=args.version,components=args.components,component_evidence=args.component_evidence)
+        payload=json.dumps(result,indent=2,allow_nan=False).encode('utf-8')
+        with args.destination.open('xb') as stream: stream.write(payload)
+        result={'path':str(args.destination),'sha256':hashlib.sha256(payload).hexdigest(),'compiler_invoked':False,'controller_contacted':False}
     else: result=review_validation(root,args.source_path,args.report_path,compiled_path=args.compiled_path,readback_path=args.readback_path)
     print(json.dumps(result,indent=2,allow_nan=False))
     return result

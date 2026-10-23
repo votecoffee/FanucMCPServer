@@ -20,7 +20,9 @@ def setup_tools(root):
     for name in ('asc2bint.dll','bin2asct.dll'):
         (profile/name).write_bytes(b'Synthetic offline translator component')
     context=root/'source_context';context.mkdir();(context/'support').mkdir();(context/'support/config.dat').write_bytes(b'synthetic context')
-    return {'maketp':maker,'printtp':printer,'configuration':config,'robot_context':context,'version':'V9.40-1'}
+    return {'maketp':maker,'printtp':printer,'configuration':config,'robot_context':context,'version':'V9.40-1',
+            'components':[profile/name for name in ('asc2bint.dll','bin2asct.dll')],
+            'component_evidence':'Synthetic test layout; no vendor dependency or compatibility claim'}
 
 
 def test_isolated_compile_readback_hash_review_preserves_sources_and_never_deploys(tmp_path,monkeypatch):
@@ -52,7 +54,7 @@ def test_isolated_compile_readback_hash_review_preserves_sources_and_never_deplo
 
 
 @pytest.mark.parametrize('missing',['asc2bint.dll','bin2asct.dll'])
-def test_missing_native_translator_keeps_actionable_report_without_invoking_tools(tmp_path,monkeypatch,missing):
+def test_missing_explicit_component_keeps_report_without_invoking_tools(tmp_path,monkeypatch,missing):
     path=listing(tmp_path);options=setup_tools(tmp_path)
     (tmp_path/'profile'/missing).unlink()
     def unexpected_run(*args,**kwargs):

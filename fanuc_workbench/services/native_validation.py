@@ -105,21 +105,35 @@ def _snapshot_context(source,destination):
                 if copied>512*1024*1024: raise ValueError('Robot context grew beyond its byte bound')
                 digest.update(chunk);writer.write(chunk)
         manifest.append({'path':relative.as_posix(),'bytes':size,'sha256':digest.hexdigest()})
-    return manifest
+    return sorted(manifest,key=lambda row:row['path'])
 
 
-def _inspect_toolchain(profile):
-    components=[]
-    for name in ('asc2bint.dll','bin2asct.dll'):
-        path=profile/name
+def _inspect_toolchain(profile,selected,evidence):
+    """Hash explicit supporting files; this is not vendor dependency discovery."""
+    if not isinstance(selected,(list,tuple)) or not 1<=len(selected)<=128:
+        raise ValueError('Select 1..128 explicit supporting component files; no vendor layout is assumed')
+    if not isinstance(evidence,str) or not 1<=len(evidence.strip())<=4096:
+        raise ValueError('Describe the source of the supporting component selection')
+    components=[];seen=set()
+    for value in selected:
+        path=Path(value)
+        if not path.is_absolute() or path.absolute()!=path.resolve() or path.is_symlink():
+            raise ValueError('Supporting component paths must be absolute and ordinary')
+        key=os.path.normcase(str(path))
+        if key in seen: raise ValueError('Duplicate supporting component file')
+        seen.add(key)
+        if path.exists() and getattr(path.stat(),'st_file_attributes',0)&0x400:
+            raise ValueError('Supporting components cannot be redirected')
         present=path.is_file()
         components.append({'path':str(path),'present':present,
             'sha256':hashlib.sha256(_read(path,64*1024*1024)).hexdigest() if present else None})
-    return {'profile_path':str(profile),'components':components,
+    return {'profile_path':str(profile),'components':sorted(components,key=lambda row:os.path.normcase(row['path'])),
+            'selection_evidence':evidence.strip(),'dependency_completeness_verified':False,
             'missing_components':[row['path'] for row in components if not row['present']]}
 
 
-def validate_offline(source,destination,*,maketp,printtp,configuration,robot_context,version,timeout=30):
+def validate_offline(source,destination,*,maketp,printtp,configuration,robot_context,version,
+                     components=None,component_evidence='',timeout=30,runner=None,expected_inputs=None):
     if not isinstance(version,str) or not re.fullmatch(r'V\d{1,2}\.\d{2}-\d{1,3}',version): raise ValueError('Select an explicit installed WinOLPC core version')
     if type(timeout) not in (int,float) or not 1<=timeout<=60: raise ValueError('Use compiler timeout 1..60 seconds')
     source,maketp,printtp,configuration,robot_context=map(Path,(source,maketp,printtp,configuration,robot_context))
@@ -140,7 +154,7 @@ def validate_offline(source,destination,*,maketp,printtp,configuration,robot_con
     if not profile_text: raise ValueError('Select an explicit WinOLPC profile directory in the configuration Path')
     profile=Path(profile_text)
     profile=(profile if profile.is_absolute() else configuration.resolve().parent/profile).resolve()
-    toolchain=_inspect_toolchain(profile)
+    toolchain=_inspect_toolchain(profile,components,component_evidence)
     support=robot_context/'support'
     if not support.is_dir(): raise ValueError('Robot context needs its support directory')
     compiler_hash=hashlib.sha256(_read(maketp,64*1024*1024)).hexdigest()
@@ -172,15 +186,24 @@ def validate_offline(source,destination,*,maketp,printtp,configuration,robot_con
         'source_file':name+'.LS','compiled_file':name+'.TP','readback_file':'readback.LS',
         'compile_returncode':None,'print_returncode':None,'compiled_sha256':None,'readback_sha256':None,
         'status':'compile_failed','controller_contacted':False,'controller_written':False,'deployment_prepared':False}
+    execute=runner or _run
     try:
+        if expected_inputs is not None:
+            actual={'source_sha256':identity['source_sha256'],
+                'configuration_sha256':hashlib.sha256(config).hexdigest(),
+                'compiler_sha256':compiler_hash,'printer_sha256':printer_hash,
+                'context_manifest':context_manifest,
+                'profile_components':{os.path.normcase(row['path']):row['sha256'] for row in toolchain['components']}}
+            if actual!=expected_inputs:
+                raise ValueError('Copied native inputs differ from the reviewed source, configuration, profile or context; no compiler was invoked')
         if toolchain['missing_components']:
             report['status']='toolchain_unavailable'
-            report['compile_diagnostics']=['Selected WinOLPC profile is missing native translator components:',
-                *toolchain['missing_components'],'Install or select a compatible complete WinOLPC toolchain; no tools were invoked.']
+            report['compile_diagnostics']=['Explicitly pinned supporting files are unavailable:',
+                *toolchain['missing_components'],'Review the selected toolchain paths; no tools were invoked. Dependency completeness is unverified.']
             (destination/'compile.log').write_text('\n'.join(report['compile_diagnostics'])+'\n',encoding='utf-8')
         else:
             report['compiler_invoked']=True
-            state,log=_run([str(maketp),str(destination/(name+'.LS')),str(destination/(name+'.TP')),'/config',str(destination/'robot.ini'),'/ver',version],destination,timeout)
+            state,log=execute([str(maketp),str(destination/(name+'.LS')),str(destination/(name+'.TP')),'/config',str(destination/'robot.ini'),'/ver',version],destination,timeout)
             (destination/'compile.log').write_bytes(log);report['compile']=state;report['compile_returncode']=state['returncode']
             report['compile_diagnostics']=log.decode('utf-8',errors='replace').splitlines()[:200]
             compiled=destination/(name+'.TP')
@@ -189,7 +212,7 @@ def validate_offline(source,destination,*,maketp,printtp,configuration,robot_con
                 if not tp: raise ValueError('Compiler produced an empty TP file')
                 report['compiled_sha256']=hashlib.sha256(tp).hexdigest();report['status']='compiled_without_matching_readback'
                 report['printer_invoked']=True
-                state,log=_run([str(printtp),str(destination/(name+'.TP')),str(destination/'readback.LS'),'/config',str(destination/'robot.ini'),'/ver',version],destination,timeout)
+                state,log=execute([str(printtp),str(destination/(name+'.TP')),str(destination/'readback.LS'),'/config',str(destination/'robot.ini'),'/ver',version],destination,timeout)
                 (destination/'print.log').write_bytes(log);report['print']=state;report['print_returncode']=state['returncode']
                 report['print_diagnostics']=log.decode('utf-8',errors='replace').splitlines()[:200]
                 readback=destination/'readback.LS'
@@ -202,6 +225,10 @@ def validate_offline(source,destination,*,maketp,printtp,configuration,robot_con
             raise ValueError('Original source or configuration changed during validation')
         if (destination/(name+'.LS')).read_bytes()!=raw or (destination/'robot.ini').read_bytes()!=effective_config:
             raise ValueError('Validation inputs changed during compiler execution')
+        if (_inspect_toolchain(profile,components,component_evidence)!=toolchain
+                or hashlib.sha256(_read(maketp,64*1024*1024)).hexdigest()!=compiler_hash
+                or hashlib.sha256(_read(printtp,64*1024*1024)).hexdigest()!=printer_hash):
+            raise ValueError('Selected native tool files changed during validation')
         for item in context_manifest:
             with (robot_context/item['path']).open('rb') as reader:
                 if hashlib.file_digest(reader,'sha256').hexdigest()!=item['sha256']:

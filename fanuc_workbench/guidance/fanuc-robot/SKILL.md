@@ -5,6 +5,13 @@ description: "Inspect FANUC robot files and diagnostic evidence, manage FanucMCP
 
 # FANUC robot work
 
+Check `capabilities` for the selected profile first. For
+`standalone-local-native`, follow [local native validation](references/local-native.md)
+for pinned MakeTP/PrintTP preparation, one-time execution and receipt inspection.
+That profile has no controller or GUI routes. `standalone-offline` continues to
+exclude native utilities. Profile and guide content do not grant authorization
+to change connections, broaden policy or execute a pending native pilot.
+
 Use the selected FanucMCPServer connection. Call named tools on the standalone route; on the app-owned host, discover and describe them before invocation. Do not switch routes during retained work. Keep the same connection through
 prepare/review/commit and job completion. Closing the server loses its in-memory
 plans. After a lost write response, inspect retained app evidence and current

@@ -104,6 +104,9 @@ class RobotBridge:
                         owner.close()
                     except Exception:
                         failed += 1
+                from fanuc_workbench.bridge.owned_workers import workers
+                if workers.snapshot()["active"]:
+                    failed += 1
                 if failed:
                     raise RuntimeError("Owned resource cleanup is incomplete; inspect retained ownership before recovery")
                 self._closed = True
@@ -122,6 +125,9 @@ class RobotBridge:
             jobs = len(self.operations.jobs.events)
         with self._lock:
             plans = len(self._plans) + len(self.comments.plans) + len(self.native.plans)
+        local_native = getattr(self, "local_native_validation", None)
+        if local_native is not None:
+            plans += local_native.review_plan_count
         from fanuc_workbench.bridge.owned_workers import workers
         return {"active_operations": requests + jobs, "review_plans": plans, "owned_resources": workers.snapshot()}
 

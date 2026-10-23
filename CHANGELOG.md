@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Added a separate direct local-native candidate profile: administrator-pinned
+  MakeTP/PrintTP/configuration/profile/context hashes, saved LS source review,
+  single-use compilation plans, artifact diagnostics, status and unused-plan
+  discard. Keep zero robots/writes and exclude controller/GUI/extension/shared
+  routes. The accepted installed 15-tool offline profile is not changed by source
+  preparation. Added metadata-only toolchain capture and current workflow guidance.
+  Supporting file pins are explicit and include their selection source; fixed
+  translator names are no longer treated as a universal dependency contract.
+
 - Prepared atomic local MakeTP/PrintTP background jobs using the reviewed shared
   resource API: durable reservation before resume, exact worker activation,
   compiler-step identity receipts, one active job, eight-process/512 MiB limits,

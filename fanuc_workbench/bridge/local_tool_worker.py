@@ -4,6 +4,7 @@ import base64
 import os
 from pathlib import Path
 import time
+import traceback
 
 from fanuc_workbench.bridge.local_tool_job import digest, read_message, validate_request
 from fanuc_workbench.bridge.storage import atomic_json
@@ -64,8 +65,15 @@ def main(argv=None):
         state, output = _run_process(request["arguments"], request["cwd"], request["timeout"], contained=True, claim=claim)
         response.update(state=state, output_base64=base64.b64encode(output).decode("ascii"))
     except Exception as exc:
+        atomic_json(folder / "failure.json", {"error_type": type(exc).__name__,
+            "winerror": getattr(exc, "winerror", None), "traceback": traceback.format_exc(),
+            "request_sha256": args.sha256, "identity": identity})
         response.update(error_type=type(exc).__name__)
     atomic_json(folder / "result.json", response)
+    # Keep the reporter stable for the owner's identity-bound group cleanup.
+    # The private kill-on-close job ends this inert wait even if the owner dies.
+    # No child is launched and no program/native operation is retried here.
+    time.sleep(120)
 
 
 if __name__ == "__main__":

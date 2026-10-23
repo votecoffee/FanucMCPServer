@@ -13,6 +13,7 @@ import re
 import sys
 import threading
 import time
+import traceback
 import uuid
 
 from fanuc_workbench.bridge.storage import atomic_json
@@ -74,6 +75,32 @@ def bounded_driver():
     from universal_tools.windows_resources import ProcessDriver
 
     class Driver(ProcessDriver):
+        diagnostic_path = None
+
+        def capture(self, pid):
+            try:
+                return super().capture(pid)
+            except OSError as exc:
+                self.record_query_failure("OpenProcess/identity", pid, exc)
+                raise
+
+        def capture_handle(self, handle, pid):
+            try:
+                return super().capture_handle(handle, pid)
+            except OSError as exc:
+                self.record_query_failure("GetProcessTimes/QueryFullProcessImageNameW", pid, exc)
+                raise
+
+        def record_query_failure(self, api, pid, error):
+            if self.diagnostic_path is not None:
+                try:
+                    atomic_json(self.diagnostic_path / ("query-failure-" + uuid.uuid4().hex + ".json"),
+                        {"api": api, "pid": pid, "host_id": self.host_id, "error": repr(error),
+                         "winerror": getattr(error, "winerror", None), "traceback": traceback.format_exc(),
+                         "identity_verified": False, "exit_inferred": False})
+                except OSError:
+                    pass  # Preserve and propagate the original unknown-query failure.
+
         def create_suspended(self, argv, **options):
             import win32job
             group = super().create_suspended(argv, **options)
@@ -119,10 +146,14 @@ class LocalToolJob:
                 folder = Path(cwd) / ("native-tool-" + uuid.uuid4().hex)
                 folder.mkdir()
                 private_directory(folder)
+                self.ledger.driver.diagnostic_path = folder
                 request.update(nonce=uuid.uuid4().hex, protocol=1)
                 atomic_json(folder / "request.json", request)
                 request_sha = digest(folder / "request.json", 64 * 1024)
-                atomic_json(folder / "receipt.json", {"state": "launching", "request_sha256": request_sha})
+                expected_images = {os.path.normcase(str(Path(path).resolve())): digest(Path(path))
+                                   for path in {sys.executable, sys._base_executable}}
+                atomic_json(folder / "receipt.json", {"state": "launching", "request_sha256": request_sha,
+                    "python_images": expected_images})
                 environment = {k: v for k, v in os.environ.items() if k.upper() in {
                     "SYSTEMROOT", "WINDIR", "PATH", "PATHEXT", "TEMP", "TMP", "LOCALAPPDATA",
                     "APPDATA", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "COMSPEC"}}
@@ -141,9 +172,8 @@ class LocalToolJob:
                     record = self.launch.refresh()
                     if identity not in [member.model_dump(mode="json") for member in record.members]:
                         raise ValueError("Native worker is outside its exact private job")
-                    expected_images = {os.path.normcase(str(Path(sys.executable).resolve())),
-                                       os.path.normcase(str(Path(sys._base_executable).resolve()))}
-                    if identity["executable"] not in expected_images:
+                    if (identity["executable"] not in expected_images
+                            or digest(Path(identity["executable"])) != expected_images[identity["executable"]]):
                         raise ValueError("Unexpected native worker executable")
                     workers.update(self.inventory_id, "running", pid=identity["pid"],
                         creation_time=int(identity["created"]), ledger_resources=[record.resource_id])
@@ -170,22 +200,33 @@ class LocalToolJob:
                 self.inventory_id = None
                 self.owner.close()
                 return result
-        except BaseException:
+        except BaseException as error:
+            failure = {"error_type": type(error).__name__, "winerror": getattr(error, "winerror", None),
+                       "traceback": traceback.format_exc(), "resource_id": self.launch.resource_id if self.launch else None}
             cleanup = None
             if self.launch is not None:
                 try:
                     cleanup = self.launch.close()  # Exact owned job only; no PID-tree guessing.
                 except Exception as exc:
                     cleanup = {"outcome": "uncertain", "error_type": type(exc).__name__}
-            if folder is not None:
-                atomic_json(folder / "receipt.json", {"state": "uncertain", "never_replay": True,
-                    "resource_id": self.launch.resource_id if self.launch else None, "cleanup": cleanup})
             if self.inventory_id is not None:
                 if cleanup and cleanup["outcome"] in {"terminated", "already_exited"}:
                     workers.release(self.inventory_id)
                     self.inventory_id = None
                 else:
                     workers.update(self.inventory_id, "uncertain")
+            if self.owner is not None and cleanup and cleanup["outcome"] in {"terminated", "already_exited"}:
+                try:
+                    self.owner.close()
+                except Exception as exc:
+                    failure["owner_close_error_type"] = type(exc).__name__
+            if folder is not None:
+                try:
+                    atomic_json(folder / "owner-failure.json", failure)
+                    atomic_json(folder / "receipt.json", {"state": "uncertain", "never_replay": True,
+                        "resource_id": self.launch.resource_id if self.launch else None, "cleanup": cleanup})
+                except OSError:
+                    pass  # Diagnostic I/O cannot bypass private job cleanup or replace its original error.
             raise
         finally:
             _admission.release()
