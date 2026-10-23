@@ -67,7 +67,7 @@ def test_foreign_marketplace_is_not_removed(tmp_path,monkeypatch):
 
 
 @pytest.mark.parametrize('legacy_name', [False, True])
-def test_setup_remembers_custom_configuration_across_upgrade(tmp_path, monkeypatch, legacy_name):
+def test_explicit_policy_preserved_and_legacy_runtime_never_mutated(tmp_path, monkeypatch, legacy_name):
     module = load_setup()
     root = tmp_path / 'new bundle'
     wheels = root / 'plugin/wheels'
@@ -75,37 +75,39 @@ def test_setup_remembers_custom_configuration_across_upgrade(tmp_path, monkeypat
     (wheels / 'fanuc_mcp_server_bridge-0.7.0.dev0-py3-none-any.whl').write_bytes(b'fake wheel')
     module.__file__ = str(root / 'setup.py')
     monkeypatch.setattr(module, 'verify_bundle', lambda _: None)
-    monkeypatch.setattr(module.venv, 'EnvBuilder', lambda **_: SimpleNamespace(create=lambda _: None))
-    calls = []
-    def run(command, **kwargs):
-        calls.append(command)
-        return SimpleNamespace(stdout=json.dumps({'tool_count': 48, 'configured_robots': 2,
-            'app_version': module.versions.DISPLAY_VERSION, 'package_version': module.versions.PACKAGE_VERSION}))
-    monkeypatch.setattr(module.subprocess, 'run', run)
-    runtime = tmp_path / 'stable runtime'
-    config = tmp_path / 'custom robot policy.json'
-    original = b'{"state_dir":"retained-evidence","source_dir":"retained-edits","robots":{}}\r\n'
+    runtime = tmp_path / 'app owned runtime'
+    config = tmp_path / 'custom offline policy.json'
+    original = b'{"state_dir":"retained-evidence","source_dir":"retained-inputs","robots":{},"allow_writes":false}\r\n'
     config.write_bytes(original)
+    before = None
     if legacy_name:
         runtime.mkdir()
-        (runtime / 'installation.json').write_text(json.dumps({
-            'kind': 'fanuc-workbench-runtime', 'config': str(config.resolve())}))
-    monkeypatch.setattr(sys, 'argv', ['setup.py', '--runtime-dir', str(runtime), '--config', str(config), '--register', 'none'])
-    module.main()
-    monkeypatch.setattr(sys, 'argv', ['setup.py', '--runtime-dir', str(runtime), '--register', 'none'])
-    module.main()
-    assert json.loads((runtime / 'installation.json').read_text())['config'] == str(config.resolve())
-    assert json.loads((root / 'plugin/runtime.json').read_text())['config'] == str(config.resolve())
-    assert config.read_bytes() == original and not (runtime / 'robot_bridge.local.json').exists()
-    assert json.loads((runtime / 'installation.json').read_text())['kind'] == 'fanuc-mcp-server-runtime'
-    assert json.loads((runtime / 'installation.json').read_text())['release'] == module.versions.release_metadata()
-    assert json.loads((root / 'plugin/runtime.json').read_text())['release'] == module.versions.release_metadata()
-    removals = [i for i, cmd in enumerate(calls) if 'uninstall' in cmd]
+        marker = runtime / 'installation.json'
+        marker.write_text(json.dumps({'kind': 'fanuc-workbench-runtime', 'config': str(config)}))
+        before = marker.read_bytes()
+    from fanuc_workbench.services import stable_install
+    calls = []
+    def install(*args, **kwargs):
+        calls.append((args, kwargs))
+        return {'connection': {'command':str(runtime / 'python/pythonw.exe'),
+            'args':['-I','-B',str(runtime / 'StartMcp.py')],'cwd':str(runtime)}}
+    monkeypatch.setattr(stable_install, 'install', install)
+    argv = ['setup.py', '--runtime-dir', str(runtime), '--config', str(config), '--register', 'none',
+        '--expected-selection-sha256', 'absent', '--management-registry', str(tmp_path / 'registry'),
+        '--installed-plugin-version', '26.1022.180303']
+    monkeypatch.setattr(sys, 'argv', argv)
     if legacy_name:
-        assert len(removals) == 1 and calls[removals[0]][-1] == 'fanuc-workbench-bridge'
-        assert removals[0] < next(i for i, cmd in enumerate(calls) if 'install' in cmd)
+        with pytest.raises(ValueError, match='Legacy runtime retained'): module.main()
+        assert marker.read_bytes() == before and not calls
     else:
-        assert not removals
+        module.main()
+        assert calls[0][0][3] == config and calls[0][1]['expected_selection'] == 'absent'
+        # An upgrade supplies both the policy and expected prior selection explicitly.
+        argv[argv.index('absent')] = '1' * 64
+        monkeypatch.setattr(sys, 'argv', argv)
+        module.main()
+        assert calls[1][0][3] == config and calls[1][1]['expected_selection'] == '1' * 64
+    assert config.read_bytes() == original
 
 
 def test_config_selection_handles_first_install_legacy_and_explicit_override(tmp_path):

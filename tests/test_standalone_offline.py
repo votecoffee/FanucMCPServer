@@ -96,6 +96,28 @@ def test_preview_cannot_expand_offline_profile(offline):
         create_server(offline, offline=True, protocol_preview=True)
 
 
+def test_offline_wire_schema_bounds_and_expected_errors_are_caller_safe(offline, monkeypatch):
+    from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
+    async def check():
+        server = create_server(offline, offline=True)
+        schemas = {row.name: row.input_schema for row in await server.list_tools()}
+        for name in ("list_artifacts", "artifact_files", "analyze_workspace", "compare_workspaces", "read_audit"):
+            properties = schemas[name]["properties"]
+            assert properties["offset"]["minimum"] == 0 and properties["offset"]["default"] == 0
+            assert properties["limit"]["minimum"] == 1 and properties["limit"]["maximum"] == 500
+            assert properties["limit"]["default"] == 100
+        assert schemas["read_artifact"]["properties"]["length"]["maximum"] == 65536
+        with pytest.raises(ToolError, match="Invalid offline request"):
+            await server.call_tool("artifact_files", {"artifact_id": "invalid"})
+        def fail(*args, **kwargs):
+            raise RuntimeError("unexpected-private-detail")
+        monkeypatch.setattr(offline.operations.store, "read", fail)
+        with pytest.raises(UnexpectedToolError) as error:
+            await server.call_tool("read_artifact", {"artifact_id": "invalid", "path": "SAMPLE.LS"})
+        assert "unexpected-private-detail" not in str(error.value)
+    asyncio.run(check())
+
+
 def test_explicit_offline_cli_policy_overrides_environment_and_refuses_before_start(tmp_path, monkeypatch):
     from fanuc_workbench.bridge import mcp_server
     path = tmp_path / "explicit.json"

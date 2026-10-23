@@ -27,25 +27,18 @@ remain aliases. `FANUC_MCP_SERVER_CONFIG` is the preferred configuration variabl
 The GUI reads old FANUC Workbench profiles when its new profile file is absent,
 and preserves the old file when saving to the new location.
 
-The offline installer accepts existing `fanuc-workbench-runtime` ownership
-markers and retains their selected configuration. During that explicit upgrade,
-it uninstalls the old headless distribution before installing the renamed wheel
-so both distributions do not own the same Python files. For the GUI, use a fresh
-environment or uninstall `fanuc-workbench` before installing `fanuc-mcp-server`.
-
-Existing standalone runtime folders and active Codex registrations can keep their
-current paths. Running setup registers the new plugin identity unless
-`--register none` or `--register mcp` is selected. It does not remove the old
-registration. After checking the renamed connection, disable the old registration
-before using both against the same controller. Compatible feature reloads retain
-their existing behavior.
+The current [stable installer](STABLE_LAUNCHER.md) prepares a new app-owned
+offline installation. Legacy in-place runtime folders, evidence and uncertainty
+remain retained; the installer refuses to overwrite them. The desktop installer
+has its own environment and legacy package migration. Existing controller/native
+profiles retain their independent acceptance gates.
 
 ## Build and install
 
 The root `InstallPlugin.cmd --help` describes the checkout wrapper. After building
 the bundle below, `InstallPlugin.cmd --bundle "C:/RobotTools/FANUC Bundle"`
-forwards the remaining setup arguments unchanged. Include `--runtime-dir`; use
-`--register none` for runtime-only setup or `--codex-home` to choose a disposable
+forwards the remaining setup arguments unchanged. Include the explicit stable
+installation arguments below; use `--register none` to defer publication or `--codex-home` to choose a disposable
 registration profile. `InstallPlugin.cmd --bundle PATH -- --help` shows bundle
 setup help without installation. Setup defaults to this app's standalone plugin;
 it never selects a universal plugin.
@@ -71,7 +64,7 @@ Keep that bundle at a stable path. Install with the matching Python version;
 the setup script verifies file hashes and installs only from bundled wheels:
 
 ```powershell
-py -3.14 -B C:/RobotTools/FanucPluginBundle/setup.py --runtime-dir C:/RobotTools/FanucRuntime
+py -3.14 -B C:/RobotTools/FanucPluginBundle/setup.py --runtime-dir C:/RobotTools/FanucRuntime --config C:/RobotData/offline-policy.json --expected-selection-sha256 absent --management-registry C:/RobotData/manager-registry
 ```
 
 Setup installs the app's own Codex plugin by default (`--register plugin`). The
@@ -81,26 +74,30 @@ selection have been removed. An old runtime recorded as a broker integration
 must first have its retained work reconciled, then use a new standalone runtime
 directory; setup refuses to mutate the old runtime or clear its recovery state.
 
-Use `--register mcp` for plain MCP registration, or `--register none` to install
-only the runtime. Do not register both forms in the same profile. Optional
+Use `--register none --installed-plugin-version VERSION` to prepare/select a
+runtime while retaining an observed existing standalone plugin. Publish the
+returned host-local direct connection separately when needed; keep one enabled
+server route. Optional
 `--codex-home C:/RobotTools/IsolatedCodexProfile` confines CLI registration to a
-separate profile. Python itself and Codex are prerequisites, not bundled software.
-The runtime directory must be empty or owned by this installer. Existing user
-configuration is preserved. Setup performs no controller connection or write.
+separate profile. Matching Python and Codex are installation prerequisites.
+Setup retains a windowless base interpreter and standard library, so startup
+does not depend on the installation's original Python path or venv redirector.
+The app directory must be empty or owned by the stable installer. Setup performs
+no controller connection or write and accepts only zero-robot offline policies.
 
-For an existing custom policy, pass `--config C:/RobotTools/MyRobotPolicy.json`.
-The installer records that absolute selection in the runtime ownership marker
-and reuses it on later upgrades when `--config` is omitted. Missing saved
-configuration fails before runtime changes. Older runtimes without a recorded
-selection need `--config` once unless their default configuration exists.
+Supply the reviewed policy explicitly on each install. Relative data paths are
+resolved against its original folder, preserving existing evidence. Updates
+require the exact prior selection SHA-256 and a new fixed release; they never
+replace a live peer's backend or mutate a retained runtime.
 
 The local plugin keeps its own `plugin.json` and `fanuc-robot` skill. The bundle
 hashes an immutable `mcp.template.json`; setup emits `mcp.json` with the selected
-installed Python and `stdio_supervisor` entrypoint, plus its local `runtime.json`.
-The runtime marker records the generated connection SHA-256. Reinstall verifies
-the unchanged recipe and regenerates the connection, without relying on a global
-Python installation. The supervisor neither installs dependencies nor contacts a controller. Configuration
-and evidence live outside the plugin cache. Public marketplace submission and
+app-owned `python/pythonw.exe`, `StartMcp.py` and stable working directory.
+The `${FANUC_MCP_INSTALL_ROOT}` source markers are installer recipes; no host
+variable expansion is assumed. Publish only the generated absolute binding.
+The stable entry verifies immutable snapshots and preserves original SDK wire
+handles, EOF and exact parent lifetime. Configuration and evidence live outside
+the plugin cache. Public marketplace submission and
 native Codex confirmation UI acceptance remain pending.
 
 The managed stdio profile requires Windows. Its SDK streams remain ordinary

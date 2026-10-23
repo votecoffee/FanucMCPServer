@@ -35,7 +35,9 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
         except ImportError:  # Preserve existing editable direct installations until explicit upgrade.
             from mcp.server.fastmcp import FastMCP as MCPServer, Context
         from mcp.types import ToolAnnotations
-        from pydantic import BaseModel, StrictBool
+        from pydantic import BaseModel, StrictBool, Field
+        from mcp.server.mcpserver.exceptions import ToolError
+        from fanuc_workbench.bridge.requests import RequestQueueFull
         from mcp.server.mcpserver import Elicit, Resolve
     except ImportError:
         raise RuntimeError('Install MCP support with: python -m pip install -e ".[mcp]"') from None
@@ -89,8 +91,6 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
         def decorate(function):
             if restricted and function.__name__ not in allowed_tools:
                 return function  # Absent from dispatch as well as discovery; no hidden fallback.
-            if inspect.iscoroutinefunction(function):
-                return server.tool(annotations=annotations)(function)
             @wraps(function)
             async def concurrent(*args, **kwargs):
                 control = function.__name__ in {
@@ -98,7 +98,20 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
                     "list_native_toolchains", "native_validation_status", "discard_native_validation",
                 } or (function.__name__ in {"run_read_operation", "describe_operation"}
                       and kwargs.get("operation_id") == "core.requests.status")
-                return await bridge.requests.run(function, *args, control=control, **kwargs)
+                try:
+                    if inspect.iscoroutinefunction(function):
+                        return await function(*args, **kwargs)
+                    return await bridge.requests.run(function, *args, control=control, **kwargs)
+                except FileNotFoundError:
+                    if restricted:
+                        raise ToolError("Saved evidence or a listed file was not found; check list_artifacts and artifact_files before retrying") from None
+                    raise
+                except ValueError:
+                    if restricted:
+                        raise ToolError("Invalid offline request; verify identifiers, manifest-listed paths, hashes and documented argument limits") from None
+                    raise
+                except RequestQueueFull:
+                    raise ToolError("Request capacity reached; inspect current work and wait for an owning request to finish") from None
             return server.tool(annotations=annotations)(concurrent)
         return decorate
 
@@ -290,18 +303,21 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
         return bridge.operations.import_workspace(source_folder, note)
 
     @tool(annotations=read)
-    def list_artifacts(offset: int = 0, limit: int = 100) -> dict:
+    def list_artifacts(offset: Annotated[int, Field(ge=0, strict=True)] = 0,
+                       limit: Annotated[int, Field(ge=1, le=500, strict=True)] = 100) -> dict:
         """Browse saved backups, snapshots, samples, recordings and offline packages."""
         return bridge.operations.store.list(offset=offset, limit=limit)
 
     @tool(annotations=read)
-    def artifact_files(artifact_id: str, offset: int = 0, limit: int = 100) -> dict:
+    def artifact_files(artifact_id: str, offset: Annotated[int, Field(ge=0, strict=True)] = 0,
+                       limit: Annotated[int, Field(ge=1, le=500, strict=True)] = 100) -> dict:
         """List files and exact hashes in one saved artifact with pagination."""
         from fanuc_workbench.services.workspace_api import page
         return page(bridge.operations.store.get(artifact_id)["files"], offset, limit)
 
     @tool(annotations=read)
-    def read_artifact(artifact_id: str, path: str, offset: int = 0, length: int = 32768) -> dict:
+    def read_artifact(artifact_id: str, path: str, offset: Annotated[int, Field(ge=0, strict=True)] = 0,
+                      length: Annotated[int, Field(ge=1, le=65536, strict=True)] = 32768) -> dict:
         """Retrieve a bounded byte range as base64 from an unchanged manifest-listed artifact file."""
         return bridge.operations.store.read(artifact_id, path, offset, length)
 
@@ -375,14 +391,16 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
             raise
 
     @tool(annotations=read)
-    def analyze_workspace(artifact_id: str, kind: str, offset: int = 0, limit: int = 100, query: str = "") -> dict:
+    def analyze_workspace(artifact_id: str, kind: str, offset: Annotated[int, Field(ge=0, strict=True)] = 0,
+                          limit: Annotated[int, Field(ge=1, le=500, strict=True)] = 100, query: str = "") -> dict:
         """Run health/options/alarms/mastering/DCS/network/lint/program/xref/register/frame/I-O evidence analysis."""
         if offline:
             return offline_profile.analyze(bridge, artifact_id, kind, offset, limit, query)
         return bridge.operations.analyze(artifact_id, kind, offset, limit, query)
 
     @tool(annotations=read)
-    def compare_workspaces(before: str, after: str, offset: int = 0, limit: int = 100) -> dict:
+    def compare_workspaces(before: str, after: str, offset: Annotated[int, Field(ge=0, strict=True)] = 0,
+                           limit: Annotated[int, Field(ge=1, le=500, strict=True)] = 100) -> dict:
         """Compare captured workspace bytes and existing semantic LS analysis."""
         return bridge.operations.compare(before, after, offset, limit)
 
@@ -445,7 +463,8 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
         return bridge.operations.prepare_restore(robot_id, artifact_id, path, remote, expected_sha256)
 
     @tool(annotations=read)
-    def read_audit(offset: int = 0, limit: int = 100) -> dict:
+    def read_audit(offset: Annotated[int, Field(ge=0, strict=True)] = 0,
+                   limit: Annotated[int, Field(ge=1, le=500, strict=True)] = 100) -> dict:
         """Read paginated operation/audit history without exposing credentials."""
         return bridge.operations.audit(offset, limit)
 

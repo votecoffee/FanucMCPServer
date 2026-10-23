@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal DisableDelayedExpansion
 pushd "%~dp0" || exit /b 1
 if defined FANUC_INSTALL_PYTHON (
     "%FANUC_INSTALL_PYTHON%" -B "%~dp0scripts\install_desktop.py" %*

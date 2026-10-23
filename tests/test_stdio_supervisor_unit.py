@@ -88,13 +88,15 @@ def test_generated_plugin_connection_uses_installed_python_and_no_conditional_pl
     spec = importlib.util.spec_from_file_location("fanuc_bundle_setup_unit", root / "packaging/bridge/setup_bundle.py")
     setup = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(setup)
-    python = tmp_path / "Runtime With Spaces/venv/Scripts/python.exe"
+    runtime = tmp_path / "Runtime With Spaces"
+    python = runtime / "python/pythonw.exe"
     pointer = tmp_path / "Plugin With Spaces/runtime.json"
-    connection = setup.plugin_connection(python, pointer, tmp_path)
+    connection = setup.plugin_connection(python, pointer, runtime)
     assert set(connection["mcpServers"]) == {"fanuc-mcp-server"}
     server = connection["mcpServers"]["fanuc-mcp-server"]
     assert server["command"] == str(python)
-    assert server["args"] == ["-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--runtime", str(pointer)]
+    assert server["args"] == ["-I", "-B", str(runtime / "StartMcp.py")]
+    assert server["cwd"] == str(runtime)
 
 
 def test_bundle_recipe_remains_verifiable_after_generating_runtime_connection(tmp_path):
@@ -109,7 +111,7 @@ def test_bundle_recipe_remains_verifiable_after_generating_runtime_connection(tm
     (tmp_path / "BUNDLE_MANIFEST.json").write_text(json.dumps({"release": setup.versions.release_metadata(), "compatibility": setup.compatibility(), "files": [
         {"path": "plugin/mcp.template.json", "sha256": hashlib.sha256(recipe).hexdigest(), "bytes": len(recipe)}]}))
     setup.verify_bundle(tmp_path)
-    connection = setup.plugin_connection(Path("C:/Test/python.exe"), plugin / "runtime.json", tmp_path)
+    connection = setup.plugin_connection(tmp_path / "python/pythonw.exe", plugin / "runtime.json", tmp_path)
     setup.generated_file(tmp_path, "plugin/mcp.json", json.dumps(connection).encode())
     setup.generated_file(tmp_path, "plugin/runtime.json", b'{}')
     setup.verify_bundle(tmp_path)  # Reinstall checks the immutable recipe again.

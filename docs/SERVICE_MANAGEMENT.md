@@ -41,13 +41,20 @@ proxies and backend workers do not create duplicate owner registrations.
 Components include the running app distribution, framework, SDK and, when
 associated, plugin. Running versions are captured at process startup; installed
 metadata is refreshed independently. Available versions stay unknown and
-`update_pending` stays false unless an independent update source establishes an
-update. The manager may additionally display its own local publisher inventory.
+`update_pending` stays false unless selected metadata establishes an update.
+For a [stable installation](STABLE_LAUNCHER.md), the hash-bound current manifest
+provides selected backend versions; they can differ from this process's running
+versions. The installed standalone plugin remains a separate observation.
+The manager may additionally display its own local publisher inventory.
 No package-feed or GitHub update check runs here.
 
 Status identifies per-chat stdio workers, shared app-host owners or explicitly
 marked validation workers. A per-chat worker is not a shared multi-chat server.
-The installed Python stdio supervisor stays alive for its child and forwards
+The reviewed stable offline launcher serves in its surviving windowless Python
+process, admits no app-created children, and records exact parent-loss/EOF/dead
+generation receipts. Its one-actor private job and eight-frontdoor admission
+limit do not adopt SDK console/redirector actors or attached applications.
+Legacy/full-profile Python stdio supervisors stay alive for their children and forward
 opaque bytes through explicit pipes. Client EOF closes worker stdin and lets
 the child drain its domain work. A private activation handshake binds both
 launcher/worker identities before MCP starts. Unexpected supervisor death closes

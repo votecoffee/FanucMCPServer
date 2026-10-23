@@ -3,9 +3,9 @@
   "mcpServers": {
     "fanuc-mcp-server": {
       "type": "stdio",
-      "command": "py",
-      "args": ["-3", "-B", "-m", "fanuc_workbench.bridge.stdio_supervisor", "--runtime", "${PLUGIN_ROOT}/runtime.json"],
-      "cwd": "${PLUGIN_ROOT}"
+      "command": "${FANUC_MCP_INSTALL_ROOT}/python/pythonw.exe",
+      "args": ["-I", "-B", "${FANUC_MCP_INSTALL_ROOT}/StartMcp.py"],
+      "cwd": "${FANUC_MCP_INSTALL_ROOT}"
     }
   }
 }

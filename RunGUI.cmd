@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal DisableDelayedExpansion
 pushd "%~dp0" || exit /b 1
 set "_fanuc_gui_python=%~dp0.venv\Scripts\pythonw.exe"
 if defined FANUC_GUI_PYTHON set "_fanuc_gui_python=%FANUC_GUI_PYTHON%"

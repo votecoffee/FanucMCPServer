@@ -82,6 +82,12 @@ def build(source: Path, output: Path, framework_wheel: Path):
     (plugin / "mcp.json").rename(plugin / "mcp.template.json")
     shutil.copyfile(source / "packaging" / "bridge" / "setup_bundle.py", output / "setup.py")
     shutil.copyfile(source / "fanuc_workbench/version.py", output / "release_version.py")
+    # Stdlib-only installer services; setup can prepare a runtime without loading
+    # packages from the checkout or executing the selected MCP/native profile.
+    for relative in ("version.py", "bridge/stable_launcher.py", "services/stable_install.py"):
+        destination = output / "fanuc_workbench" / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / "fanuc_workbench" / relative, destination)
     wheels = plugin / "wheels"
     wheels.mkdir()
     shutil.copyfile(framework_wheel, wheels / framework_wheel.name)
@@ -111,6 +117,7 @@ def build(source: Path, output: Path, framework_wheel: Path):
     shutil.copyfile(source / "docs" / "STANDALONE_OFFLINE.md", docs / "STANDALONE_OFFLINE.md")
     shutil.copyfile(source / "docs" / "LOCAL_NATIVE_VALIDATION.md", docs / "LOCAL_NATIVE_VALIDATION.md")
     shutil.copyfile(source / "docs" / "CONFIG_PUBLICATION.md", docs / "CONFIG_PUBLICATION.md")
+    shutil.copyfile(source / "docs" / "STABLE_LAUNCHER.md", docs / "STABLE_LAUNCHER.md")
     shutil.copyfile(source / "packaging" / "framework.lock.json", docs / "framework.lock.json")
     shutil.copyfile(source / "packaging" / "framework-requirements.txt", docs / "framework-requirements.txt")
     for name in ("DESKTOP_GUIDE.md", "ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md", "CONTROLLER_INTERFACES.md", "HTTP_READS.md", "SNPX_READS.md", "SNPX_DECODING.md", "SNPX_EVIDENCE.md", "SNPX_IO_EVIDENCE.md", "RECORDING_ANALYSIS.md", "RECORDING_EVIDENCE.md", "RECORDING_HANDSHAKE.md", "VQLOG_ANALYSIS.md", "ALARM_ANALYSIS.md", "ALARM_COMPARISON.md", "PROGRAM_DEPENDENCIES.md", "PROGRAM_DIAGNOSTICS.md", "REQUEST_CONCURRENCY.md", "COMMUNITY_INTEGRATIONS.md"):

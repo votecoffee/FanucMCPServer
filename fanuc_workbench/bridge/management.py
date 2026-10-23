@@ -101,6 +101,30 @@ class ServiceReporting:
                 raise ValueError("Plugin identity changed")
             versions["plugin"] = ComponentVersion(installed=current, running=self.running_plugin,
                                                    available=None, update_pending=False)
+        # The selected immutable backend may differ from this live generation.
+        # Observe only pointer/manifest metadata here; status never loads code,
+        # adopts a process, touches a controller or declares an update healthy.
+        if self.runtime is not None:
+            pointer = json.loads(self.runtime.read_bytes())
+            if pointer.get("stable_root"):
+                import hashlib
+                root = Path(pointer["stable_root"])
+                from fanuc_workbench.bridge.stable_launcher import read, parse
+                selection = parse(read(root / "launcher/current.json"))
+                snapshot_id = selection["snapshot_id"]
+                if (not isinstance(snapshot_id, str) or len(snapshot_id) != 64
+                        or any(c not in "0123456789abcdef" for c in snapshot_id)):
+                    raise ValueError("Invalid selected launcher identity")
+                raw = read(root / "launcher/snapshots" / snapshot_id / "manifest.json", 8388608)
+                if hashlib.sha256(raw).hexdigest() != snapshot_id:
+                    raise ValueError("Selected launcher metadata hash differs")
+                selected = parse(raw)
+                for key, installed in (("app", selected["release"]["display_version"]),
+                                       ("framework", selected["framework"]), ("sdk", selected["sdk"]),
+                                       ("plugin", selected["installed_plugin_version"])):
+                    running = self.running_plugin if key == "plugin" else self.running[key]
+                    versions[key] = ComponentVersion(installed=installed, running=running,
+                        available=None, update_pending=installed != running)
         if self.bridge is None:
             status = ManagedStatus(state="degraded", message=(
                 "Shared app-host owner. Retained-worker activity is unknown; restart is disabled."),

@@ -61,6 +61,27 @@ def test_installed_and_running_versions_remain_distinct(bridge_case, tmp_path, m
     assert versions["framework"].available is None and not versions["framework"].update_pending
 
 
+def test_stable_selection_reports_pending_backend_without_changing_live_generation(bridge_case, tmp_path):
+    from fanuc_workbench.bridge import stable_launcher as launcher
+    bridge, robot, _ = bridge_case
+    pointer = plugin(tmp_path)
+    pointer.write_bytes(launcher.encoded({"plugin_id": management.PLUGIN_ID, "stable_root": str(tmp_path)}))
+    reporting = management.ServiceReporting(bridge, runtime=pointer)
+    manifest = {"release": {"display_version": "26.1023.235959"}, "framework": "0.20.0", "sdk": "2.3.0",
+        "installed_plugin_version": "1.0.0"}
+    raw = launcher.encoded(manifest); identifier = launcher.digest(raw)
+    snapshot = tmp_path / "launcher/snapshots" / identifier
+    snapshot.mkdir(parents=True)
+    (snapshot / "manifest.json").write_bytes(raw)
+    (tmp_path / "launcher/current.json").write_bytes(launcher.encoded({"schema_version": 1, "snapshot_id": identifier}))
+    reporting.refresh()
+    versions = reporting.status().versions
+    assert versions["app"].running == management.APP_VERSION
+    assert versions["app"].installed == "26.1023.235959" and versions["app"].update_pending
+    assert versions["plugin"].installed == versions["plugin"].running == "1.0.0"
+    assert not reporting.status().restart_allowed and robot.connects == robot.uploads == 0
+
+
 def test_busy_plans_stale_requests_and_concurrent_duplicates_never_restart(bridge_case, tmp_path):
     bridge, robot, config = bridge_case
     (config.source_dir / "MAIN.LS").write_bytes(PROPOSED)

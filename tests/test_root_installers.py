@@ -18,7 +18,7 @@ def module(name):
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Real Windows CMD forwarding")
-@pytest.mark.parametrize("wrapper,script", [("Install.cmd", "install_desktop.py"), ("InstallPlugin.cmd", "install_plugin.py")])
+@pytest.mark.parametrize("wrapper,script", [("Install.cmd", "install_desktop.py"), ("InstallPlugin.cmd", "install_plugin.py"), ("InstallMCP.cmd", "install_mcp.py")])
 @pytest.mark.parametrize("exit_code", [0, 17])
 def test_cmd_forwards_spaces_unicode_and_exit_code(tmp_path, wrapper, script, exit_code):
     root = tmp_path / "Checkout with spaces"; (root / "scripts").mkdir(parents=True)
@@ -33,7 +33,7 @@ def test_cmd_forwards_spaces_unicode_and_exit_code(tmp_path, wrapper, script, ex
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Real Windows CMD help")
-@pytest.mark.parametrize("wrapper", ["Install.cmd", "InstallPlugin.cmd"])
+@pytest.mark.parametrize("wrapper", ["Install.cmd", "InstallPlugin.cmd", "InstallMCP.cmd"])
 def test_actual_root_wrapper_help_has_no_install_side_effect(wrapper):
     command = '"' + os.environ["COMSPEC"] + '" /d /s /c ""' + str(ROOT / wrapper) + '" --help"'
     result = subprocess.run(command, env={**os.environ, "FANUC_INSTALL_PYTHON": sys.executable},

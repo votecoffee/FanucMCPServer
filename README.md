@@ -17,7 +17,7 @@ plugin and native skills. There is no universal Codex plugin or broker route.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1023.112621** (America/New_York). App,
+The current source checkpoint is **26.1023.165651** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
@@ -67,8 +67,8 @@ Windows entry points in this checkout:
 ```powershell
 .\Install.cmd --help
 .\Install.cmd --venv-dir "C:/RobotTools/FANUC Desktop" --no-shortcut
+.\InstallMCP.cmd --help
 .\InstallPlugin.cmd --help
-.\InstallPlugin.cmd --bundle "C:/RobotTools/FANUC Bundle" --runtime-dir "C:/RobotTools/FANUC Runtime" --register none
 ```
 
 `Install.cmd` installs the desktop and its Start menu shortcut unless
@@ -85,6 +85,14 @@ After installing the desktop, double-click [RunGUI.cmd](RunGUI.cmd) in the repo
 root, or run `.\RunGUI.cmd`. It opens the GUI using `.venv` without reinstalling.
 For a custom desktop environment, set `FANUC_GUI_PYTHON` to its absolute
 `pythonw.exe` path before running the command.
+
+`InstallMCP.cmd` prepares an app-owned stable offline launcher and immutable,
+hash-verified runtime outside checkouts and plugin caches. It retains old runtime
+bytes and live generations, and returns an exact connection for separate
+publication. It does not edit Codex settings or start the server. See the
+[stable launcher guide](docs/STABLE_LAUNCHER.md) for required wheel/policy inputs,
+atomic selection, bounds and lifecycle checks. Source plugin connection files
+are installer recipes; publish only the generated absolute stable binding.
 
 ### Dependencies
 
@@ -152,8 +160,8 @@ The default distribution includes the desktop dependencies. For a separate
 runtime without Qt, follow the [headless plugin bundle guide](docs/ROBOT_PLUGIN_SETUP.md).
 
 Bundle setup installs the app's standalone Codex plugin by default. Use
-`--register none` for runtime-only setup or `--register mcp` for a direct MCP
-registration without a plugin. Broker routing is no longer supported; the shared
+`--register none` to prepare without registration; host-local direct bindings
+are published separately from the returned connection. Broker routing is no longer supported; the shared
 framework remains an app dependency. See the [plugin guide](docs/ROBOT_PLUGIN_SETUP.md).
 For desktop use alone, omit the `mcp` extra or run `install_and_run.bat`.
 On Windows, that script also creates **Start > FanucMCPServer > FanucMCPServer**

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Added an app-owned stable offline launcher with retained base Python,
+  hash-verified immutable runtimes, exact CAS selection/backups and no dependency
+  on Codex plugin caches or checkout branches. InstallMCP.cmd prepares without
+  settings edits; bundle setup emits the same stable binding. The 15-tool
+  offline profile, SDK 2.3.0 and framework 0.20.0 remain selected.
+- Added bounded offline generation receipts, exact kernel/parent identities,
+  parent-loss cleanup, dead-generation refusal/reconciliation and selected versus
+  running manager versions. Published offline integer bounds match service
+  limits; anticipated request errors are caller-safe and unexpected errors stay
+  masked. Native/compiler/controller acceptance remains separate.
+
 - Added root desktop/built-plugin CMD installers with quoted argument forwarding,
   explicit desktop launch and failure propagation. Documented current connection
   profiles, the shared CodexMCPBroker framework and independent Windows manager,
