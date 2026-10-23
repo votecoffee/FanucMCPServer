@@ -1,4 +1,12 @@
-# App-owned shared framework (experimental)
+# Shared framework and app-owned hosting
+
+[CodexMCPBroker](https://github.com/votecoffee/CodexMCPBroker) supplies the shared
+Python application framework and a separate Windows management application.
+Its historical universal plugin is retired. FanucMCPServer keeps its standalone
+MCP server, app-owned plugin, native skills and desktop application. The manager
+has its own `InstallManager.cmd` and does not require a Codex plugin/connection.
+See [management integration](SERVICE_MANAGEMENT.md). This repository does not
+install the manager or use broker routing.
 
 The shared app framework supplies a stable app-owned MCP host with replaceable
 backends. FanucMCPServer ships its own standalone Codex plugin, desktop app and
@@ -11,6 +19,15 @@ Framework 0.20 adds [tray-manager reporting](SERVICE_MANAGEMENT.md). Only the
 owning service registers; proxies and backend workers do not. Restart remains
 disabled because there is no surviving app-owned supervisor and retained-worker
 activity is unknown. Installing this app does not install another manager.
+
+The reviewed app dependency remains 0.20.0 / MCP SDK 2.3.0 even when the shared
+repository publishes a newer timestamped release. Adoption requires a separate
+pin, wheel/RECORD review and app acceptance. Direct offline (15 tools), local
+native candidate (20 tools), full standalone (55 tools) and app-owned hosting
+are distinct deployments; see [profiles](../README.md#capabilities-and-limits).
+The local-native implementation includes exact input hashes, single-use plans,
+bounded private jobs and retained uncertainty. Source/package checks do not
+establish a successful vendor compile or authorize changing a live profile.
 
 ## Dependency and build
 

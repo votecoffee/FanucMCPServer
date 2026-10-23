@@ -1,5 +1,11 @@
 # Tray service reporting
 
+The shared [CodexMCPBroker repository](https://github.com/votecoffee/CodexMCPBroker)
+provides both the framework and the independently installed Windows manager.
+Run its `InstallManager.cmd` to install that management app. There is no universal
+Codex plugin. FANUC keeps its own standalone server, Codex plugin and native
+skills; management reporting does not replace their connection or authorization.
+
 The standalone MCP process registers with the shared Windows MCP Service Manager
 for its lifetime. The app uses `universal-codex-tools==0.20.0` and MCP SDK 2.3.0.
 Install the manager separately if desired; this app's installer does not install

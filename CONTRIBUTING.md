@@ -19,6 +19,20 @@ py -3 -m venv .venv
 Use the verified local framework wheel and tested dependency constraints in
 [the framework guide](docs/APP_FRAMEWORK.md). No separate routing plugin is
 required, and development must use an isolated environment.
+The dependency is maintained in [CodexMCPBroker](https://github.com/votecoffee/CodexMCPBroker),
+which supplies a shared framework and separate Windows manager. FANUC retains
+its own standalone server/plugin/skills; there is no universal plugin. Keep the
+reviewed dependency pin until a separately verified upgrade is adopted.
+
+The root `Install.cmd` and `InstallPlugin.cmd` provide desktop and built-bundle
+entry points. Their `--help` paths do not install or launch software. Test argument
+forwarding and failures in disposable directories; normal installations and
+native profile activation are separate acceptance steps.
+
+For config publication, follow [the byte-preserving TOML workflow](docs/CONFIG_PUBLICATION.md).
+Use disposable profiles and retain exact before/after bytes. Never apply a fixture
+or local experiment to a live Codex config. The installer delegates registration
+to the Codex CLI; a CLI success alone is not byte-preservation evidence.
 
 Tests use synthetic files, simulated controller transports and local MCP
 sessions. Running the suite does not establish controller or commissioning

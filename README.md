@@ -10,10 +10,14 @@ within an existing session.
 The repository and application are named **FanucMCPServer**. The Python
 distribution is `fanuc-mcp-server`; the `fanuc_workbench` import namespace and
 legacy commands remain compatible with the former FANUC Workbench name.
+The shared dependency comes from [CodexMCPBroker](https://github.com/votecoffee/CodexMCPBroker),
+which now provides an MCP application framework and a separately installed Windows
+management app. FanucMCPServer retains its standalone MCP server, app-owned Codex
+plugin and native skills. There is no universal Codex plugin or broker route.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1023.082408** (America/New_York). App,
+The current source checkpoint is **26.1023.112621** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
@@ -58,6 +62,25 @@ their own worker lane; existing approval and single-use change plans still apply
 
 ## Install
 
+Windows entry points in this checkout:
+
+```powershell
+.\Install.cmd --help
+.\Install.cmd --venv-dir "C:/RobotTools/FANUC Desktop" --no-shortcut
+.\InstallPlugin.cmd --help
+.\InstallPlugin.cmd --bundle "C:/RobotTools/FANUC Bundle" --runtime-dir "C:/RobotTools/FANUC Runtime" --register none
+```
+
+`Install.cmd` installs the desktop and its Start menu shortcut unless
+`--no-shortcut` is supplied; launch is explicit with `--launch`.
+`install_and_run.bat` remains the install-and-launch alias. `InstallPlugin.cmd`
+forwards setup arguments to an already built bundle; it does not build one.
+Use `--codex-home` with a disposable profile for registration tests; registration
+can change that profile's Codex config. Help and `--register none` do not register
+a plugin. Both CMDs forward quoted paths and propagate failure exit codes.
+`FANUC_INSTALL_PYTHON` optionally selects an absolute Python executable instead
+of `py -3`. See [plugin setup](docs/ROBOT_PLUGIN_SETUP.md) for the bundle build.
+
 ### Dependencies
 
 - Python 3.11 or newer and Git for a source installation.
@@ -87,6 +110,10 @@ The MCP process also provides [tray-manager status](docs/SERVICE_MANAGEMENT.md)
 from cached local state, with restart disabled until an app-owned supervisor can
 enforce safe quiescence across chats. Setup preserves the standalone plugin and
 does not install another manager.
+The independent [Windows manager](https://github.com/votecoffee/CodexMCPBroker/blob/main/docs/service-management.md)
+is installed from its own repository with `InstallManager.cmd`; it needs no
+Codex plugin or MCP connection. A newer framework release does not change this
+app's reviewed 0.20.0 pin or migrate a running installation automatically.
 
 MCP workers acquire an exclusive lease for their policy's state directory and
 hold it through shutdown. A second standalone or app-host backend worker using
@@ -238,6 +265,16 @@ reloadable `workbench.programs` 1.1.0 release adds six read analyses through the
 operation catalog while retaining the established tool schemas and original release.
 
 ## Capabilities and limits
+
+| Connection profile | Tools | Scope |
+| --- | --- | --- |
+| Direct `--offline` | 15 | Saved evidence and analyses; zero robots/writes, no native/extension launch |
+| Direct `--local-native-policy` | 20 | Saved evidence plus pinned local compilation plans; native pilot required, no controller/GUI routes |
+| Full standalone server/plugin | 55 | Configured service-layer operations under the selected robot/access policy |
+| Experimental app-owned host | 14 front-door / 56 backend | Explicit publication and separate host/native acceptance |
+
+These are separate profiles. Updating source or a dependency does not switch the
+installed profile, broaden online permissions or establish native acceptance.
 
 | Area | Available capabilities |
 | --- | --- |

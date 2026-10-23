@@ -42,6 +42,19 @@ their existing behavior.
 
 ## Build and install
 
+The root `InstallPlugin.cmd --help` describes the checkout wrapper. After building
+the bundle below, `InstallPlugin.cmd --bundle "C:/RobotTools/FANUC Bundle"`
+forwards the remaining setup arguments unchanged. Include `--runtime-dir`; use
+`--register none` for runtime-only setup or `--codex-home` to choose a disposable
+registration profile. `InstallPlugin.cmd --bundle PATH -- --help` shows bundle
+setup help without installation. Setup defaults to this app's standalone plugin;
+it never selects a universal plugin.
+
+The root `Install.cmd` handles the desktop environment and optional Start menu
+shortcut; `--launch` opens the app only after success. Both CMDs preserve quoted
+paths and nonzero exit codes. Neither installs the separate Windows manager from
+[CodexMCPBroker](https://github.com/votecoffee/CodexMCPBroker).
+
 Build in a Python environment with pip, setuptools and wheel. This step uses
 the package index to resolve dependency wheels for that Python/Windows version:
 

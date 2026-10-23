@@ -109,6 +109,8 @@ def build(source: Path, output: Path, framework_wheel: Path):
     shutil.copyfile(source / "docs" / "RESOURCE_OWNERSHIP.md", docs / "RESOURCE_OWNERSHIP.md")
     shutil.copyfile(source / "docs" / "RELEASE_VERSIONING.md", docs / "RELEASE_VERSIONING.md")
     shutil.copyfile(source / "docs" / "STANDALONE_OFFLINE.md", docs / "STANDALONE_OFFLINE.md")
+    shutil.copyfile(source / "docs" / "LOCAL_NATIVE_VALIDATION.md", docs / "LOCAL_NATIVE_VALIDATION.md")
+    shutil.copyfile(source / "docs" / "CONFIG_PUBLICATION.md", docs / "CONFIG_PUBLICATION.md")
     shutil.copyfile(source / "packaging" / "framework.lock.json", docs / "framework.lock.json")
     shutil.copyfile(source / "packaging" / "framework-requirements.txt", docs / "framework-requirements.txt")
     for name in ("DESKTOP_GUIDE.md", "ROBOT_BRIDGE.md", "ROBOT_BRIDGE_COVERAGE.md", "ROBOT_PLUGIN_SETUP.md", "ROBOT_EXTENSIONS.md", "ROBOT_NATIVE_API.md", "CONTROLLER_INTERFACES.md", "HTTP_READS.md", "SNPX_READS.md", "SNPX_DECODING.md", "SNPX_EVIDENCE.md", "SNPX_IO_EVIDENCE.md", "RECORDING_ANALYSIS.md", "RECORDING_EVIDENCE.md", "RECORDING_HANDSHAKE.md", "VQLOG_ANALYSIS.md", "ALARM_ANALYSIS.md", "ALARM_COMPARISON.md", "PROGRAM_DEPENDENCIES.md", "PROGRAM_DIAGNOSTICS.md", "REQUEST_CONCURRENCY.md", "COMMUNITY_INTEGRATIONS.md"):

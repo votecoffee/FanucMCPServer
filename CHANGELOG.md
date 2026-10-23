@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Added root desktop/built-plugin CMD installers with quoted argument forwarding,
+  explicit desktop launch and failure propagation. Documented current connection
+  profiles, the shared CodexMCPBroker framework and independent Windows manager,
+  while retaining the standalone FANUC server, plugin and skills.
+- Added an explicit reviewed-file TOML flag publication helper using binary UTF-8
+  writes and Windows CRLF without double translation. Preserve unrelated parsed
+  values and multiline strings; refuse malformed line endings and stale edits.
+  Tests and documentation use disposable profiles, not live config repair.
+
 - Added a separate direct local-native candidate profile: administrator-pinned
   MakeTP/PrintTP/configuration/profile/context hashes, saved LS source review,
   single-use compilation plans, artifact diagnostics, status and unused-plan
