@@ -65,13 +65,23 @@ application Quit/Exit, saves user documents or closes attached software.
 | Full installed plugin/plain MCP stdio | Installed-runtime supervisor, durable report-only launcher/worker records, retained handles, activation before MCP startup, opaque SDK streams, private job and EOF drain | Real startup/duplicate/EOF/owner-death, package and Codex acceptance |
 | App-host backend | New publications use the same supervisor; explicit registry allowlist propagation and exclusive state-directory lease; unmanaged older publications refuse startup pending explicit republish | Real host/retained-worker lifecycle and registry acceptance |
 | Feature/native RPC worker | Shared durable launch records, private Windows job, verified creation timestamp, retained handles, activation barrier, bounded inventory and uncertain-cleanup refusal | Real child-tree/owner-death and installed/native acceptance |
-| Offline MakeTP/PrintTP | Activated private tool worker contains compiler descendants; compiler intent/binding is durable; output is bounded and retained locally | Real timeout/child cleanup and native compiler acceptance |
+| Offline MakeTP/PrintTP | Common atomic suspended background launch; actual caller owns the job; activation after exact worker/job membership; durable compiler step intent and retained-handle identity; bounded file IPC/logs; one job/eight actors/512 MiB | Harmless child/owner-loss fixtures, then separately coordinated real compiler acceptance |
 | GUI ROBOGUIDE launch | Automatic launch refuses until native application/workcell ownership is accepted; backup handoff remains available and preserves existing folders | Explicit native ownership/dirty-state acceptance before enabling automatic launch; user-opened sessions remain protected |
 | Host-policy validation helper | Fixed metadata script in an owned activated worker using the selected interpreter; bounded IPC, durable records and redacted errors; never starts the host | Real selected-runtime/EOF/owner-death acceptance |
 | Doctor | Explicit administrative SDK client with a private registry; exercises the same supervised stdio entrypoint; default performs no controller probe | Real installed package/EOF acceptance |
 | Build/install helpers | Explicit administrative pip/CLI commands; not server-owned runtime/native resources | Package/registration checks in a disposable profile before installation |
 
-Compiler and policy helpers use the common RPC lifetime implementation. The GUI
+Compiler utilities use the shared background resource launcher, with no inherited
+stdio or job handle. Its memory limit is installed while the group is suspended,
+before the common ledger binds and resumes it. Only fixed MakeTP/PrintTP paths
+and executable hashes are accepted; no shell or arbitrary command route exists.
+The parent retains the exact activated worker and confirms membership in its own
+job before granting execution. Each compiler step journals launch intent before
+creation and binds the OS identity from its retained process handle. Job cleanup
+covers descendants and preserves bounded outputs and uncertain receipts. This
+background protocol does not replace the client's MCP SDK stdio transport.
+
+Policy helpers retain their separate RPC lifetime implementation. The GUI
 refuses closure while private workers or uncertain cleanup remain. Do not install
 or enable the candidate on the strength of stub tests alone. Existing user-owned
 native software remains untouched while ownership is unestablished.

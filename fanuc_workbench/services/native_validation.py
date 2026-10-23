@@ -9,8 +9,6 @@ from pathlib import Path
 import re
 import subprocess
 import threading
-import base64
-import sys
 import uuid
 
 from fanuc_workbench.extensions.programs_v1_1_0.validation import compare_native_listing,review_validation
@@ -24,22 +22,14 @@ def _read(path,maximum):
 
 
 def _run(arguments,cwd,timeout):
-    """Use the private, job-contained offline tool worker; never lose its owner."""
-    if type(timeout) not in (int,float) or not 1<=timeout<=60: raise ValueError('Use compiler timeout 1..60 seconds')
-    from fanuc_workbench.bridge.extension_process import RpcProcess
-    bootstrap=Path(__file__).resolve().parents[1]/'bridge'/'native_tool_worker.py'
-    worker=RpcProcess([sys.executable,'-B',str(bootstrap)], {'provider':'native-tools'},
-                      operation_timeout=timeout+10)
-    try:
-        result=worker.call('run',{'arguments':arguments,'cwd':str(cwd),'timeout':timeout},{})
-        raw=base64.b64decode(result['output_base64'],validate=True)
-        if len(raw)>1024*1024: raise ValueError('Native tool output exceeds its byte bound')
-        return result['state'],raw
-    finally:
-        worker.close()
+    """Atomic background worker; this never substitutes for MCP SDK stdio."""
+    from fanuc_workbench.bridge.local_tool_job import run_tool
+    from fanuc_workbench.bridge.resource_context import resource_context
+    registry=resource_context().ledger.directory.parent
+    return run_tool(arguments,cwd,timeout,registry=registry)
 
 
-def _run_process(arguments,cwd,timeout,*,contained=False):
+def _run_process(arguments,cwd,timeout,*,contained=False,claim=None):
     """Only the activated owned tool worker calls this compiler launch path."""
     if contained is not True: raise RuntimeError('Use the owned offline tool worker')
     if (not isinstance(arguments,list) or not 1<=len(arguments)<=32
@@ -53,7 +43,8 @@ def _run_process(arguments,cwd,timeout,*,contained=False):
     log_path=folder/('native-tool-'+uuid.uuid4().hex+'.log')
     from fanuc_workbench.bridge.resource_context import resource_context
     from fanuc_workbench.bridge.process_identity import creation_time
-    claim=resource_context().begin('compiler-process')
+    external_claim=claim is not None
+    if claim is None: claim=resource_context().begin('compiler-process')
     process=None;output=bytearray();truncated=False;drain_errors=[]
     def drain():
         nonlocal truncated
@@ -73,7 +64,8 @@ def _run_process(arguments,cwd,timeout,*,contained=False):
         # native descendants inherit containment before they execute.
         process=subprocess.Popen(arguments,cwd=cwd,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
                                  close_fds=True,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
-        claim.bind(process.pid,creation_time(process._handle))
+        if external_claim: claim.bind_handle(process._handle,process.pid)
+        else: claim.bind(process.pid,creation_time(process._handle))
         thread=threading.Thread(target=drain,daemon=True);thread.start()
         timed_out=False
         try: process.wait(timeout=timeout)

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Prepared atomic local MakeTP/PrintTP background jobs using the reviewed shared
+  resource API: durable reservation before resume, exact worker activation,
+  compiler-step identity receipts, one active job, eight-process/512 MiB limits,
+  bounded file IPC/logs and no inherited MCP streams. Preserve uncertain outcomes
+  without retries. Installed offline profiles remain unchanged; real native
+  compiler and GUI/controller acceptance are separate.
+
 - Added timestamp checkpoint `26.1022.180303` with an explicit direct
   `--offline` profile: 15 saved-evidence tools, zero robots/writes, no extension,
   native utility, worker, shared-host or protocol-preview routes. Refuse

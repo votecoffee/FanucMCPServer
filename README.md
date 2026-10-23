@@ -13,7 +13,7 @@ legacy commands remain compatible with the former FANUC Workbench name.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1022.180303** (America/New_York). App,
+The current source checkpoint is **26.1023.072945** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
@@ -91,7 +91,11 @@ share the owning worker's bounded dispatcher. See [worker ownership](docs/SERVIC
 Private feature/native workers also have a bounded inventory and creation-bound
 Windows handles. RPC workers now use the shared durable ledger; remaining launch paths are listed in
 the [resource ownership matrix](docs/RESOURCE_OWNERSHIP.md); release acceptance is pending.
-Offline compiler and host-policy helpers share the owned-worker lifecycle.
+Offline compiler utilities use atomically created private background jobs, bounded
+file IPC and hash-checked executables. Each utility job admits at most eight
+processes and 512 MiB of private commit; the actual caller owns its lifetime.
+Host-policy helpers retain their separate owned RPC lifecycle. Native utility
+runtime acceptance is required before enabling a candidate installation.
 ROBOGUIDE integration stages backups for a separately opened user session;
 automatic application launch remains unavailable pending ownership acceptance.
 Installed plugin/plain MCP connections use an owned stdio supervisor in the

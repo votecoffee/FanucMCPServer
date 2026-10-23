@@ -11,29 +11,24 @@ from fanuc_workbench.services import native_validation as module
 
 @pytest.mark.parametrize("failure", [False, True])
 def test_compile_routes_through_owned_worker_and_always_closes(monkeypatch, tmp_path, failure):
-    from fanuc_workbench.bridge import extension_process
+    from fanuc_workbench.bridge import local_tool_job, resource_context
     events = []
-    class Worker:
-        def __init__(self, command, ready_fields, **kwargs):
-            assert ready_fields == {"provider": "native-tools"}
-            assert command[-1].endswith("native_tool_worker.py")
-            events.append("owned-start")
-        def call(self, operation, arguments, context):
-            assert operation == "run" and arguments["timeout"] == 10
-            events.append("dispatch")
-            if failure:
-                raise RuntimeError("Inert unverified tool outcome")
-            return {"state": {"returncode": 0}, "output_base64": base64.b64encode(b"retained log").decode()}
-        def close(self):
-            events.append("close-owned-tree")
-    monkeypatch.setattr(extension_process, "RpcProcess", Worker)
+    def run(arguments, cwd, timeout, *, registry):
+        assert arguments == ["inert"] and cwd == tmp_path and timeout == 10
+        assert registry == tmp_path / "registry"
+        events.append("atomic-owned-job")
+        if failure: raise RuntimeError("Inert unverified tool outcome")
+        return {"returncode": 0}, b"retained log"
+    monkeypatch.setattr(local_tool_job, "run_tool", run)
+    monkeypatch.setattr(resource_context, "resource_context", lambda: SimpleNamespace(
+        ledger=SimpleNamespace(directory=tmp_path / "registry/resources")))
     if failure:
         with pytest.raises(RuntimeError):
             module._run(["inert"], tmp_path, 10)
     else:
         state, output = module._run(["inert"], tmp_path, 10)
         assert state["returncode"] == 0 and output == b"retained log"
-    assert events == ["owned-start", "dispatch", "close-owned-tree"]
+    assert events == ["atomic-owned-job"]
 
 
 @pytest.mark.parametrize("timed_out,truncated", [(False, False), (True, False), (False, True)])
