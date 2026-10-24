@@ -3,16 +3,16 @@ import asyncio
 import os
 import secrets
 import time
+import hashlib
 from contextlib import nullcontext
 from typing import Annotated
 from pathlib import Path
 
-from fanuc_workbench.bridge.service import RobotBridge
 from fanuc_workbench.identity import APP_NAME, configuration_environment
 from fanuc_workbench.version import DISPLAY_VERSION, add_version_argument
 
 
-def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_identity=None, protocol_preview=False, offline=False, local_native=None):
+def create_server(bridge: "RobotBridge", *, guidance=None, skills=True, frontend_identity=None, protocol_preview=False, offline=False, local_native=None):
     from fanuc_workbench.bridge import offline_profile
     if offline and local_native is not None:
         raise ValueError("Select one explicit standalone profile")
@@ -44,8 +44,9 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
 
     from fanuc_workbench.bridge.guidance import WorkflowGuidance
     from fanuc_workbench.bridge.protocol import FanucServer, feature_report
-    from fanuc_workbench.bridge.job_tasks import JobTasks, job_id as task_job_id, owner_hash
-    from fanuc_workbench.bridge.artifact_resources import ArtifactResources
+    if protocol_preview:
+        from fanuc_workbench.bridge.job_tasks import JobTasks, job_id as task_job_id
+        from fanuc_workbench.bridge.artifact_resources import ArtifactResources
     guidance = guidance or WorkflowGuidance(bridge.config.state_dir / "workflow-guidance")
     tasks = JobTasks(bridge, frontend_identity) if protocol_preview and skills and frontend_identity is not None else None
     artifacts = ArtifactResources(bridge) if protocol_preview and skills else None
@@ -79,7 +80,7 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
     server.workflow_guidance = guidance  # Local embedding/admin API, never an MCP write route.
     server.job_tasks = tasks
     server.artifact_resources = artifacts
-    principal_hash = owner_hash(frontend_identity)
+    principal_hash = hashlib.sha256(frontend_identity.encode()).hexdigest() if frontend_identity else None
 
     def authorized_job(identifier):
         bridge.operations.jobs.authorize_owner(identifier, principal_hash)
@@ -101,6 +102,8 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
                 try:
                     if inspect.iscoroutinefunction(function):
                         return await function(*args, **kwargs)
+                    if offline and hasattr(bridge, "run_data") and not control:
+                        return await bridge.requests.run(bridge.run_data, function, *args, **kwargs)
                     return await bridge.requests.run(function, *args, control=control, **kwargs)
                 except FileNotFoundError:
                     if restricted:
@@ -112,6 +115,15 @@ def create_server(bridge: RobotBridge, *, guidance=None, skills=True, frontend_i
                     raise
                 except RequestQueueFull:
                     raise ToolError("Request capacity reached; inspect current work and wait for an owning request to finish") from None
+                except MemoryError:
+                    if offline:
+                        raise ToolError("Offline data request exceeded the bounded process memory budget; inspect retained evidence before smaller reads") from None
+                    raise
+                except Exception as exc:
+                    from fanuc_workbench.bridge.offline_admission import OfflineWorkBusy
+                    if isinstance(exc, OfflineWorkBusy):
+                        raise ToolError(str(exc)) from None
+                    raise
             return server.tool(annotations=annotations)(concurrent)
         return decorate
 

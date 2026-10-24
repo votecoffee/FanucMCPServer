@@ -9,13 +9,12 @@ import threading
 
 from fanuc_workbench.bridge.config import BridgeConfig
 from fanuc_workbench.bridge.offline_profile import validate
-from fanuc_workbench.bridge.operations import WorkbenchOperations
 from fanuc_workbench.bridge.requests import RequestDispatcher
-from fanuc_workbench.bridge.service import RobotBridge
+from fanuc_workbench.bridge.evidence_io import append_audit, artifact_folder
 from fanuc_workbench.bridge.storage import ArtifactStore, RobotBusyError, RobotLocks
 
 
-OFFLINE_CLIENT_LIMIT = 8
+OFFLINE_CLIENT_LIMIT = 32
 _uncertain_leases = []
 
 
@@ -25,15 +24,18 @@ class OfflineOperations:
         self.bridge = bridge
         self.store = ArtifactStore(bridge.config.state_dir)
 
-    import_workspace = WorkbenchOperations.import_workspace
-    read_metadata = WorkbenchOperations.read_metadata
-    compare = WorkbenchOperations.compare
-    inspect_program = WorkbenchOperations.inspect_program
-    audit = WorkbenchOperations.audit
-    transform_pose = staticmethod(WorkbenchOperations.transform_pose)
+    def __getattr__(self, name):
+        if name not in {"import_workspace", "read_metadata", "compare", "inspect_program", "audit", "transform_pose"}:
+            raise AttributeError(name)
+        from fanuc_workbench.bridge.operations import WorkbenchOperations
+        function = getattr(WorkbenchOperations, name)
+        if name == "transform_pose":
+            return function
+        return lambda *a, **kw: function(self, *a, **kw)
 
 
 class OfflineBridge:
+    offline_metadata = True
     def __init__(self, config, *, config_path=None):
         validate(config)
         self.config, self.config_path = config, config_path
@@ -48,9 +50,16 @@ class OfflineBridge:
             config.robot_lock_timeout_seconds, configuration_supplier=lambda: self.config)
         self.operations = OfflineOperations(self)
 
-    _audit = RobotBridge._audit
-    _folder = RobotBridge._folder
-    list_robots = RobotBridge.list_robots
+    _audit = append_audit
+    _folder = artifact_folder
+
+    def list_robots(self):
+        return {"allow_writes": False, "write_scope": self.config.write_scope, "robots": []}
+
+    def run_data(self, function, *args, **kwargs):
+        from fanuc_workbench.bridge.offline_admission import OfflineWorkGate
+        return OfflineWorkGate(self.config.state_dir).run(function, *args,
+            cancel_event=self.requests.cancel_event, **kwargs)
 
     def management_activity(self):
         from fanuc_workbench.bridge.owned_workers import workers
@@ -72,10 +81,12 @@ def owned_offline_bridge(config_path, *, factory=OfflineBridge):
     config_path = config_path.resolve()
     config = BridgeConfig.load(config_path)
     validate(config)  # Mandatory before admission or state/dispatcher creation.
-    slots = RobotLocks(config.state_dir / "mcp-owner" / "offline-clients")
+    # This separate transport budget also bounds direct development entrypoints.
+    # Neither these leases nor legacy idle peers occupy the data-work budget.
+    slots = RobotLocks(config.state_dir / "mcp-owner" / "metadata-clients")
     lease = None
     for index in range(OFFLINE_CLIENT_LIMIT):
-        candidate = slots.acquire(f"offline-client-{index}")
+        candidate = slots.acquire(f"metadata-client-{index}")
         try:
             candidate.__enter__()
         except RobotBusyError:
@@ -83,7 +94,7 @@ def owned_offline_bridge(config_path, *, factory=OfflineBridge):
         lease = candidate
         break
     if lease is None:
-        raise SystemExit("FANUC offline client capacity reached (8 per evidence state); close an owning chat and reconnect")
+        raise SystemExit("Offline metadata connection capacity reached (32); data worker capacity is separate")
     try:
         bridge = factory(config, config_path=config_path)
     except BaseException:
@@ -95,7 +106,7 @@ def owned_offline_bridge(config_path, *, factory=OfflineBridge):
         try:
             bridge.close()
         except BaseException:
-            _uncertain_leases.append(lease)  # Kernel releases only at actual exit.
+            _uncertain_leases.append(lease)
             raise
         else:
             lease.__exit__(None, None, None)

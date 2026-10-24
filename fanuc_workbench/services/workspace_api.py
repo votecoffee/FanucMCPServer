@@ -33,9 +33,7 @@ def page(rows, offset=0, limit=100):
             "next_offset": offset + limit if offset + limit < len(rows) else None}
 
 
-ANALYSES = ("health", "options", "alarms", "alarm_intelligence", "mastering", "dcs", "ethernetip",
-            "lint", "programs", "dependencies", "unused_programs", "xref", "register_usage",
-            "comments", "positions", "variables", "numeric_registers", "position_registers", "frames", "io")
+from fanuc_workbench.services.analysis_catalog import ANALYSES
 
 
 class WorkspaceService:

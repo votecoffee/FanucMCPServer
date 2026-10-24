@@ -302,18 +302,12 @@ class RobotBridge:
         return value
 
     def _audit(self, action: str, **fields) -> None:
-        record = {"at": datetime.now(timezone.utc).isoformat(), "action": action, **fields}
-        if self.requests.current_request_id:
-            record["request_id"] = self.requests.current_request_id
-        with self._audit_lock, self.audit_locks.acquire("journal", timeout=15), (self.config.state_dir / "audit.jsonl").open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(record) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
+        from fanuc_workbench.bridge.evidence_io import append_audit
+        append_audit(self, action, **fields)
 
     def _folder(self) -> Path:
-        folder = self.config.state_dir / uuid.uuid4().hex
-        folder.mkdir()
-        return folder
+        from fanuc_workbench.bridge.evidence_io import artifact_folder
+        return artifact_folder(self)
 
     @staticmethod
     def _display(path: Path, remote: str) -> dict:

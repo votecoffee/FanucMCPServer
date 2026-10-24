@@ -458,7 +458,8 @@ class WorkbenchOperations:
         rows = []
         total = 0
         if path.exists():
-            with self.bridge._audit_lock, self.bridge.audit_locks.acquire("journal", timeout=15), path.open(encoding="utf-8") as stream:
+            with self.bridge._audit_lock, self.bridge.audit_locks.acquire("journal", timeout=15,
+                    cancel_event=self.bridge.requests.cancel_event if getattr(self.bridge, "offline_metadata", False) else None), path.open(encoding="utf-8") as stream:
                 for index, line in enumerate(stream):
                     total = index + 1
                     if offset <= index < offset + limit:

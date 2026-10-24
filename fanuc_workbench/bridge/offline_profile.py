@@ -3,7 +3,7 @@ from contextlib import contextmanager
 import sys
 
 from fanuc_workbench.version import release_metadata
-from fanuc_workbench.services.workspace_api import ANALYSES, WorkspaceService
+from fanuc_workbench.services.analysis_catalog import ANALYSES
 
 
 PROFILE = "standalone-offline"
@@ -32,7 +32,9 @@ def capabilities(bridge):
         "spawned_workers": False, "protocol_preview": False,
         "concurrency": bridge.requests.status(),
         "multi_chat": {"evidence_state": "shared immutable artifact catalog and sources",
-            "client_limit": 8, "admission": "per-client OS lease; released after that client's request drain",
+            "client_limit": 32, "admission": "bounded metadata frontdoors; short-lived data admission only",
+            "data_workers": 8, "data_waiters": 16, "data_wait_seconds": 5,
+            "frontdoor_memory_bytes": 134217728,
             "journal": "shared cross-process append/read lock", "native_owner_lease": "not acquired",
             "job_or_native_recovery": False},
         "evidence_only": True, "local_changes": "hash-manifested copies under the configured state directory"}
@@ -41,6 +43,7 @@ def capabilities(bridge):
 def analyze(bridge, artifact_id, kind, offset=0, limit=100, query=""):
     # The full profile intentionally uses reloadable workers. This selected
     # profile calls the same pure service directly and never consults a registry.
+    from fanuc_workbench.services.workspace_api import WorkspaceService
     return WorkspaceService.analyze(bridge.operations.store.verify(artifact_id), kind, offset, limit, query)
 
 

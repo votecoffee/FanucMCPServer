@@ -47,18 +47,18 @@ def test_offline_peers_share_imports_reads_and_drain_independently(tmp_path):
         assert not second.requests.closed
 
 
-def test_bound_is_eight_and_native_owner_is_preserved(tmp_path):
+def test_transport_bound_is_32_and_native_owner_is_preserved(tmp_path):
     path = policy(tmp_path)
     class InertNativeOwner:
         def __init__(self, *args, **kwargs): pass
         def close(self): pass
     with owned_mcp_bridge(path, factory=InertNativeOwner):
         with ExitStack() as stack:
-            peers = [stack.enter_context(owned_offline_bridge(path)) for _ in range(8)]
-            assert len(peers) == 8
+            peers = [stack.enter_context(owned_offline_bridge(path)) for _ in range(32)]
+            assert len(peers) == 32
             with pytest.raises(SystemExit, match="capacity reached"):
                 with owned_offline_bridge(path):
-                    pytest.fail("Ninth client was admitted")
+                    pytest.fail("33rd transport was admitted")
             with pytest.raises(SystemExit, match="already has an MCP worker"):
                 with owned_mcp_bridge(path, factory=InertNativeOwner):
                     pytest.fail("Offline admission altered the native owner's lease")
@@ -112,7 +112,7 @@ def test_uncertain_local_drain_retains_only_its_slot(tmp_path):
         with pytest.raises(RuntimeError, match="uncertainty"):
             with owned_offline_bridge(path, factory=Broken): pass
         with ExitStack() as stack:
-            for _ in range(7): stack.enter_context(owned_offline_bridge(path))
+            for _ in range(31): stack.enter_context(owned_offline_bridge(path))
             with pytest.raises(SystemExit, match="capacity reached"):
                 with owned_offline_bridge(path): pass
     finally:

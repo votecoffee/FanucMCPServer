@@ -420,7 +420,7 @@ finally: bridge.close()
                 assert denied.is_error
             else:
                 from mcp.shared.exceptions import MCPError
-                with pytest.raises(MCPError, match="Elicitation not supported"):
+                with pytest.raises(MCPError, match="Elicitation not supported|form elicitation capability"):
                     await session.call_tool(commit_tool, args)
             assert not uploaded.exists()
             if client_supports_confirmation:
