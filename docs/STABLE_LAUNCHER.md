@@ -49,9 +49,10 @@ app root/
 Policy state/source paths retain their original absolute data locations. Runtime
 and launcher bytes never depend on the checkout branch or a plugin cache.
 Installation preserves earlier runtimes and live generations. Existing sessions
-keep their original imports; selection applies only to new launches. The existing
-exclusive policy-state lease still refuses a second backend for that state until
-its owner finishes. It does not silently replace or restart that owner.
+keep their original imports; selection applies only to new launches. Offline
+clients hold separate bounded slots and can share the same evidence state.
+Each client drains only its own requests. The native/controller exclusive lease
+remains unchanged; offline views never acquire, replace or release that lease.
 
 ## Publish the connection
 
@@ -93,7 +94,11 @@ another process keeps the input pipe open. Normal EOF follows SDK 2.3's original
 wire-handle claims and closes the app. Protocol stdout carries no logs.
 
 Admission is serialized and limited to eight live offline frontdoors, with at
-most 4096 retained session receipts. Only a positively absent/different prior
+most 4096 retained session receipts. Eight OS-held client slots also bound each
+evidence state, including direct offline clients. Closing/crashing one client
+releases only its own slot. Audit reads/appends share the existing journal lock;
+UUID artifact manifests publish atomically. Offline startup/close does not
+construct a job/native owner or recover another process's journal. Only a positively absent/different prior
 generation with no native intents or children can receive a dead-session receipt.
 Unknown identities and uncertain intents refuse recovery; live peers remain
 untouched. There is no PID/name-global termination, domain retry or journal replay.

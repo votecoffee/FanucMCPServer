@@ -17,12 +17,15 @@ plugin and native skills. There is no universal Codex plugin or broker route.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1023.165651** (America/New_York). App,
+The current source checkpoint is **26.1024.085654** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
 An explicit [direct standalone offline profile](docs/STANDALONE_OFFLINE.md)
 exposes saved-workspace analysis without extension or native launch routes.
+Up to eight offline chats can share an evidence state, with independent request
+drain, immutable artifact publication and cross-process audit locking. Starting
+an offline chat does not acquire native ownership or recover another chat's jobs.
 A separate [local native validation profile](docs/LOCAL_NATIVE_VALIDATION.md)
 adds pinned MakeTP/PrintTP preparation, single-use compilation and diagnostics
 without controller or GUI access. It is a candidate for a coordinated native
@@ -128,7 +131,7 @@ is installed from its own repository with `InstallManager.cmd`; it needs no
 Codex plugin or MCP connection. A newer framework release does not change this
 app's reviewed 0.20.0 pin or migrate a running installation automatically.
 
-MCP workers acquire an exclusive lease for their policy's state directory and
+Controller/local-native MCP workers acquire an exclusive lease for their policy's state directory and
 hold it through shutdown. A second standalone or app-host backend worker using
 that state is refused before service construction. Independent requests still
 share the owning worker's bounded dispatcher. See [worker ownership](docs/SERVICE_MANAGEMENT.md).

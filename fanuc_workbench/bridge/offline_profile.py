@@ -31,6 +31,10 @@ def capabilities(bridge):
         "native_utilities": False, "extension_execution": False, "shared_host": False,
         "spawned_workers": False, "protocol_preview": False,
         "concurrency": bridge.requests.status(),
+        "multi_chat": {"evidence_state": "shared immutable artifact catalog and sources",
+            "client_limit": 8, "admission": "per-client OS lease; released after that client's request drain",
+            "journal": "shared cross-process append/read lock", "native_owner_lease": "not acquired",
+            "job_or_native_recovery": False},
         "evidence_only": True, "local_changes": "hash-manifested copies under the configured state directory"}
 
 

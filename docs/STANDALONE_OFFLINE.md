@@ -57,8 +57,13 @@ never executed as Python or a native application.
 The MCP client owns creation of the frontdoor Python process and any Python
 environment launcher. FANUC does not substitute the framework background launcher
 for SDK stdio or claim post-launch self-registration as pre-launch containment.
-The actual surviving MCP process holds the exclusive state-directory OS lease
-through request drain. Its startup/stop audit receipts retain the shared resource
+Up to eight offline processes share an evidence state through separate OS-held
+client slots. The actual surviving process holds its own slot through its request
+drain. It does not construct controller/native/job owners, acquire their exclusive
+lease or recover/replay any job. Immutable artifact IDs are unique, catalog entries
+publish atomically and audit appends/reads share the existing cross-process
+journal lock. A client can read a workspace imported by another client; closing
+one leaves its peers available. Startup/stop audit receipts retain the shared resource
 API's host/PID/creation FILETIME/executable and owner-generation identity. No
 temporary registration helper owns it. This profile starts no Node/shell, feature
 worker, native worker, compiler, service/SCM launcher or attached user application.
@@ -73,5 +78,7 @@ reconciliation remain outside its scope, untouched and unavailable.
 Source/stub and harmless process fixtures are separate from real MCP acceptance.
 Before release, an authorized disposable direct canary must verify the actual
 installed/cache versions and normal SDK initialization, useful saved-file read,
-duplicate/reconnect refusal, EOF/drain and abnormal-loss identities. Check manager
+simultaneous same-policy initialization, concurrent imports/reads/audit, peer
+preservation through EOF/crash/reconnect and exact loss identities. Capacity
+refusal must apply to a ninth client, not ordinary second-chat access. Check manager
 offline/restart refusal and preserve the exact wheel/plugin/config hashes.

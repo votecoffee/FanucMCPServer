@@ -67,15 +67,22 @@ Old detached instances cannot be safely retired from zero counters alone: their
 reporting-only endpoint cannot atomically fence admission or attest to uncertain
 effects. Do not bulk-kill names/PIDs or clear restart journals.
 
-## Exclusive worker admission
+## Worker admission
 
-The standalone entrypoint and experimental app-host backend acquire the same OS
+The controller/local-native standalone entrypoint and experimental app-host backend acquire the same OS
 lease under the configured `state_dir/mcp-owner` before constructing their
 bridge. The limit is **one MCP worker per state directory**, including aliases
 of that directory. Extra connections fail with an ownership message; they do not
 wait in a startup queue, attach to the existing worker or select another route.
 Use the owning client's bounded concurrent requests. Multi-chat shared hosting
 remains a separate, explicit deployment choice.
+
+The saved-evidence `--offline` profile admits up to eight independent clients per
+state directory. These views use separate OS-held slots, share immutable artifact
+publication and the existing audit lock, and drain their own requests. They never
+construct/reconcile a job/native owner or acquire/release its exclusive lease.
+An offline second chat does not require a shared-host migration or replacing a
+live legacy peer. Stable-launcher frontdoor limits also remain unchanged.
 
 The lease stays held through bridge/job/native shutdown, independent of tray
 availability and launcher survival. If draining fails, the lease is retained

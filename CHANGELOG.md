@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Fixed offline multi-chat admission: eight independent per-state OS slots,
+  per-client request drain, shared audit locking and immutable artifact imports.
+  Offline startup no longer constructs an online/native/job owner or takes its
+  lifetime-exclusive state lease. Controller/local-native ownership remains
+  exclusive; no job/native journal recovery or replay is added.
+
 - Added an app-owned stable offline launcher with retained base Python,
   hash-verified immutable runtimes, exact CAS selection/backups and no dependency
   on Codex plugin caches or checkout branches. InstallMCP.cmd prepares without

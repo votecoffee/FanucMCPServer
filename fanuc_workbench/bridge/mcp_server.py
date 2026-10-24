@@ -536,6 +536,7 @@ def main() -> None:
     if args.config is None:
         parser.error("--config or FANUC_MCP_SERVER_CONFIG is required")
     from fanuc_workbench.bridge.instance_owner import owned_mcp_bridge
+    from fanuc_workbench.bridge.offline_service import owned_offline_bridge
     from fanuc_workbench.bridge.management import report_service
     from fanuc_workbench.bridge.resource_context import configure_resource_registry, close_resource_context
     from fanuc_workbench.bridge import offline_profile
@@ -545,7 +546,9 @@ def main() -> None:
         native_policy = NativeToolPolicy(args.local_native_policy)
     restricted = args.offline or native_policy is not None
     configure_resource_registry(args.management_registry)
-    with owned_mcp_bridge(args.config, validate=offline_profile.validate if restricted else None) as bridge:
+    owner = (owned_offline_bridge(args.config) if args.offline else
+             owned_mcp_bridge(args.config, validate=offline_profile.validate if restricted else None))
+    with owner as bridge:
         native_service = None
         if native_policy is not None:
             from fanuc_workbench.services.local_native import LocalNativeValidation

@@ -9,7 +9,7 @@ it is not a second recovery database. Installation/process acceptance is pending
 
 ## Worker source safeguards
 
-The standalone and app-host backend use one exclusive worker lease per policy
+The controller/local-native standalone and app-host backend use one exclusive worker lease per policy
 state directory. A process-local inventory additionally admits at most 16 private
 feature/native workers, including retiring generations and uncertain cleanup.
 It retains failed owners and exact handles until cleanup is established or the
@@ -61,7 +61,7 @@ application Quit/Exit, saves user documents or closes attached software.
 
 | Path | Ownership and current source behavior | Remaining release requirement |
 | --- | --- | --- |
-| Direct standalone offline | Explicit `--offline` dispatch allowlist, zero robots/writes, actual frontdoor identity audit and exclusive state lease; stable app-owned base Python serves in process, one-actor/512 MiB job, no child/native/extension routes; kernel generation and exact parent-loss receipts | Retain per-install stable-entry SDK discovery, reads, EOF/crash/client-loss, immutable update and identity evidence; desktop activation remains separate |
+| Direct standalone offline | Explicit `--offline` dispatch allowlist, zero robots/writes, up to eight independent client slots per evidence state; no native/job owner or journal recovery; shared audit lock and immutable atomic artifacts; stable in-process base Python, one-actor/512 MiB job, exact parent-loss receipts | Retain real simultaneous same-policy clients, cross-client artifact reads/imports/audit, EOF/crash/reconnect and live-peer preservation; desktop activation remains separate |
 | Direct standalone local-native candidate | Separate `--local-native-policy` selection; saved-evidence tools plus five pinned local compilation tools; same zero-robot/write refusal; one single-use validation pipeline; atomic private utility jobs and retained uncertainty | Source/package and harmless fixture checks, followed by separately coordinated actual native compiler/foreground cleanup acceptance |
 | Full installed plugin/plain MCP stdio | Installed-runtime supervisor, durable report-only launcher/worker records, retained handles, activation before MCP startup, opaque SDK streams, private job and EOF drain | Real startup/duplicate/EOF/owner-death, package and Codex acceptance |
 | App-host backend | New publications use the same supervisor; explicit registry allowlist propagation and exclusive state-directory lease; unmanaged older publications refuse startup pending explicit republish | Real host/retained-worker lifecycle and registry acceptance |
