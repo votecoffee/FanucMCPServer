@@ -1,6 +1,8 @@
 """Minimal direct stdio profile: saved evidence only, with no child launch routes."""
 from contextlib import contextmanager
+import os
 import sys
+import uuid
 
 from fanuc_workbench.version import release_metadata
 from fanuc_workbench.services.analysis_catalog import ANALYSES
@@ -51,11 +53,19 @@ def analyze(bridge, artifact_id, kind, offset=0, limit=100, query=""):
 def lifetime_receipt(bridge, context=None, *, profile=PROFILE):
     # This is the actual surviving MCP process. The client owns its launch;
     # never misrepresent a post-launch self record as pre-launch containment.
-    if context is None:
-        from fanuc_workbench.bridge.resource_context import resource_context
-        context = resource_context()
-    owner = {"owner_id": context.owner.owner_id, "identity": context.owner.identity.model_dump(mode="json"),
-            "ownership": "client-owned-frontdoor", "profile": profile}
+    if context is None and profile == PROFILE and getattr(bridge, "offline_metadata", False):
+        # Metadata clients have no native launch/attachment authority. Their
+        # stable process receipt and OS metadata lease already own admission;
+        # a provenance ID must not create/close an unrelated resource owner.
+        from universal_tools.windows_resources import ProcessDriver
+        owner = {"owner_id": uuid.uuid4().hex, "identity": ProcessDriver().capture(os.getpid()),
+                 "ownership": "client-owned-frontdoor", "profile": profile}
+    else:
+        if context is None:
+            from fanuc_workbench.bridge.resource_context import resource_context
+            context = resource_context()
+        owner = {"owner_id": context.owner.owner_id, "identity": context.owner.identity.model_dump(mode="json"),
+                 "ownership": "client-owned-frontdoor", "profile": profile}
     bridge._audit("offline_owner_started", **owner)
     try:
         yield

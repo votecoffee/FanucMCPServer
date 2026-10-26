@@ -4,6 +4,7 @@ from contextlib import ExitStack
 from concurrent.futures import ThreadPoolExecutor
 import json
 import threading
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,6 +12,27 @@ from fanuc_workbench.bridge import offline_service
 from fanuc_workbench.bridge.instance_owner import owned_mcp_bridge
 from fanuc_workbench.bridge.mcp_server import create_server
 from fanuc_workbench.bridge.offline_service import owned_offline_bridge
+
+
+def test_metadata_provenance_never_creates_or_closes_native_resource_owner(monkeypatch):
+    from fanuc_workbench.bridge import offline_profile, resource_context
+    from universal_tools.windows_resources import ProcessDriver
+    identity = {"host_id": "a" * 64, "pid": 123, "created": "456", "executable": "synthetic.exe"}
+    monkeypatch.setattr(ProcessDriver, "capture", lambda *_: identity)
+    def forbidden():
+        pytest.fail("An offline metadata client must not construct a native resource owner")
+    monkeypatch.setattr(resource_context, "resource_context", forbidden)
+    monkeypatch.setattr(resource_context, "_context", None)
+    events = []
+    bridge = SimpleNamespace(offline_metadata=True, _closed=False,
+        _audit=lambda action, **fields: events.append((action, fields)))
+    with offline_profile.lifetime_receipt(bridge):
+        bridge._closed = True
+    resource_context.close_resource_context()
+    assert [event[0] for event in events] == ["offline_owner_started", "offline_owner_stopped"]
+    assert events[0][1] == events[1][1]
+    assert events[0][1]["identity"] == identity
+    assert len(events[0][1]["owner_id"]) == 32
 
 
 def policy(tmp_path):

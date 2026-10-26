@@ -44,6 +44,10 @@ Policies are generated and parsed through production code. Validate the explicit
 zero-robot/write-disabled profile before admission. Do not construct a native,
 controller or JobManager owner merely to answer metadata. Preserve uncertain
 journals, workspace hashes, atomic catalog publication and shared audit locks.
+Offline lifetime audit provenance uses its own ID and actual process identity;
+it does not create or close a native resource-ledger owner. Stable process
+receipts and OS metadata leases retain admission/lifetime evidence. Native and
+local-native profiles keep their existing resource ownership and close barriers.
 
 The stable entry change is an explicit bootstrap migration. The installer needs
 `--expected-bootstrap-sha256` as well as the exact prior selection hash. It first
