@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fanuc-mcp-server-bridge"
-version = "26.1026.92555"
+version = "26.1026.103131"
 description = "Standalone local FanucMCPServer MCP runtime using the shared services"
 requires-python = ">=3.11"
 dependencies = ["mcp==2.3.0", "universal-codex-tools==0.20.0", "paramiko>=3.5", "XlsxWriter>=3.2", "reportlab>=4.2", "pywin32>=311; sys_platform == 'win32'"]

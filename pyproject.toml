@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fanuc-mcp-server"
-version = "26.1026.92555"
+version = "26.1026.103131"
 description = "MCP server and desktop workbench for FANUC robot files, diagnostics, and reviewed changes."
 readme = "README.md"
 requires-python = ">=3.11"
