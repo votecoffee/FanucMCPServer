@@ -122,6 +122,7 @@ def build(source: Path, output: Path, framework_wheel: Path):
     shutil.copyfile(source / "docs" / "RESOURCE_OWNERSHIP.md", docs / "RESOURCE_OWNERSHIP.md")
     shutil.copyfile(source / "docs" / "RELEASE_VERSIONING.md", docs / "RELEASE_VERSIONING.md")
     shutil.copyfile(source / "docs" / "STANDALONE_OFFLINE.md", docs / "STANDALONE_OFFLINE.md")
+    shutil.copyfile(source / "docs" / "CONNECTION_READINESS.md", docs / "CONNECTION_READINESS.md")
     shutil.copyfile(source / "docs" / "LOCAL_NATIVE_VALIDATION.md", docs / "LOCAL_NATIVE_VALIDATION.md")
     shutil.copyfile(source / "docs" / "CONFIG_PUBLICATION.md", docs / "CONFIG_PUBLICATION.md")
     shutil.copyfile(source / "docs" / "STABLE_LAUNCHER.md", docs / "STABLE_LAUNCHER.md")

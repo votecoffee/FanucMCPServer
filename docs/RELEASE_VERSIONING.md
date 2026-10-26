@@ -2,7 +2,7 @@
 
 The app, desktop and headless Python distributions, MCP server information and
 standalone Codex plugin share one fixed release timestamp. The current source
-checkpoint is **26.1024.085654**, selected in **America/New_York**. It identifies
+checkpoint is **26.1024.102540**, selected in **America/New_York**. It identifies
 source/package bytes; it does not attest to installation or native acceptance.
 Framework, MCP SDK/protocol, file schema and feature-extension versions are
 independent and are not restamped with the application.
@@ -13,8 +13,8 @@ The human display uses `YY.MMDD.HHmmss`, including all leading zeros. Python
 PEP 440 and strict SemVer package/plugin identities use the same three numeric
 components with leading zeros removed. For example, display `26.0102.030405`
 has package/plugin identity `26.102.30405`. Compare numeric identities rather
-than padded strings. The current display `26.1024.085654` has canonical package
-identity `26.1024.85654`.
+than padded strings. The current display `26.1024.102540` has canonical package
+identity `26.1024.102540`.
 
 `fanuc_workbench/version.py` holds the chosen timestamp and the normalization
 rules. Calendar/time validation includes leap years and rejects impossible dates
@@ -29,7 +29,7 @@ Windows assembly/file fields have bounded numeric components. If a Windows
 resource or .NET wrapper is built, retain the three-part requested version for
 Product/Informational/package metadata and map file/assembly fields to
 `YY.MMDD.HHmm.ss`. The example becomes `26.102.304.5`; the current mapping is
-`26.1024.856.54`. Every field fits a 16-bit unsigned integer. This Python app
+`26.1024.1025.40`. Every field fits a 16-bit unsigned integer. This Python app
 does not currently produce a .NET assembly or rewrite Python's executable.
 
 ## Stamp once, then verify and build

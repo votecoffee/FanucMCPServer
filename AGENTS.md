@@ -19,3 +19,7 @@ examples and documentation that applies to all users.
 - Follow `CONTRIBUTING.md` for development and validation. Distinguish offline
   checks from controller acceptance; never infer native behavior from file
   transfer success alone.
+- Follow `docs/CONNECTION_READINESS.md` when changing imports, tools, launchers or
+  admission. Classify metadata versus data/native cost; verify cold saved-route
+  startup, expected multi-chat demand and lifecycle behavior without retiring
+  legitimate peers. Preserve failed cases and private evidence under `.local/`.

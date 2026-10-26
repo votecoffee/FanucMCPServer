@@ -133,6 +133,7 @@ def main():
     parser.add_argument("--expected-selection-sha256", required=True, help="Exact selection hash, or absent on first install")
     parser.add_argument("--management-registry", required=True, type=Path)
     parser.add_argument("--installed-plugin-version", help="Observed plugin version when registration is deferred")
+    parser.add_argument("--expected-bootstrap-sha256", help="Exact prior entry hash for a reviewed bootstrap migration")
     parser.add_argument("--register", choices=("none", "plugin"), default="plugin")
     parser.add_argument("--codex-home", type=Path)
     args = parser.parse_args()
@@ -155,7 +156,8 @@ def main():
     generated_file(root, "wheel-inventory.json", encoded(inventory(wheels)))
     result = install(args.runtime_dir, wheels, wheel_manifest, args.config,
         expected_selection=args.expected_selection_sha256, registry=args.management_registry,
-        plugin_version=args.installed_plugin_version or versions.PACKAGE_VERSION)
+        plugin_version=args.installed_plugin_version or versions.PACKAGE_VERSION,
+        expected_bootstrap=args.expected_bootstrap_sha256)
     connection = {"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
         "mcpServers":{"fanuc-mcp-server":{"type":"stdio", **result["connection"]}}}
     generated_file(root, "plugin/mcp.json", json.dumps(connection, indent=2).encode())

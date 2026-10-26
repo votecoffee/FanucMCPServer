@@ -29,7 +29,7 @@ For updates, supply the exact SHA-256 of `launcher/current.json` instead of
 `absent`. The installer refuses stale selection, existing release directories,
 unowned roots, changed stable bootstrap bytes, linked paths or tampered prior
 payloads. Incomplete/failed staging stays available for inspection. A bootstrap
-change needs a separately reviewed migration; ordinary backend updates preserve
+change needs a separately reviewed migration with `--expected-bootstrap-sha256`; ordinary backend updates preserve
 the stable entry bytes. Never bypass refusal by deleting uncertain files.
 
 The layout is:
@@ -42,6 +42,10 @@ app root/
   launcher/snapshots/hash/  retained hash-bound manifest
   launcher/backups/         exact prior selection bytes
   runtimes/release/          immutable packages, offline policy and metadata
+    dependencies.zip        pure Python dependency/application code
+    stdlib.zip              selected standard library
+    native/                 declared native extensions and DLLs
+    guidance/               explicit current workflow documents
   receipts/                 installation receipts
   sessions/                 durable process-generation and cleanup receipts
 ```
@@ -58,9 +62,15 @@ remains unchanged; offline views never acquire, replace or release that lease.
 
 Use the exact connection returned by installation: app-owned
 `python/pythonw.exe`, `-I -B` and the absolute `StartMcp.py`, with the app root
-as `cwd`. The bootstrap verifies the selected Python and full backend inventory
+as `cwd`. The bootstrap verifies the selected Python bootstrap/native closure and full backend inventory
 before importing MCP packages. Missing, malformed, tampered or linked selections
 refuse startup without falling back to another release or profile.
+
+Archives and native payloads stay pinned against writes/replacement from
+verification through process exit. Imports use only those archives and exact
+manifest-declared native extensions. Unselected legacy standard-library files,
+new native-directory modules and unsafe archive member paths are refused.
+The installer retains its original unpacked staging for payload comparison.
 
 The bundle installer `InstallPlugin.cmd --bundle ...` now uses this contract and
 requires the same explicit policy, expected-selection hash and registry. It
@@ -82,7 +92,7 @@ Do not edit immutable cache files or restore stale global backups.
 
 The actual windowless interpreter serves MCP in process. No app-created helper,
 shell, Node process, venv redirector or native child route is enabled. A private
-Windows Job admits one actor and 512 MiB private commit; the job handle lives
+Windows Job admits one actor and 128 MiB private commit; the job handle lives
 through actual process exit. The client's SDK may separately own a redirector,
 console host or job. Those actors must be inventoried during client acceptance;
 they are not app-created processes or authority for app cleanup.
@@ -93,9 +103,10 @@ logical `sys.executable` aliases. Parent exit stops this offline process even if
 another process keeps the input pipe open. Normal EOF follows SDK 2.3's original
 wire-handle claims and closes the app. Protocol stdout carries no logs.
 
-Admission is serialized and limited to eight live offline frontdoors, with at
-most 4096 retained session receipts. Eight OS-held client slots also bound each
-evidence state, including direct offline clients. Closing/crashing one client
+Admission is serialized and limited to 32 bounded metadata frontdoors, with at
+most 4096 retained session receipts. 32 OS-held metadata slots also bound each
+evidence state, including direct offline clients. Eight executing data calls and 16 waiters
+are admitted separately, only for the duration of work. Closing/crashing one client
 releases only its own slot. Audit reads/appends share the existing journal lock;
 UUID artifact manifests publish atomically. Offline startup/close does not
 construct a job/native owner or recover another process's journal. Only a positively absent/different prior
@@ -113,3 +124,6 @@ failed/concurrent publication, active-peer preservation, initialize/discovery,
 current guidance, synthetic reads, EOF, abrupt process/parent death and reconnect.
 Package/SDK checks do not prove activation in an already-open desktop chat or
 authorize native/controller acceptance.
+
+See [connection readiness and capacity](CONNECTION_READINESS.md) for steady/legacy
+transition memory budgets, expected chat demand, cold startup and migration recovery.

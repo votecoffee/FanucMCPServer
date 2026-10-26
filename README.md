@@ -17,14 +17,15 @@ plugin and native skills. There is no universal Codex plugin or broker route.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1024.085654** (America/New_York). App,
+The current source checkpoint is **26.1024.102540** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
 An explicit [direct standalone offline profile](docs/STANDALONE_OFFLINE.md)
 exposes saved-workspace analysis without extension or native launch routes.
-Up to eight offline chats can share an evidence state, with independent request
-drain, immutable artifact publication and cross-process audit locking. Starting
+Up to 32 bounded offline metadata connections share an evidence state, with
+eight data calls executing and 16 waiting. Guidance and capabilities stay
+available without data admission; artifact publication and audit locking remain shared. Starting
 an offline chat does not acquire native ownership or recover another chat's jobs.
 A separate [local native validation profile](docs/LOCAL_NATIVE_VALIDATION.md)
 adds pinned MakeTP/PrintTP preparation, single-use compilation and diagnostics
@@ -211,10 +212,10 @@ Launch the desktop interface with:
 .\.venv\Scripts\fanuc-mcp-server-gui.exe
 ```
 
-Configure a connection through **Robot → Connection…**, take or open a backup,
+Configure a connection through **Robot â†’ Connectionâ€¦**, take or open a backup,
 then inspect programs, diagnostics and comparisons. Detailed native setup is in
 the [native API guide](docs/ROBOT_NATIVE_API.md).
-Use **Robot → Manage connections…** to stage profile additions, edits, copies
+Use **Robot â†’ Manage connectionsâ€¦** to stage profile additions, edits, copies
 and removals, then save and select the desired robot. Names are unique; custom
 ports/timeouts are retained, and switching the active target pauses live file polling.
 Live / Recorder remembers watch drafts, binds recordings to their source/watches,
@@ -223,18 +224,18 @@ Use **Open recording JSON** to inspect saved desktop captures offline, including
 paged values/errors, gap-aware trends, timeline/cycle events and the file hash.
 The viewer leaves active collection and connection settings unchanged; see the
 [desktop guide](docs/DESKTOP_GUIDE.md#saved-recordings).
-Use **Help → Open desktop log folder** for local startup/error diagnostics and
-**Help → About FanucMCPServer** for version and settings locations.
+Use **Help â†’ Open desktop log folder** for local startup/error diagnostics and
+**Help â†’ About FanucMCPServer** for version and settings locations.
 
 ### Controller access mode
 
-Use **Settings → Safeguards and policies…** for the full
+Use **Settings â†’ Safeguards and policiesâ€¦** for the full
 [chat-permissions editor](docs/SAFEGUARDS_GUI.md): online-write permission,
 per-robot targets/read scope, approval method, expiry, limits and app-host
 permissions. Changes require a validated review, retain the original policy and
 do not alter running sessions or contact a controller.
 
-Open **Settings → MCP access…**, select the MCP server's local robot policy,
+Open **Settings â†’ MCP accessâ€¦**, select the MCP server's local robot policy,
 and load it. **Read-only controller access** is checked by default. Save the
 desired mode, then reconnect the MCP server using that file. Existing sessions
 keep their previous policy until reconnected. The **Native Controller** view
@@ -275,7 +276,7 @@ for the offline CLI; native compiler success and controller acceptance remain
 separate checks. Native jobs hash explicitly selected supporting files and retain
 diagnostics when a selected file is unavailable. File pins do not establish
 dependency completeness or compatibility; no fixed vendor layout is assumed.
-The desktop exposes these tools at **Search / Analysis → Program diagnostics**,
+The desktop exposes these tools at **Search / Analysis â†’ Program diagnostics**,
 including opt-in triggered captures from existing native reads. The optional
 reloadable `workbench.programs` 1.1.0 release adds six read analyses through the
 operation catalog while retaining the established tool schemas and original release.
@@ -357,6 +358,9 @@ it requires a compatible controller service/options and never changes assignment
 
 ## Development
 
+Follow [connection readiness and capacity](docs/CONNECTION_READINESS.md), including
+cold startup and expected open-chat demand through the actual stable binding.
+
 Install the test dependencies and run the offline suite:
 
 ```powershell
@@ -388,5 +392,5 @@ validation, and use sanitized examples suitable for a public repository.
 
 ## License
 
-[MIT](LICENSE) © 2026 votecoffee.
+[MIT](LICENSE) Â© 2026 votecoffee.
 Adapted community components retain their [upstream notices and licenses](fanuc_workbench/licenses/THIRD_PARTY_NOTICES.md).

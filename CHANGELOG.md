@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Separated bounded metadata connections from lazy offline data execution:
+  32 connections at 128 MiB each, eight executing data calls and 16 waiters.
+  Metadata/guidance remain available at data saturation. Preserve legacy live
+  generations with explicit transition budgets, source/package/host evidence
+  boundaries, reviewed bootstrap migration and pinned hash-verified archives
+  for cold imports without scanning thousands of loose files.
+
 - Fixed offline multi-chat admission: eight independent per-state OS slots,
   per-client request drain, shared audit locking and immutable artifact imports.
   Offline startup no longer constructs an online/native/job owner or takes its

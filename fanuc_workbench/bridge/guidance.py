@@ -26,7 +26,7 @@ from fanuc_workbench.version import add_version_argument
 
 
 APP_ID = "fanuc-mcp-server"
-ROOT = Path(__file__).resolve().parents[1] / "guidance"
+ROOT = Path(os.environ.get("FANUC_MCP_GUIDANCE_ROOT", Path(__file__).resolve().parents[1] / "guidance"))
 CONTEXT = SimpleNamespace(protocol_version="2026-07-28")
 MAX_POINTER = 1024 * 1024
 

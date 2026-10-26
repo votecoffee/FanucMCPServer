@@ -52,7 +52,7 @@ Status identifies per-chat stdio workers, shared app-host owners or explicitly
 marked validation workers. A per-chat worker is not a shared multi-chat server.
 The reviewed stable offline launcher serves in its surviving windowless Python
 process, admits no app-created children, and records exact parent-loss/EOF/dead
-generation receipts. Its one-actor private job and eight-frontdoor admission
+generation receipts. Its one-actor/128 MiB private job and 32-frontdoor admission
 limit do not adopt SDK console/redirector actors or attached applications.
 Legacy/full-profile Python stdio supervisors stay alive for their children and forward
 opaque bytes through explicit pipes. Client EOF closes worker stdin and lets
@@ -77,12 +77,15 @@ wait in a startup queue, attach to the existing worker or select another route.
 Use the owning client's bounded concurrent requests. Multi-chat shared hosting
 remains a separate, explicit deployment choice.
 
-The saved-evidence `--offline` profile admits up to eight independent clients per
+The saved-evidence `--offline` profile admits up to 32 independent metadata clients per
 state directory. These views use separate OS-held slots, share immutable artifact
 publication and the existing audit lock, and drain their own requests. They never
 construct/reconcile a job/native owner or acquire/release its exclusive lease.
 An offline second chat does not require a shared-host migration or replacing a
-live legacy peer. Stable-launcher frontdoor limits also remain unchanged.
+live legacy peer. Data work is admitted lazily with eight executing calls, 16
+waiters and a five-second admission deadline. Idle chats own no data slot.
+See [connection readiness](CONNECTION_READINESS.md) for measured acceptance and
+the bounded legacy transition; live old clients retain their original limits.
 
 The lease stays held through bridge/job/native shutdown, independent of tray
 availability and launcher survival. If draining fails, the lease is retained

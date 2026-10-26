@@ -31,6 +31,9 @@ native profile activation are separate acceptance steps.
 Use [the stable launcher contract](docs/STABLE_LAUNCHER.md) for published MCP
 routes. Keep immutable updates and exact parent/EOF/dead-generation checks
 separate from native domain acceptance; retain reviewed SDK/framework pins.
+Follow [connection readiness and capacity](docs/CONNECTION_READINESS.md) when
+adding tools. Test expected open-chat demand and cold startup, not just package
+installation or two clients; metadata must not monopolize expensive work slots.
 
 For config publication, follow [the byte-preserving TOML workflow](docs/CONFIG_PUBLICATION.md).
 Use disposable profiles and retain exact before/after bytes. Never apply a fixture

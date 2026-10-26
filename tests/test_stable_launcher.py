@@ -114,9 +114,10 @@ class Driver:
         self.closed = False
     def capture(self, pid):
         return identity(pid)
-    def open(self, observed):
-        assert observed == identity(os.getppid())
-        return SimpleNamespace(wait=lambda ms: False, close=lambda: setattr(self, "closed", True))
+    def _open(self, pid, terminate=False):
+        assert pid == os.getppid() and terminate is False
+        return SimpleNamespace(identity=identity(pid), alive=lambda: True, wait=lambda ms: False,
+            close=lambda: setattr(self, "closed", True))
     def state(self, value):
         return self.prior_state
 
