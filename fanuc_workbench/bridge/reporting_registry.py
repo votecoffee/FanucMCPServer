@@ -1,13 +1,13 @@
 """Read-verify prepared Windows reporting directories without reapplying ACLs.
 
-The framework's private-directory writer is used only for a directory created
-by this instance. Existing permissions are verified on retained, non-reparse
-handles. Never repair another instance's registry while starting or closing.
+Private creation and the first retained handle are one native operation. Existing
+permissions are verified without repair through retained, non-reparse handles.
 """
 import threading
 from pathlib import Path
 
-from universal_tools.management import ManagementRegistry, private_directory
+from universal_tools.management import ManagementRegistry
+from fanuc_workbench.bridge.reporting_directory import open_private_directory
 
 
 class ReportingRegistry(ManagementRegistry):
@@ -65,10 +65,13 @@ class ReportingRegistry(ManagementRegistry):
         import win32con
         import win32file
         if path not in self._handles:
-            handle = win32file.CreateFile(str(path), ntsecuritycon.FILE_READ_ATTRIBUTES |
-                (win32con.READ_CONTROL if private else 0), win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE,
-                None, win32con.OPEN_EXISTING,
-                win32file.FILE_FLAG_BACKUP_SEMANTICS | win32file.FILE_FLAG_OPEN_REPARSE_POINT, None)
+            if private:
+                handle, _created = open_private_directory(self._handles[path.parent][0], path.name)
+            else:
+                handle = win32file.CreateFile(str(path), ntsecuritycon.FILE_READ_ATTRIBUTES |
+                    ntsecuritycon.FILE_LIST_DIRECTORY,
+                    win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE, None, win32con.OPEN_EXISTING,
+                    win32file.FILE_FLAG_BACKUP_SEMANTICS | win32file.FILE_FLAG_OPEN_REPARSE_POINT, None)
             try:
                 identity = self._identity(handle)
                 if private:
@@ -91,13 +94,6 @@ class ReportingRegistry(ManagementRegistry):
             for path in reversed(self.directory.parents):
                 self._pin(path)
             for path in (self.directory, self.directory / "instances"):
-                if path not in self._handles:
-                    try:
-                        path.mkdir(parents=True, exist_ok=False)
-                    except FileExistsError:
-                        pass  # Existing ACLs belong to their owners; verify only.
-                    else:
-                        private_directory(path)
                 self._pin(path, private=True)
 
     def close(self):

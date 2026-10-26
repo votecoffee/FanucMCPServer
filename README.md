@@ -17,7 +17,7 @@ plugin and native skills. There is no universal Codex plugin or broker route.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1026.110126** (America/New_York). App,
+The current source checkpoint is **26.1026.113952** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.

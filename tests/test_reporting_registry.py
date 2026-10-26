@@ -18,9 +18,10 @@ def test_prepared_registry_never_rewrites_populated_peer_acls(tmp_path, monkeypa
     peer.write_bytes(b'preserve exact peer bytes')
     before = bytes(win32security.GetFileSecurity(str(peer), win32security.DACL_SECURITY_INFORMATION))
     owner.close()
-    def forbidden(_):
+    def forbidden(*_):
         pytest.fail("Existing directory permissions must be verified without rewriting")
-    monkeypatch.setattr(module, "private_directory", forbidden)
+    monkeypatch.setattr(win32security, "SetNamedSecurityInfo", forbidden)
+    monkeypatch.setattr(win32security, "SetSecurityInfo", forbidden)
     def publish(index):
         registry = module.ReportingRegistry(directory)
         try:
@@ -193,3 +194,143 @@ def test_unexpected_reporting_permissions_are_visible_and_do_not_block_service(t
         reached_body = True
     assert reached_body and "tray reporting unavailable" in capsys.readouterr().err
     assert bytes(win32security.GetFileSecurity(str(directory), win32security.DACL_SECURITY_INFORMATION)) == before
+
+
+def test_created_directory_cannot_be_replaced_before_first_verification(tmp_path, monkeypatch):
+    import win32security
+    from fanuc_workbench.bridge import reporting_registry as module
+    directory = tmp_path / "created"
+    registry = module.ReportingRegistry(directory)
+    opened = module.open_private_directory
+    observed = []
+    def at_native_return(parent, name):
+        handle, created = opened(parent, name)
+        try:
+            if created:
+                # The kernel returned an already-private, non-delete-shared
+                # handle. This boundary precedes the registry's first verify.
+                registry._verify(handle)
+                identity = registry._identity(handle)
+                path = directory if name == directory.name else directory / name
+                with pytest.raises(OSError):
+                    path.rename(path.with_name(path.name + "-displaced"))
+                assert registry._identity(handle) == identity
+                observed.append((name, created))
+            return handle, created
+        except BaseException:
+            handle.Close()
+            raise
+    monkeypatch.setattr(module, "open_private_directory", at_native_return)
+    def forbidden(*_):
+        pytest.fail("Creation must never use a path or handle ACL rewrite")
+    monkeypatch.setattr(win32security, "SetNamedSecurityInfo", forbidden)
+    monkeypatch.setattr(win32security, "SetSecurityInfo", forbidden)
+    try:
+        registry.prepare()
+        assert observed == [(directory.name, True), ("instances", True)]
+    finally:
+        registry.close()
+
+
+def test_empty_parent_cannot_be_replaced_before_child_creation(tmp_path, monkeypatch):
+    from fanuc_workbench.bridge import reporting_registry as module
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    registry = module.ReportingRegistry(parent / "registry")
+    opened = module.open_private_directory
+    attempts = []
+    def at_native_entry(handle, name):
+        if name == registry.directory.name:
+            with pytest.raises(OSError):
+                parent.rename(tmp_path / "displaced-parent")
+            attempts.append(name)
+        return opened(handle, name)
+    monkeypatch.setattr(module, "open_private_directory", at_native_entry)
+    try:
+        registry.prepare()
+        assert attempts == [registry.directory.name]
+    finally:
+        registry.close()
+
+
+@pytest.mark.parametrize("boundary", ["root", "instances"])
+def test_racing_foreign_directory_keeps_its_acl_and_is_refused(tmp_path, monkeypatch, boundary):
+    import ntsecuritycon
+    import win32security
+    from fanuc_workbench.bridge import reporting_registry as module
+    directory = tmp_path / "registry"
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    acl = win32security.ACL()
+    acl.AddAccessAllowedAceEx(win32security.ACL_REVISION_DS, 3, ntsecuritycon.FILE_ALL_ACCESS,
+                             win32security.CreateWellKnownSid(win32security.WinWorldSid))
+    win32security.SetNamedSecurityInfo(str(foreign), win32security.SE_FILE_OBJECT,
+        win32security.DACL_SECURITY_INFORMATION | win32security.PROTECTED_DACL_SECURITY_INFORMATION,
+        None, None, acl, None)
+    peer = foreign / "retained-peer.txt"
+    peer.write_bytes(b'foreign source must remain unchanged')
+    before = bytes(win32security.GetFileSecurity(str(foreign), win32security.DACL_SECURITY_INFORMATION))
+    opened = module.open_private_directory
+    event = []
+    def replace_before_kernel_open(parent, name):
+        target = directory if boundary == "root" else directory / "instances"
+        if not event and name == target.name:
+            assert not target.exists()
+            foreign.rename(target)
+            event.append(target)
+        return opened(parent, name)
+    monkeypatch.setattr(module, "open_private_directory", replace_before_kernel_open)
+    def forbidden(*_):
+        pytest.fail("A racing existing directory's ACL must never be repaired")
+    monkeypatch.setattr(win32security, "SetNamedSecurityInfo", forbidden)
+    monkeypatch.setattr(win32security, "SetSecurityInfo", forbidden)
+    registry = module.ReportingRegistry(directory)
+    try:
+        with pytest.raises(ValueError, match="permissions"):
+            registry.prepare()
+        assert len(event) == 1
+        assert bytes(win32security.GetFileSecurity(str(event[0]), win32security.DACL_SECURITY_INFORMATION)) == before
+        assert (event[0] / peer.name).read_bytes() == b'foreign source must remain unchanged'
+    finally:
+        registry.close()
+
+
+def test_eight_first_use_creators_share_one_private_directory_identity(tmp_path, monkeypatch):
+    import threading
+    import win32security
+    from fanuc_workbench.bridge import reporting_registry as module
+    directory = tmp_path / "café 工具 🚀"
+    opened = module.open_private_directory
+    barrier = threading.Barrier(8)
+    guard = threading.Lock()
+    results = []
+    def observe(parent, name):
+        if name == directory.name:
+            barrier.wait(10)
+        handle, created = opened(parent, name)
+        with guard:
+            results.append((name, created, module.ReportingRegistry._identity(handle)))
+        return handle, created
+    monkeypatch.setattr(module, "open_private_directory", observe)
+    def forbidden(*_):
+        pytest.fail("Concurrent first use must not rewrite directory ACLs")
+    monkeypatch.setattr(win32security, "SetNamedSecurityInfo", forbidden)
+    monkeypatch.setattr(win32security, "SetSecurityInfo", forbidden)
+    registries = [module.ReportingRegistry(directory) for _ in range(8)]
+    try:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(lambda registry: registry.prepare(), registries))
+        for name in (directory.name, "instances"):
+            group = [row for row in results if row[0] == name]
+            assert len(group) == 8 and sum(row[1] for row in group) == 1
+            assert len({row[2] for row in group}) == 1
+    finally:
+        for registry in registries:
+            registry.close()
+
+
+@pytest.mark.parametrize("name", ["..", "parent/child", "dir\\child", "dir:stream", "registry.", "registry ", "NUL", "COM¹.txt"])
+def test_native_names_cannot_alias_a_different_win32_publication_path(name):
+    from fanuc_workbench.bridge.reporting_directory import open_private_directory
+    with pytest.raises(ValueError, match="ordinary"):
+        open_private_directory(0, name)  # Refuses the name before using a kernel handle.
