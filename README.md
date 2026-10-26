@@ -17,7 +17,7 @@ plugin and native skills. There is no universal Codex plugin or broker route.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1024.102540** (America/New_York). App,
+The current source checkpoint is **26.1026.110126** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
@@ -27,6 +27,9 @@ Up to 32 bounded offline metadata connections share an evidence state, with
 eight data calls executing and 16 waiting. Guidance and capabilities stay
 available without data admission; artifact publication and audit locking remain shared. Starting
 an offline chat does not acquire native ownership or recover another chat's jobs.
+Offline Windows status reporting verifies existing private directory permissions
+without rewriting peers' permissions on every connection; see
+[connection readiness](docs/CONNECTION_READINESS.md) for the lifecycle and capacity contract.
 A separate [local native validation profile](docs/LOCAL_NATIVE_VALIDATION.md)
 adds pinned MakeTP/PrintTP preparation, single-use compilation and diagnostics
 without controller or GUI access. It is a candidate for a coordinated native

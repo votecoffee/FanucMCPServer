@@ -48,6 +48,14 @@ Offline lifetime audit provenance uses its own ID and actual process identity;
 it does not create or close a native resource-ledger owner. Stable process
 receipts and OS metadata leases retain admission/lifetime evidence. Native and
 local-native profiles keep their existing resource ownership and close barriers.
+On Windows, offline status reporting verifies the existing registry directory's
+protected user/SYSTEM permissions through retained non-reparse handles. It
+requires the current user as directory owner and rejects links in the parent path.
+Directory identity and permissions are checked again for later publications.
+Existing inheritable ACLs are retained during each start,
+publication or close. Only directories created by that reporter receive new
+private ACLs. Unexpected permissions disable optional reporting without repairing
+peers or blocking MCP; the connection still exposes no restart authority.
 
 The stable entry change is an explicit bootstrap migration. The installer needs
 `--expected-bootstrap-sha256` as well as the exact prior selection hash. It first

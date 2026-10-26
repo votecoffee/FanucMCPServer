@@ -8,6 +8,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 import importlib.metadata as metadata
 import json
+import os
 from pathlib import Path
 import sys
 import threading
@@ -82,6 +83,10 @@ class ServiceReporting:
                                     restart_allowed=False, restart_reason=RESTART_REASON)
         self.agent = ManagedService("fanuc-mcp-server", "FanucMCPServer", self.status,
             restart=self.deny_restart, plugin_id=PLUGIN_ID if self.running_plugin else None, registry=registry)
+        if os.name == "nt" and getattr(bridge, "offline_metadata", False):
+            from fanuc_workbench.bridge.reporting_registry import ReportingRegistry
+            from universal_tools.management import default_registry
+            self.agent.registry = ReportingRegistry(registry if registry is not None else default_registry())
 
     @staticmethod
     def deny_restart(_request):
@@ -174,7 +179,11 @@ class ServiceReporting:
         self.stopped.set()
         if self.thread:
             self.thread.join(timeout=3)
-        self.agent.close()
+        try:
+            self.agent.close()
+        finally:
+            if os.name == "nt" and getattr(self.bridge, "offline_metadata", False):
+                self.agent.registry.close()
 
 
 @contextmanager
