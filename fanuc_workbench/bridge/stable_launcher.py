@@ -57,6 +57,61 @@ def read(path, maximum=65536):
     return raw
 
 
+@contextmanager
+def session_reader(directory):
+    """Read mutable receipt snapshots from guarded handles, under admission lock.
+
+    Validate/pin the directory once instead of statting every ancestor for each
+    retained receipt. File handles allow atomic receipt replacement by peers;
+    OPEN_REPARSE_POINT checks the object actually read, never a followed link.
+    """
+    directory = ordinary(directory, directory=True)
+    if os.name != "nt":
+        def snapshot(path):
+            if Path(path).parent != directory:
+                raise ValueError("Receipt escaped its guarded directory")
+            return read(path)
+        yield snapshot
+        return
+    import ctypes as c
+    from ctypes import wintypes as w
+    import msvcrt
+    kernel = c.WinDLL("kernel32", use_last_error=True)
+    create = kernel.CreateFileW
+    create.argtypes = [w.LPCWSTR, w.DWORD, w.DWORD, c.c_void_p, w.DWORD, w.DWORD, w.HANDLE]
+    create.restype = w.HANDLE
+    kernel.CloseHandle.argtypes, kernel.CloseHandle.restype = [w.HANDLE], w.BOOL
+    attributes = kernel.GetFileInformationByHandleEx
+    attributes.argtypes, attributes.restype = [w.HANDLE, c.c_int, c.c_void_p, w.DWORD], w.BOOL
+    class Tag(c.Structure):
+        _fields_ = [("attributes", w.DWORD), ("tag", w.DWORD)]
+    def open_checked(path, folder=False):
+        handle = create(str(path), 0x80000000, 3 if folder else 7, None, 3, 0x02200000, None)
+        if handle == c.c_void_p(-1).value:
+            raise OSError(c.get_last_error(), "Receipt could not be opened")
+        tag = Tag()
+        if (not attributes(handle, 9, c.byref(tag), c.sizeof(tag)) or tag.attributes & 0x400
+                or bool(tag.attributes & 0x10) != folder):
+            kernel.CloseHandle(handle)
+            raise ValueError("Receipt is a reparse point or has an unverifiable type")
+        return handle
+    handle = open_checked(directory, True)
+    def snapshot(path):
+        path = Path(path)
+        if path.parent != directory:
+            raise ValueError("Receipt escaped its guarded directory")
+        descriptor = msvcrt.open_osfhandle(open_checked(path), os.O_RDONLY | os.O_BINARY)
+        with os.fdopen(descriptor, "rb") as stream:
+            raw = stream.read(65537)
+        if len(raw) > 65536:
+            raise ValueError("Receipt metadata exceeds its limit")
+        return raw
+    try:
+        yield snapshot
+    finally:
+        kernel.CloseHandle(handle)
+
+
 def parse(raw):
     def unique(pairs):
         result = {}
@@ -479,13 +534,13 @@ class OfflineGeneration:
         self.stop = threading.Event()
         self.guard = threading.RLock()
         self.thread = None
-        with locked(self.directory / "admission.lock"):
+        with locked(self.directory / "admission.lock"), session_reader(self.directory) as receipt:
             paths = list(self.directory.glob("*.json"))
             if len(paths) >= MAX_RECORDS:
                 raise RuntimeError("Offline generation receipt capacity reached; retain and archive receipts before reconnecting")
             active = legacy = 0
             for path in paths:
-                prior = parse(read(path))
+                prior = parse(receipt(path))
                 if prior.get("state") in {"closed", "parent-exited", "reconciled-dead", "failed"}:
                     continue
                 if (prior.get("profile") != "standalone-offline" or prior.get("native_intents") is not False

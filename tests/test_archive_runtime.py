@@ -197,3 +197,36 @@ else: raise AssertionError('Unpaired bytecode was executed')
     result = subprocess.run([sys.executable, "-I", "-B", str(script), str(Path(launch.__file__).resolve()),
         str(runtime)], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
+
+
+def test_guarded_receipt_reader_allows_atomic_peer_publication_and_bounds_data(tmp_path):
+    directory = tmp_path / "sessions"
+    directory.mkdir()
+    path = directory / "receipt.json"
+    path.write_bytes(b'{"state":"active"}')
+    with launch.session_reader(directory) as read:
+        assert read(path) == b'{"state":"active"}'
+        launch.atomic(path, b'{"state":"closed"}')
+        assert read(path) == b'{"state":"closed"}'
+        with pytest.raises(ValueError, match="escaped|file type"):
+            read(tmp_path / "elsewhere.json")
+        path.write_bytes(b"x" * 65537)
+        with pytest.raises(ValueError, match="limit"):
+            read(path)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows receipt directory reparse refusal")
+def test_guarded_receipt_reader_rejects_directory_junction(tmp_path):
+    directory = tmp_path / "sessions"
+    directory.mkdir()
+    other = tmp_path / "other"
+    other.mkdir()
+    junction = directory / "receipt.json"
+    result = subprocess.run(["cmd", "/c", "mklink", "/J", str(junction), str(other)], capture_output=True)
+    assert result.returncode == 0, result.stderr
+    try:
+        with launch.session_reader(directory) as read:
+            with pytest.raises(ValueError, match="reparse|type"):
+                read(junction)
+    finally:
+        junction.rmdir()  # Remove only this test's empty junction, never target contents.
