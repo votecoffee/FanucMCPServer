@@ -84,6 +84,8 @@ def main():
         except Exception as exc:
             kind = type(exc).__name__
             emit({"request_id": identifier, "error_type": kind if re.fullmatch(r"[A-Za-z0-9_]{1,64}", kind) else "WorkerError"})
+        finally:
+            request = result = None  # Release completed payloads before receive blocks.
 
 
 if __name__ == "__main__":

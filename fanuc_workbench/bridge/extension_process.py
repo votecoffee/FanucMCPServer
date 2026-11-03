@@ -190,6 +190,9 @@ class RpcProcess:
                         break
                     except queue.Full:
                         continue
+                # The queue owns the response until consumed. Do not retain its
+                # raw/decoded payload while blocking for the next message.
+                line = value = None
         except Exception:
             pass
         finally:

@@ -143,3 +143,22 @@ def test_offline_receipt_uses_actual_owner_identity_and_preserves_uncertainty(of
     assert rows[-1]["action"] == ("offline_owner_stopped" if closed else "offline_owner_unverified")
     assert all(row["identity"] == identity and row["owner_id"] == "a" * 32 for row in rows)
     assert all(row["ownership"] == "client-owned-frontdoor" for row in rows)
+
+
+def test_offline_cli_never_configures_or_closes_native_resource_ownership(tmp_path, monkeypatch):
+    from contextlib import nullcontext
+    from fanuc_workbench.bridge import mcp_server, management, resource_context
+    path = tmp_path / "offline.json"
+    path.write_text(json.dumps({"state_dir": "state", "source_dir": "inputs", "robots": {}, "allow_writes": False}))
+    def forbidden(*args, **kwargs):
+        pytest.fail("An offline CLI lifetime must not mutate native resource ownership")
+    monkeypatch.setattr(resource_context, "configure_resource_registry", forbidden)
+    monkeypatch.setattr(resource_context, "close_resource_context", forbidden)
+    monkeypatch.setattr(management, "report_service", lambda *a, **k: nullcontext())
+    monkeypatch.setattr(offline_profile, "lifetime_receipt", lambda *a, **k: nullcontext())
+    calls = []
+    monkeypatch.setattr(mcp_server, "create_server", lambda *a, **k: SimpleNamespace(run=lambda **kw: calls.append(kw)))
+    monkeypatch.setattr(sys, "argv", ["fanuc-server", "--offline", "--config", str(path)])
+    mcp_server.main()
+    assert calls == [{"transport": "stdio"}]
+

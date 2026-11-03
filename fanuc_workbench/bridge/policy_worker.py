@@ -67,9 +67,12 @@ def main():
         request = receive()
         if request is None or request.get("command") == "shutdown":
             return
-        result = run_policy(request["arguments"]) if request["operation_id"] == "policy" else {
-            "ok": False, "message": "Host policy validation/save failed; inspect retained work before saving"}
-        send({"request_id": request["request_id"], "result": result})
+        try:
+            result = run_policy(request["arguments"]) if request["operation_id"] == "policy" else {
+                "ok": False, "message": "Host policy validation/save failed; inspect retained work before saving"}
+            send({"request_id": request["request_id"], "result": result})
+        finally:
+            request = result = None
 
 
 if __name__ == "__main__":

@@ -557,7 +557,8 @@ def main() -> None:
         from fanuc_workbench.services.local_native import NativeToolPolicy
         native_policy = NativeToolPolicy(args.local_native_policy)
     restricted = args.offline or native_policy is not None
-    configure_resource_registry(args.management_registry)
+    if not args.offline:
+        configure_resource_registry(args.management_registry)
     owner = (owned_offline_bridge(args.config) if args.offline else
              owned_mcp_bridge(args.config, validate=offline_profile.validate if restricted else None))
     with owner as bridge:
@@ -573,7 +574,8 @@ def main() -> None:
                 finally:
                     # Keep management and the owner lease alive through native drain.
                     bridge.close()
-    close_resource_context()
+    if not args.offline:
+        close_resource_context()
 
 
 if __name__ == "__main__":

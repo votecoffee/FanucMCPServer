@@ -60,7 +60,10 @@ def main():
                     result["reason"] = str(exc)[:256]  # Fixed contract messages; vendor exception text is excluded.
                 if type(exc) is VendorCallError:
                     result["vendor_call"] = exc.details
-            send({"request_id": request["request_id"], "result": result})
+            try:
+                send({"request_id": request["request_id"], "result": result})
+            finally:
+                request = result = operations = operation = None
     finally:
         try:
             if robot is not None:

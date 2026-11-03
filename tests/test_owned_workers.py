@@ -1,6 +1,9 @@
 """Inert process handles and stub kernels only; never start native/MCP software."""
 import ctypes
+import gc
+import queue
 import threading
+import weakref
 from types import SimpleNamespace
 
 import pytest
@@ -9,6 +12,45 @@ from fanuc_workbench.bridge import extension_process as module
 from fanuc_workbench.bridge.extension_host import Generation
 from fanuc_workbench.bridge.native import NativeChanges
 from fanuc_workbench.bridge.owned_workers import WorkerInventory
+
+
+def test_ipc_reader_releases_completed_decoded_payload_while_connection_stays_open(monkeypatch):
+    class Response(dict):
+        pass
+    response = Response(result="synthetic response")
+    reference = weakref.ref(response)
+    decoded = [response]
+    del response
+    monkeypatch.setattr(module.json, "loads", lambda _: decoded.pop())
+    waiting, release = threading.Event(), threading.Event()
+    class Wire:
+        first = True
+        def readline(self, maximum):
+            if self.first:
+                self.first = False
+                return b'{"result":"synthetic response"}\n'
+            waiting.set()
+            assert release.wait(3)
+            return b""
+    client = object.__new__(module.RpcProcess)
+    client.stopped = threading.Event()
+    client.inbox = queue.Queue(maxsize=1)
+    client.process = SimpleNamespace(stdout=Wire())
+    client.broken = False
+    reader = threading.Thread(target=client._read)
+    reader.start()
+    try:
+        result = client.inbox.get(timeout=2)
+        assert result["result"] == "synthetic response"
+        del result
+        assert waiting.wait(2)
+        gc.collect()
+        assert reference() is None
+        assert reader.is_alive() and not client.broken
+    finally:
+        release.set()
+        reader.join(timeout=3)
+        assert not reader.is_alive()
 
 
 class Kernel:
