@@ -27,6 +27,9 @@ Up to 32 bounded offline metadata connections share an evidence state, with
 eight data calls executing and 16 waiting. Guidance and capabilities stay
 available without data admission; artifact publication and audit locking remain shared. Starting
 an offline chat does not acquire native ownership or recover another chat's jobs.
+Idle request threads retire after 30 seconds and restart on demand without closing
+the chat connection. Proven-departed offline session receipts move incrementally
+to retained history; completed history does not consume live admission capacity.
 Offline Windows status reporting verifies existing private directory permissions
 without rewriting peers' permissions on every connection; see
 [connection readiness](docs/CONNECTION_READINESS.md) for the lifecycle and capacity contract.

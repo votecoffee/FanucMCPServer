@@ -6,9 +6,13 @@ from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
 import contextvars
 import threading
+import time
 import uuid
 
 from fanuc_workbench.bridge.storage import RequestCancelled, utc_now
+
+
+IDLE_POOL_SECONDS = 30
 
 
 class RequestQueueFull(RuntimeError):
@@ -49,10 +53,10 @@ class RequestDispatcher:
         self.closed = False
         self.active = {}
         self.history = deque(maxlen=64)
-        self.pools = {
-            "requests": ThreadPoolExecutor(max_workers=workers, thread_name_prefix="fanuc-request"),
-            "control": ThreadPoolExecutor(max_workers=1, thread_name_prefix="fanuc-control"),
-        }
+        self.pools = {}
+        self.idle_timers = {}
+        self.idle_since = {}
+        self.retiring = {}
 
     @property
     def current_request_id(self):
@@ -81,6 +85,10 @@ class RequestDispatcher:
             capacity = 9 if control else self.workers + self.pending
             if sum(entry[0]["lane"] == lane for entry in self.active.values()) >= capacity:
                 raise RequestQueueFull("Request queue is full; inspect current requests before submitting more work")
+            self.idle_since.pop(lane, None)
+            if lane not in self.pools:
+                self.pools[lane] = ThreadPoolExecutor(max_workers=1 if control else self.workers,
+                    thread_name_prefix="fanuc-control" if control else "fanuc-request")
             identifier = uuid.uuid4().hex
             future = RequestFuture(identifier)
             record = {"request_id": identifier, "operation": getattr(function, "__name__", "request")[:100],
@@ -90,6 +98,7 @@ class RequestDispatcher:
             def execute():
                 if not future.set_running_or_notify_cancel():
                     self._finish(record, future, "cancelled")
+                    self._arm_idle(lane)
                     return
                 with self.lock:
                     record.update(status="running", started_at=utc_now())
@@ -107,6 +116,7 @@ class RequestDispatcher:
                 finally:
                     self.local.request_id = self.local.cancel_event = None
                     self.local.configuration = None
+                    self._arm_idle(lane)
 
             try:
                 # Do not expose/cancel the executor Future: its queue slot must
@@ -116,6 +126,43 @@ class RequestDispatcher:
                 self.active.pop(identifier, None)
                 raise
             return future
+
+    def _arm_idle(self, lane):
+        with self.lock:
+            if self.closed or any(row[0]["lane"] == lane for row in self.active.values()):
+                return
+            self.idle_since[lane] = time.monotonic()
+            if lane not in self.idle_timers:
+                self._start_idle_timer(lane, IDLE_POOL_SECONDS)
+
+    def _start_idle_timer(self, lane, seconds):
+        timer = threading.Timer(seconds, lambda: self._retire_idle(lane, timer))
+        timer.name = "fanuc-idle-" + lane
+        timer.daemon = True
+        self.idle_timers[lane] = timer
+        timer.start()
+
+    def _retire_idle(self, lane, timer):
+        with self.lock:
+            if self.closed or self.idle_timers.get(lane) is not timer:
+                return
+            self.idle_timers.pop(lane)
+            if lane not in self.idle_since:
+                return  # A request is still executing; its completion rearms.
+            remaining = IDLE_POOL_SECONDS - (time.monotonic() - self.idle_since[lane])
+            if remaining > 0:
+                self._start_idle_timer(lane, remaining)
+                return
+            self.idle_since.pop(lane)
+            pool = self.pools.pop(lane)
+            self.retiring[pool] = timer
+        try:
+            # No queued/running requests remain in this lane. Join outside the
+            # admission lock; a new request may create a fresh pool immediately.
+            pool.shutdown(wait=True)
+        finally:
+            with self.lock:
+                self.retiring.pop(pool)
 
     def _finish(self, record, future, status, **fields):
         with self.lock:
@@ -152,7 +199,14 @@ class RequestDispatcher:
                     return
                 self.closed = True
                 futures = [future for _, future in self.active.values()]
+                pools = set(self.pools.values()) | set(self.retiring)
+                timers = set(self.idle_timers.values()) | set(self.retiring.values())
+                self.idle_timers.clear()
+            for timer in timers:
+                timer.cancel()
             for future in futures:
                 future.cancel()
-            for pool in self.pools.values():
+            for pool in pools:
                 pool.shutdown(wait=True, cancel_futures=False)
+            for timer in timers:
+                timer.join()

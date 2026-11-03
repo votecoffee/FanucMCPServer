@@ -24,7 +24,7 @@ SCHEMA = 1
 # are preserved and explicitly counted during the bounded transition.
 MAX_SESSIONS = 32
 FRONTDOOR_BYTES = 128 * 1024 * 1024
-MAX_RECORDS = 4096
+HISTORY_BATCH = 8
 MAX_MANIFEST = 8 * 1024 * 1024
 _held = []
 
@@ -534,21 +534,43 @@ class OfflineGeneration:
         self.stop = threading.Event()
         self.guard = threading.RLock()
         self.thread = None
-        with locked(self.directory / "admission.lock"), session_reader(self.directory) as receipt:
-            paths = list(self.directory.glob("*.json"))
-            if len(paths) >= MAX_RECORDS:
-                raise RuntimeError("Offline generation receipt capacity reached; retain and archive receipts before reconnecting")
-            active = legacy = 0
-            for path in paths:
-                prior = parse(receipt(path))
-                if prior.get("state") in {"closed", "parent-exited", "reconciled-dead", "failed"}:
-                    continue
+        try:
+            self._admit()
+        except BaseException:
+            self.parent_handle.close()
+            raise
+
+    def _admit(self):
+        history = self.directory / "history"
+        history.mkdir(exist_ok=True)
+        with (locked(self.directory / "admission.lock"), session_reader(self.directory) as receipt,
+              session_reader(history) as archived):
+            active = legacy = compacted = 0
+            for path in list(self.directory.glob("*.json")):
+                raw = receipt(path)
+                prior = parse(raw)
                 if (prior.get("profile") != "standalone-offline" or prior.get("native_intents") is not False
                         or prior.get("app_created_children") != []):
                     raise RuntimeError("Uncertain generation needs app-owned inspection")
-                state = driver.state(prior["identity"])
+                state = self.driver.state(prior["identity"])
                 if state in {"absent", "different"}:
-                    atomic(path, encoded({**prior, "state": "reconciled-dead", "reason": "Exact prior generation no longer exists; no children or native intents; no replay"}))
+                    if prior.get("state") in {"closed", "parent-exited", "reconciled-dead", "failed"}:
+                        if compacted >= HISTORY_BATCH:
+                            continue
+                        # Retain exact terminal evidence, independently of live
+                        # admission. A terminal label alone never proves exit.
+                        destination = history / (path.stem + "-" + digest(raw) + ".json")
+                        if receipt(path) != raw:
+                            raise RuntimeError("Session receipt changed before history compaction")
+                        if destination.exists():
+                            if archived(destination) != raw:
+                                raise ValueError("Retained session history does not match its receipt")
+                            path.unlink()
+                        else:
+                            path.rename(destination)
+                        compacted += 1
+                    else:
+                        atomic(path, encoded({**prior, "state": "reconciled-dead", "reason": "Exact prior generation no longer exists; no children or native intents; no replay"}))
                 elif state == "alive":
                     active += 1
                     if prior.get("containment", {}).get("commit_bytes", 536870912) > FRONTDOOR_BYTES:

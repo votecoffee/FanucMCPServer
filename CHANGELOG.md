@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Separate terminal offline-session history from live connection admission,
+  retaining proven-departed receipts in bounded history batches. Close retained
+  parent handles after failed admission. Retire idle request/control threads
+  after 30 seconds while keeping the MCP connection available for later calls.
+
 - Separated bounded metadata connections from lazy offline data execution:
   32 connections at 128 MiB each, eight executing data calls and 16 waiters.
   Metadata/guidance remain available at data saturation. Preserve legacy live

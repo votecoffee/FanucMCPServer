@@ -48,6 +48,7 @@ app root/
     guidance/               explicit current workflow documents
   receipts/                 installation receipts
   sessions/                 durable process-generation and cleanup receipts
+    history/                exact terminal receipts of proven-departed processes
 ```
 
 Policy state/source paths retain their original absolute data locations. Runtime
@@ -103,8 +104,14 @@ logical `sys.executable` aliases. Parent exit stops this offline process even if
 another process keeps the input pipe open. Normal EOF follows SDK 2.3's original
 wire-handle claims and closes the app. Protocol stdout carries no logs.
 
-Admission is serialized and limited to 32 bounded metadata frontdoors, with at
-most 4096 retained session receipts. 32 OS-held metadata slots also bound each
+Admission is serialized and limited to 32 bounded metadata frontdoors. Terminal
+history has no connection-admission ceiling. Each start moves up to eight exact
+terminal receipts to `sessions/history/`, after independently verifying that their
+recorded process generations have departed. Remaining terminal receipts are
+checked without consuming live capacity; the bounded move batch limits work
+under the admission lock. A terminal label with a live identity still consumes a
+slot, and an unknown identity or native intent refuses admission. Retained
+history is never replayed or deleted. 32 OS-held metadata slots also bound each
 evidence state, including direct offline clients. Eight executing data calls and 16 waiters
 are admitted separately, only for the duration of work. Closing/crashing one client
 releases only its own slot. Audit reads/appends share the existing journal lock;

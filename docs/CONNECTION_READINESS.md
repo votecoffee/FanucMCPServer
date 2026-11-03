@@ -25,6 +25,16 @@ are released after that call, cancellation at a safe boundary or actual process
 exit. A full/expired work queue returns a meaningful tool error while metadata
 and guidance remain usable. Each client's own request dispatcher also stays
 bounded. An idle metadata connection owns no data-worker slot.
+Request and control thread pools are created on demand and retire independently
+after 30 idle seconds. The MCP process/connection remains available, and the next
+call creates a fresh pool. Running and queued calls prevent their lane from
+retiring; shutdown joins both active and retiring pools outside admission locks.
+Idle retirement releases thread resources, not the interpreter's baseline memory.
+
+Completed process history is separate from live admission. Each startup retains
+up to eight proven-departed terminal receipts under `sessions/history/`, preserving
+their exact bytes. Additional terminal rows do not exhaust connection capacity.
+Live or unverifiable generations and native intents never qualify for compaction.
 
 Old live generations retain their original 512 MiB bounds and code. During the
 reviewed migration there can be at most eight such legacy actors within the

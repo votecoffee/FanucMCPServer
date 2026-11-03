@@ -200,3 +200,76 @@ def test_shutdown_callbacks_can_reenter_close_without_deadlocking(tmp_path):
     assert not closer.is_alive()
     running.result(timeout=2)
     assert queued.cancelled() and bridge.requests.status()['closed']
+
+
+def test_idle_threads_retire_and_next_request_reopens_lanes(monkeypatch):
+    from fanuc_workbench.bridge import requests
+    monkeypatch.setattr(requests, "IDLE_POOL_SECONDS", .05)
+    dispatcher = RequestDispatcher(workers=2)
+    try:
+        data = dispatcher.submit(threading.current_thread).result(timeout=2)
+        control = dispatcher.submit(threading.current_thread, control=True).result(timeout=2)
+        deadline = time.monotonic() + 3
+        while data.is_alive() or control.is_alive():
+            assert time.monotonic() < deadline
+            threading.Event().wait(.005)
+        assert not dispatcher.closed
+        assert dispatcher.submit(lambda: "still connected").result(timeout=2) == "still connected"
+        assert dispatcher.submit(lambda: "control ready", control=True).result(timeout=2) == "control ready"
+    finally:
+        dispatcher.close()
+    assert not dispatcher.idle_timers and not dispatcher.retiring
+
+
+def test_idle_retirement_preserves_running_and_queued_work(monkeypatch):
+    from fanuc_workbench.bridge import requests
+    monkeypatch.setattr(requests, "IDLE_POOL_SECONDS", .03)
+    dispatcher = RequestDispatcher(workers=1)
+    entered, release = threading.Event(), threading.Event()
+    def blocked():
+        entered.set()
+        assert release.wait(3)
+    try:
+        dispatcher.submit(lambda: None).result(timeout=2)
+        first = dispatcher.submit(blocked)
+        assert entered.wait(2)
+        second = dispatcher.submit(lambda: "queued work completed")
+        threading.Event().wait(.1)
+        assert not first.done() and not second.done()
+        assert "requests" in dispatcher.pools
+        release.set()
+        first.result(timeout=2)
+        assert second.result(timeout=2) == "queued work completed"
+    finally:
+        release.set()
+        dispatcher.close()
+
+
+def test_retirement_join_does_not_block_new_admission_and_close_still_drains(monkeypatch):
+    from fanuc_workbench.bridge import requests
+    monkeypatch.setattr(requests, "IDLE_POOL_SECONDS", .03)
+    dispatcher = RequestDispatcher(workers=1)
+    entered, release = threading.Event(), threading.Event()
+    closer = None
+    try:
+        dispatcher.submit(lambda: None).result(timeout=2)
+        with dispatcher.lock:
+            pool = dispatcher.pools["requests"]
+            shutdown = pool.shutdown
+            def slow_shutdown(*args, **kwargs):
+                entered.set()
+                assert release.wait(3)
+                return shutdown(*args, **kwargs)
+            monkeypatch.setattr(pool, "shutdown", slow_shutdown)
+        assert entered.wait(2)
+        assert dispatcher.submit(lambda: "new work").result(timeout=1) == "new work"
+        closer = threading.Thread(target=dispatcher.close)
+        closer.start()
+        threading.Event().wait(.02)
+        assert closer.is_alive()
+    finally:
+        release.set()
+        if closer is not None:
+            closer.join(timeout=3)
+            assert not closer.is_alive()
+        dispatcher.close()

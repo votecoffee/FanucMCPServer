@@ -178,3 +178,60 @@ def test_selected_pywin32_roots_are_explicit_without_executing_pth(tmp_path, mon
     assert str(packages / "win32/lib") in paths
     assert handles == [str(packages / "pywin32_system32")]
     assert "never_execute_this_installer_hook" not in sys.modules
+
+
+def test_terminal_history_beyond_former_ceiling_does_not_consume_live_admission(tmp_path):
+    directory = tmp_path / "sessions"
+    directory.mkdir()
+    originals = {}
+    for index in range(4097):
+        path = directory / f"{index:032x}.json"
+        raw = launch.encoded({"profile": "standalone-offline", "state": "reconciled-dead",
+            "native_intents": False, "app_created_children": [], "identity": identity(index + 100000)})
+        path.write_bytes(raw)
+        originals[path.name] = raw
+    driver = Driver("absent")
+    generation = launch.OfflineGeneration(tmp_path, {}, driver)
+    try:
+        assert len(list(directory.glob("*.json"))) == len(originals) - launch.HISTORY_BATCH + 1
+        assert len(list((directory / "history").glob("*.json"))) == launch.HISTORY_BATCH
+        for name, raw in originals.items():
+            archived = directory / "history" / (Path(name).stem + "-" + launch.digest(raw) + ".json")
+            retained = archived if archived.exists() else directory / name
+            assert retained.read_bytes() == raw
+    finally:
+        generation.close()
+
+
+@pytest.mark.parametrize("state,native", [("unknown", False), ("absent", True)])
+def test_terminal_label_does_not_bypass_uncertain_identity_or_intents(tmp_path, state, native):
+    path = prior(tmp_path, state="closed", native=native)
+    raw = path.read_bytes()
+    driver = Driver(state)
+    with pytest.raises(RuntimeError):
+        launch.OfflineGeneration(tmp_path, {}, driver)
+    assert path.read_bytes() == raw and driver.closed
+    assert not list((path.parent / "history").iterdir())
+
+
+def test_terminal_but_live_peer_still_consumes_capacity(tmp_path, monkeypatch):
+    path = prior(tmp_path, state="closed")
+    raw = path.read_bytes()
+    driver = Driver("alive")
+    monkeypatch.setattr(launch, "MAX_SESSIONS", 1)
+    with pytest.raises(RuntimeError, match="capacity reached"):
+        launch.OfflineGeneration(tmp_path, {}, driver)
+    assert path.read_bytes() == raw and driver.closed
+
+
+def test_failed_history_move_preserves_receipt_and_releases_parent_handle(tmp_path, monkeypatch):
+    path = prior(tmp_path, state="failed")
+    raw = path.read_bytes()
+    driver = Driver()
+    def refuse_move(*args):
+        raise OSError("Synthetic archive failure")
+    monkeypatch.setattr(Path, "rename", refuse_move)
+    with pytest.raises(OSError, match="archive failure"):
+        launch.OfflineGeneration(tmp_path, {}, driver)
+    assert path.read_bytes() == raw and driver.closed
+    assert list(path.parent.glob("*.json")) == [path]
