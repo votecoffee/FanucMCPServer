@@ -30,6 +30,8 @@ an offline chat does not acquire native ownership or recover another chat's jobs
 Idle request threads retire after 30 seconds and restart on demand without closing
 the chat connection. Proven-departed offline session receipts move incrementally
 to retained history; completed history does not consume live admission capacity.
+For a large backlog from earlier installations, use the explicit
+[session-history maintenance command](docs/STABLE_LAUNCHER.md#session-history-maintenance).
 Offline Windows status reporting verifies existing private directory permissions
 without rewriting peers' permissions on every connection; see
 [connection readiness](docs/CONNECTION_READINESS.md) for the lifecycle and capacity contract.

@@ -59,6 +59,25 @@ clients hold separate bounded slots and can share the same evidence state.
 Each client drains only its own requests. The native/controller exclusive lease
 remains unchanged; offline views never acquire, replace or release that lease.
 
+## Session history maintenance
+
+An earlier installation can retain thousands of completed receipts in the live
+session directory. From a source checkout, compact that backlog before a large
+reconnect burst, using the installed app's Python and verified dependency closure:
+
+```powershell
+& "C:/RobotTools/FanucMCPServer/python/python.exe" -I -B scripts/compact_offline_sessions.py --app-root "C:/RobotTools/FanucMCPServer"
+```
+
+The command inspects process identities outside the shared admission lock, then
+rechecks exact receipt bytes and moves at most eight per locked batch. It retains
+the bytes under `sessions/history/` and writes a local completion receipt under
+`receipts/`. Live/unverifiable generations, native intents, child-bearing receipts
+and concurrently changed rows stay untouched. An interrupted command leaves all
+retained history available; it never terminates a process or replays work.
+The default limit is 4096 eligible receipts per invocation (`--limit` changes it).
+This separates the one-time backlog from the launcher's incremental maintenance.
+
 ## Publish the connection
 
 Use the exact connection returned by installation: app-owned
