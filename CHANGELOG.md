@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Release the last raw/decoded worker IPC response and completed feature,
+  native and policy request payloads before waiting for more input. Offline
+  startup/close no longer configures or closes a native resource context.
+
+- Pin verified framework 26.1103.174507 with MCP SDK 2.3.0. Adopt completed
+  payload release, independent idle/application retirement and short-lock JSON
+  resource cleanup without migrating existing ownership registries.
+
 - Separate terminal offline-session history from live connection admission,
   retaining proven-departed receipts in bounded history batches. Close retained
   parent handles after failed admission. Retire idle request/control threads

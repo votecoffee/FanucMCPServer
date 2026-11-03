@@ -19,7 +19,7 @@ def fixture(root, release="26.1023.165651"):
     (runtime / "payload.txt").write_bytes(b"synthetic source")
     (root / "StartMcp.py").write_bytes(Path(launch.__file__).read_bytes())
     manifest = {"schema_version": 1, "profile": "standalone-offline", "runtime": release,
-        "framework": "0.20.0", "sdk": "2.3.0", "launcher_sha256": launch.digest((root / "StartMcp.py").read_bytes()),
+        "framework": launch.FRAMEWORK_VERSION, "sdk": "2.3.0", "launcher_sha256": launch.digest((root / "StartMcp.py").read_bytes()),
         "python_files": launch.inventory(root / "python"), "runtime_files": launch.inventory(runtime)}
     return manifest, runtime
 
@@ -204,10 +204,11 @@ def test_terminal_history_beyond_former_ceiling_does_not_consume_live_admission(
 
 
 @pytest.mark.parametrize("state,native", [("unknown", False), ("absent", True)])
-def test_terminal_label_does_not_bypass_uncertain_identity_or_intents(tmp_path, state, native):
+def test_terminal_label_does_not_bypass_uncertain_identity_or_intents(tmp_path, monkeypatch, state, native):
     path = prior(tmp_path, state="closed", native=native)
     raw = path.read_bytes()
     driver = Driver(state)
+    monkeypatch.setattr(launch, "MAX_SESSIONS", 1)
     with pytest.raises(RuntimeError):
         launch.OfflineGeneration(tmp_path, {}, driver)
     assert path.read_bytes() == raw and driver.closed
@@ -235,3 +236,40 @@ def test_failed_history_move_preserves_receipt_and_releases_parent_handle(tmp_pa
         launch.OfflineGeneration(tmp_path, {}, driver)
     assert path.read_bytes() == raw and driver.closed
     assert list(path.parent.glob("*.json")) == [path]
+
+
+def test_retained_framework_verification_is_explicit_and_still_hash_checked(tmp_path):
+    manifest, runtime = fixture(tmp_path)
+    manifest["framework"] = "0.20.0"
+    launch.publish(tmp_path, manifest, expected_selection="absent")
+    with pytest.raises(ValueError, match="dependency identity"):
+        launch.selected(tmp_path)
+    _, retained, _ = launch.selected(tmp_path, framework_versions=("0.20.0", launch.FRAMEWORK_VERSION))
+    assert retained["framework"] == "0.20.0"
+    (runtime / "payload.txt").write_bytes(b"tampered legacy runtime")
+    with pytest.raises(ValueError, match="mismatch"):
+        launch.selected(tmp_path, framework_versions=("0.20.0", launch.FRAMEWORK_VERSION))
+
+
+@pytest.mark.parametrize("observed", [99, 100, None])
+def test_kernel_inventory_never_reclaims_same_older_or_missing_generation(tmp_path, monkeypatch, observed):
+    path = prior(tmp_path)
+    raw = path.read_bytes()
+    driver = Driver("unknown")
+    driver.host_id = identity(123)["host_id"]
+    monkeypatch.setattr(launch, "process_creation_times", lambda: {} if observed is None else {123: observed})
+    with pytest.raises(RuntimeError, match="unverifiable"):
+        launch.OfflineGeneration(tmp_path, {}, driver)
+    assert path.read_bytes() == raw and driver.closed
+
+
+def test_kernel_inventory_proves_later_pid_generation_without_control_authority(tmp_path, monkeypatch):
+    path = prior(tmp_path)
+    driver = Driver("unknown")
+    driver.host_id = identity(123)["host_id"]
+    monkeypatch.setattr(launch, "process_creation_times", lambda: {123: 101})
+    generation = launch.OfflineGeneration(tmp_path, {}, driver)
+    try:
+        assert launch.parse(path.read_bytes())["state"] == "reconciled-dead"
+    finally:
+        generation.close()

@@ -21,7 +21,7 @@ from fanuc_workbench.bridge import stable_launcher as launcher
 from fanuc_workbench.version import release_metadata
 
 
-FRAMEWORK_SHA256 = "a1b3777f8e8c1900e136a514d89ddb485a6bf4d69a525e3d24e1d04cd040efb3"
+FRAMEWORK_SHA256 = "2f371aef0da97012d99bc79f48e6f3434d42cdfdd2ce4df00ee52d4a6039d3a1"
 
 
 def archive_runtime(runtime, python, entry_bytes):
@@ -133,9 +133,9 @@ def install(root, wheelhouse, wheel_manifest, config, *, expected_selection, reg
     wheels = [wheelhouse / row["path"] for row in rows]
     if any(path.suffix != ".whl" or path.parent != wheelhouse for path in wheels):
         raise ValueError("Reviewed wheelhouse must contain only flat wheel files")
-    framework = [row for row in rows if row["path"] == "universal_codex_tools-0.20.0-py3-none-any.whl"]
+    framework = [row for row in rows if row["path"] == "universal_codex_tools-26.1103.174507-py3-none-any.whl"]
     if len(framework) != 1 or framework[0]["sha256"] != FRAMEWORK_SHA256:
-        raise ValueError("Reviewed framework 0.20.0 wheel hash differs")
+        raise ValueError("Reviewed framework 26.1103.174507 wheel hash differs")
     release = release_metadata()
     package_name = f"fanuc_mcp_server_bridge-{release['package_version']}-py3-none-any.whl"
     if not (wheelhouse / package_name).is_file():
@@ -167,7 +167,10 @@ def install(root, wheelhouse, wheel_manifest, config, *, expected_selection, reg
         if before != expected_selection:
             raise ValueError("Launcher selection changed before installation")
         if pointer.exists():
-            launcher.selected(root)  # Never bless a tampered existing bootstrap/runtime.
+            # Verify the exact retained generation without importing it. The
+            # previous pin is accepted only for explicit installer migration;
+            # normal new bootstrap startup requires its current framework pin.
+            launcher.selected(root, framework_versions=("0.20.0", launcher.FRAMEWORK_VERSION))
         elif (root / "python").exists():
             raise ValueError("Incomplete installation has retained interpreter bytes; inspect them before another attempt")
         migrate = entry.exists() and launcher.read(entry, launcher.MAX_MANIFEST) != entry_bytes
@@ -200,7 +203,7 @@ def install(root, wheelhouse, wheel_manifest, config, *, expected_selection, reg
         probe_imports = {"python_files": python_files, "runtime_files": launcher.inventory(runtime)}
         launcher.atomic(runtime / "probe-imports.json", launcher.encoded(probe_imports))
         manifest = {"schema_version": 1, "layout": "archive-v1", "profile": "standalone-offline", "runtime": release["package_version"],
-            "release": release, "package_version": release["package_version"], "framework": "0.20.0", "sdk": "2.3.0",
+            "release": release, "package_version": release["package_version"], "framework": "26.1103.174507", "sdk": "2.3.0",
             "management_registry": str(Path(registry).absolute()), "installed_plugin_version": plugin_version,
             "launcher_sha256": launcher.digest(entry_bytes),
             "python_files": python_files, "runtime_files": launcher.inventory(runtime), "wheels": rows}
@@ -212,7 +215,7 @@ def install(root, wheelhouse, wheel_manifest, config, *, expected_selection, reg
             "from mcp.server.mcpserver import MCPServer;from universal_tools.windows_resources import ProcessDriver")
         probe_entry = runtime / "bootstrap-probe.py"
         subprocess.run([str(python / "python.exe"), "-I", "-B", "-c", code, str(probe_entry), str(runtime),
-            release["package_version"], "2.3.0", "0.20.0"], check=True, env=environment)
+            release["package_version"], "2.3.0", "26.1103.174507"], check=True, env=environment)
         snapshot_id = launcher.publish(root, manifest, expected_selection=expected_selection,
             bootstrap_bytes=entry_bytes if migrate else None, expected_bootstrap=expected_bootstrap)
         checked, _, _ = launcher.selected(root)
@@ -220,7 +223,7 @@ def install(root, wheelhouse, wheel_manifest, config, *, expected_selection, reg
         connection = {"command": str(python / "pythonw.exe"), "args": ["-I", "-B", str(entry)], "cwd": str(root),
             "env": {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONNOUSERSITE": "1", "PYTHONUTF8": "1"}}
         receipt = {"schema_version": 1, "release": release, "selection_sha256": launcher.digest(launcher.read(pointer)),
-            "snapshot_id": snapshot_id, "connection": connection, "framework": "0.20.0", "sdk": "2.3.0",
+            "snapshot_id": snapshot_id, "connection": connection, "framework": "26.1103.174507", "sdk": "2.3.0",
             "registration": "not-published", "controller_contacted": False, "old_runtimes_retained": True}
         receipts = root / "receipts"
         receipts.mkdir(exist_ok=True)

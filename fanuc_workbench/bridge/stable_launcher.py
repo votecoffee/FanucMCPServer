@@ -19,6 +19,7 @@ import zipfile
 
 
 SCHEMA = 1
+FRAMEWORK_VERSION = "26.1103.174507"
 # Transport capacity is independent of scarce data execution: 32 x 128 MiB
 # replaces 8 x 512 MiB steady-state memory budget. Existing legacy generations
 # are preserved and explicitly counted during the bounded transition.
@@ -391,7 +392,7 @@ def verify_archives(runtime, *, eager_bytecode=True):
                         raise ValueError("Archive bytecode source hash or format differs")
 
 
-def selected(root):
+def selected(root, *, framework_versions=None):
     root = ordinary(root, directory=True)
     raw = read(root / "launcher/current.json")
     value = parse(raw)
@@ -406,7 +407,8 @@ def selected(root):
         raise ValueError("Launcher manifest hash mismatch")
     manifest = parse(manifest_raw)
     if (manifest.get("schema_version") != SCHEMA or manifest.get("profile") != "standalone-offline"
-            or manifest.get("framework") != "0.20.0" or manifest.get("sdk") != "2.3.0"):
+            or manifest.get("framework") not in ((FRAMEWORK_VERSION,) if framework_versions is None else framework_versions)
+            or manifest.get("sdk") != "2.3.0"):
         raise ValueError("Unsupported launcher profile or dependency identity")
     runtime_name = manifest["runtime"]
     # Three numeric, fixed release components; no path selection by newest directory.
@@ -501,6 +503,53 @@ def publish(root, manifest, *, expected_selection, bootstrap_bytes=None, expecte
     return snapshot_id
 
 
+def process_creation_times():
+    """Read kernel creation times without opening/adopting protected processes.
+
+    Used only to prove that a PID belongs to a *later* generation. Missing PIDs
+    never establish departure here. Unsupported or malformed snapshots fail closed.
+    """
+    if os.name != "nt":
+        return None
+    import ctypes as c
+    from ctypes import wintypes as w
+    class Unicode(c.Structure):
+        _fields_ = [("length", w.USHORT), ("maximum", w.USHORT), ("buffer", c.c_void_p)]
+    class Header(c.Structure):
+        _fields_ = [("next", w.ULONG), ("threads", w.ULONG), ("reserved", c.c_int64 * 3),
+            ("created", c.c_int64), ("user", c.c_int64), ("kernel", c.c_int64),
+            ("image", Unicode), ("priority", w.LONG), ("pid", c.c_void_p)]
+    try:
+        query = c.WinDLL("ntdll").NtQuerySystemInformation
+        query.argtypes = [w.ULONG, c.c_void_p, w.ULONG, c.POINTER(w.ULONG)]
+        query.restype = w.LONG
+        size = 1024 * 1024
+        while size <= 16 * 1024 * 1024:
+            buffer, returned = c.create_string_buffer(size), w.ULONG()
+            status = query(5, buffer, size, c.byref(returned))
+            if status == -1073741820:  # STATUS_INFO_LENGTH_MISMATCH
+                size = max(size * 2, returned.value + 65536)
+                continue
+            if status != 0 or not 0 < returned.value <= size:
+                return None
+            result, offset = {}, 0
+            while offset + c.sizeof(Header) <= returned.value:
+                row = Header.from_buffer(buffer, offset)
+                pid = row.pid or 0
+                if pid in result:
+                    return None
+                result[pid] = row.created
+                if row.next == 0:
+                    return result
+                if row.next < c.sizeof(Header):
+                    return None
+                offset += row.next
+            return None
+    except (OSError, AttributeError, ValueError):
+        pass
+    return None
+
+
 class OfflineGeneration:
     """Actual surviving process owns its own offline admission/parent-loss receipt.
 
@@ -545,7 +594,9 @@ class OfflineGeneration:
         history.mkdir(exist_ok=True)
         with (locked(self.directory / "admission.lock"), session_reader(self.directory) as receipt,
               session_reader(history) as archived):
-            active = legacy = compacted = 0
+            active = legacy = compacted = uncertain_terminal = 0
+            inventory = None
+            inventory_checked = False
             for path in list(self.directory.glob("*.json")):
                 raw = receipt(path)
                 prior = parse(raw)
@@ -553,6 +604,12 @@ class OfflineGeneration:
                         or prior.get("app_created_children") != []):
                     raise RuntimeError("Uncertain generation needs app-owned inspection")
                 state = self.driver.state(prior["identity"])
+                if state == "unknown" and prior["identity"].get("host_id") == getattr(self.driver, "host_id", None):
+                    if not inventory_checked:
+                        inventory, inventory_checked = process_creation_times(), True
+                    observed = (inventory or {}).get(prior["identity"]["pid"])
+                    if observed is not None and observed > int(prior["identity"]["created"]):
+                        state = "different"
                 if state in {"absent", "different"}:
                     if prior.get("state") in {"closed", "parent-exited", "reconciled-dead", "failed"}:
                         if compacted >= HISTORY_BATCH:
@@ -571,8 +628,13 @@ class OfflineGeneration:
                         compacted += 1
                     else:
                         atomic(path, encoded({**prior, "state": "reconciled-dead", "reason": "Exact prior generation no longer exists; no children or native intents; no replay"}))
-                elif state == "alive":
+                elif state == "alive" or (state == "unknown" and prior.get("state") in
+                        {"closed", "parent-exited", "reconciled-dead", "failed"}):
+                    # Keep unverifiable terminal rows byte-identical and reserve
+                    # their full recorded budget. They are never recovered or
+                    # compacted on the strength of their terminal label alone.
                     active += 1
+                    uncertain_terminal += state == "unknown"
                     if prior.get("containment", {}).get("commit_bytes", 536870912) > FRONTDOOR_BYTES:
                         legacy += 1
                 else:
@@ -583,6 +645,7 @@ class OfflineGeneration:
                 raise RuntimeError("Legacy process budget is unverifiable; new connection refused without changing peers")
             self.record["budget"] = {"connections": 32, "new_process_bytes": FRONTDOOR_BYTES,
                 "legacy_generations": legacy, "steady_max_bytes": 4294967296,
+                "unverifiable_terminal_generations": uncertain_terminal,
                 "transition_max_bytes": 7516192768}
             atomic(self.path, encoded(self.record))
 
@@ -824,7 +887,7 @@ def main(root=None):
             FANUC_MCP_STABLE_ROOT=str(root), FANUC_MCP_SNAPSHOT_ID=selection["snapshot_id"])
         from importlib.metadata import version
         for package, expected in (("fanuc-mcp-server-bridge", manifest["package_version"]),
-                                  ("mcp", "2.3.0"), ("universal-codex-tools", "0.20.0")):
+                                  ("mcp", "2.3.0"), ("universal-codex-tools", "26.1103.174507")):
             if version(package) != expected:
                 raise ValueError("Selected package metadata differs from reviewed identity")
         from fanuc_workbench.bridge.config import BridgeConfig

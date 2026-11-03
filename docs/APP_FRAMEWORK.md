@@ -20,9 +20,12 @@ owning service registers; proxies and backend workers do not. Restart remains
 disabled because there is no surviving app-owned supervisor and retained-worker
 activity is unknown. Installing this app does not install another manager.
 
-The reviewed app dependency remains 0.20.0 / MCP SDK 2.3.0 even when the shared
-repository publishes a newer timestamped release. Adoption requires a separate
-pin, wheel/RECORD review and app acceptance. Direct offline (15 tools), local
+The reviewed source dependency is 26.1103.174507 / MCP SDK 2.3.0. This release
+releases completed session arguments/results, retires idle frontend channels,
+separates application expiry and releases the ledger lock during owned cleanup.
+FANUC retains its existing JSON ledger; indexed storage requires a separate
+explicit migration. Source/package, selected runtime and existing-chat evidence
+remain separate. Direct offline (15 tools), local
 native candidate (20 tools), full standalone (55 tools) and app-owned hosting
 are distinct deployments; see [profiles](../README.md#capabilities-and-limits).
 The local-native implementation includes exact input hashes, single-use plans,
@@ -31,14 +34,14 @@ establish a successful vendor compile or authorize changing a live profile.
 
 ## Dependency and build
 
-The source candidate pins `universal-codex-tools==0.20.0`, imported through
+The source candidate pins `universal-codex-tools==26.1103.174507`, imported through
 `universal_tools.framework`. Its MCP dependency is exactly 2.3.0. The distribution
 has not been assumed available on a public package feed. Obtain the reviewed
 wheel from the framework build, verify it against `packaging/framework.lock.json`,
 and install it in the app's isolated environment before installing the MCP extra:
 
 ```powershell
-python -m pip install C:/Packages/universal_codex_tools-0.20.0-py3-none-any.whl
+python -m pip install C:/Packages/universal_codex_tools-26.1103.174507-py3-none-any.whl
 python -m pip install -c packaging/framework-requirements.txt -e ".[dev,mcp]"
 python -B -m pytest -q
 ```

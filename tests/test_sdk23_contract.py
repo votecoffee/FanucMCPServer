@@ -26,7 +26,8 @@ def test_sdk23_preserves_standalone_wire_definitions(tmp_path, monkeypatch):
             raw = json.dumps(sorted(rows, key=lambda row: row["name"]), sort_keys=True,
                              separators=(",", ":"), ensure_ascii=False).encode()
             assert len(rows) == 48
-            assert hashlib.sha256(raw).hexdigest() == "6b9440fcc4a8df3f1ed2613d6ceb318b98db6a90ecd0f01c63225e558a5b2f66"
+            # Current source catalog, including the published offline argument bounds.
+            assert hashlib.sha256(raw).hexdigest() == "0b1e11f51628fe0b1d39fd5b83b29c0f69352711a88bc32c4f4429cd2ebd9799"
     asyncio.run(check())
 
 
@@ -35,6 +36,6 @@ def test_package_dependencies_pin_the_tested_framework_and_sdk():
     desktop = tomllib.loads((root / "pyproject.toml").read_text())["project"]
     bridge = tomllib.loads((root / "packaging/bridge/pyproject.toml").read_text())["project"]
     for deps in (desktop["optional-dependencies"]["mcp"], bridge["dependencies"]):
-        assert "mcp==2.3.0" in deps and "universal-codex-tools==0.20.0" in deps
+        assert "mcp==2.3.0" in deps and "universal-codex-tools==26.1103.174507" in deps
     for package in (desktop, bridge):
         assert package["scripts"]["fanuc-mcp-server"] == "fanuc_workbench.bridge.stdio_supervisor:main"

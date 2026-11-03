@@ -161,4 +161,3 @@ def test_offline_cli_never_configures_or_closes_native_resource_ownership(tmp_pa
     monkeypatch.setattr(sys, "argv", ["fanuc-server", "--offline", "--config", str(path)])
     mcp_server.main()
     assert calls == [{"transport": "stdio"}]
-

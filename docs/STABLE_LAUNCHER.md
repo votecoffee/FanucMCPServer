@@ -21,7 +21,7 @@ register plugins, start MCP, contact robots or delete an old runtime.
 The wheel inventory is a JSON array sorted by relative path, each row containing
 `path`, `sha256` and `bytes`. Review every wheel, including the FANUC bridge's
 fixed release and framework lock; the installer verifies the complete inventory
-and the reviewed framework 0.20.0 hash. SDK stays 2.3.0. There is no online
+and the reviewed framework 26.1103.174507 hash. SDK stays 2.3.0. There is no online
 dependency download during installation or startup. The supplied plugin version
 must be an observed installed version, independently of the new backend version.
 
@@ -110,7 +110,11 @@ terminal receipts to `sessions/history/`, after independently verifying that the
 recorded process generations have departed. Remaining terminal receipts are
 checked without consuming live capacity; the bounded move batch limits work
 under the admission lock. A terminal label with a live identity still consumes a
-slot, and an unknown identity or native intent refuses admission. Retained
+slot. An unverifiable terminal generation stays unchanged and reserves its full
+recorded budget; unverifiable nonterminal identities or native intents refuse
+admission. A read-only Windows process snapshot can prove that a protected PID
+belongs to a later creation time, without opening or controlling that process.
+Missing PIDs or equal/older creation times do not establish departure. Retained
 history is never replayed or deleted. 32 OS-held metadata slots also bound each
 evidence state, including direct offline clients. Eight executing data calls and 16 waiters
 are admitted separately, only for the duration of work. Closing/crashing one client
