@@ -60,6 +60,7 @@ class RequestDispatcher:
         self.history = deque(maxlen=64)
         self.pools = {}
         self.idle_timers = {}
+        self.idle_timer_errors = {}
         self.idle_since = {}
         self.retiring = {}
 
@@ -165,7 +166,20 @@ class RequestDispatcher:
         timer.name = "fanuc-idle-" + lane
         timer.daemon = True
         self.idle_timers[lane] = timer
-        timer.start()
+        try:
+            timer.start()
+        except BaseException as exc:
+            # Failed scheduling is not an uncertain operation drain. Remove
+            # this timer before close can attempt to join an unstarted thread.
+            # Cancellation plus the registration identity check also prevents
+            # a late callback from retiring a newly admitted request pool.
+            self.idle_timers.pop(lane, None)
+            timer.cancel()
+            self.idle_timer_errors[lane] = type(exc).__name__
+            if not isinstance(exc, Exception):
+                raise
+        else:
+            self.idle_timer_errors.pop(lane, None)
 
     def _retire_idle(self, lane, timer):
         with self.lock:
@@ -216,6 +230,7 @@ class RequestDispatcher:
                     "robot_lock_timeout_seconds": self.robot_wait_seconds,
                     "active": current, "recent": list(self.history), "closed": self.closed,
                     "admission_failed": self.admission_failed,
+                    "idle_timer_errors": dict(self.idle_timer_errors),
                     "control_workers": 1, "control_capacity": 9, "controller_contacted": False}
 
     def close(self):

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Cancel and unregister idle-retirement timers whose startup fails, preserving
+  completed results, request drain and offline metadata-slot release. Record
+  the error type and retry retirement after later work; keep real uncertain
+  drains and all admission limits unchanged.
+
 - Release completed stdio output ContextVar snapshots after flush or failure,
   preserving input context propagation to SDK handlers.
 

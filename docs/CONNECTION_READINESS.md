@@ -30,6 +30,11 @@ after 30 idle seconds. The MCP process/connection remains available, and the nex
 call creates a fresh pool. Running and queued calls prevent their lane from
 retiring; shutdown joins both active and retiring pools outside admission locks.
 Idle retirement releases thread resources, not the interpreter's baseline memory.
+If an idle timer fails to start, the dispatcher cancels and unregisters that
+timer, reports its error type in `idle_timer_errors`, and can rearm it after a
+later completion. Closing still drains the actual request pools. An unstarted
+timer cannot make a completed offline client retain its metadata lease.
+Genuine request-drain failures continue to retain their own uncertain lease.
 
 Executor submission can queue a callable before worker startup fails. Application
 work waits for the entire submission to succeed. A failure stops further worker

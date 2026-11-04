@@ -17,7 +17,7 @@ plugin and native skills. There is no universal Codex plugin or broker route.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1103.230627** (America/New_York). App,
+The current source checkpoint is **26.1103.233649** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
@@ -31,7 +31,9 @@ Startup keeps verified files open without retaining a read buffer for every file
 Stdio releases delivered frames and completed output contexts before the next message,
 while retaining the reviewed SDK descriptor diversion and session handling.
 Idle request threads retire after 30 seconds and restart on demand without closing
-the chat connection. Proven-departed offline session receipts move incrementally
+the chat connection. A failed idle-timer start does not prevent request drain or
+metadata-slot release; a later completion can retry retirement.
+Proven-departed offline session receipts move incrementally
 to retained history; completed history does not consume live admission capacity.
 If a worker fails to start, the server cancels queued requests, drains running
 operations and asks that client to reconnect. Rejected work cannot run on a later request.
