@@ -8,7 +8,8 @@ FANUC server alongside an enabled canonical direct route and verifies the
 resulting parsed settings. An existing recognized FANUC local marketplace can
 move by changing only its source value, preserving comments, physical endings,
 other settings and the disabled bundled-server policy. The supported CLI then
-adds the marketplace and plugin without uninstalling the old cache.
+adds the marketplace and plugin. Codex may retire old cache versions; retain
+prior source bundles outside its cache.
 `--codex-home` selects an
 explicit separate profile; `--register none` avoids registration entirely. Do
 not run installation/registration against a live profile during source or fixture
