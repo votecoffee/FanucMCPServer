@@ -81,6 +81,13 @@ after a watcher-join error; receipt failure still permits query-handle cleanup.
 Errors remain chained. A failed receipt write does not invent a terminal state
 or prove departure; exact-generation admission and UNKNOWN gates remain intact.
 
+The optional [lazy discovery frontend](LAZY_DISCOVERY.md) defers Python until
+explicit use. It pins one immutable catalog/backend pair, recognizes progress-only
+list metadata and retains the backend once started. Its two actors share the
+existing 128 MiB connection ceiling; the 32-connection cap is unchanged. Treat
+this as an opt-in candidate until separately published and tested through the
+selected host route.
+
 ## Startup and publication
 
 Policies are generated and parsed through production code. Validate the explicit

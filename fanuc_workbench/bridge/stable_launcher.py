@@ -394,10 +394,10 @@ def verify_archives(runtime, *, eager_bytecode=True):
                         raise ValueError("Archive bytecode source hash or format differs")
 
 
-def selected(root, *, framework_versions=None):
+def selected(root, *, framework_versions=None, pinned_snapshot=None, launcher_path=None):
     root = ordinary(root, directory=True)
-    raw = read(root / "launcher/current.json")
-    value = parse(raw)
+    value = (parse(read(root / "launcher/current.json")) if pinned_snapshot is None else
+             {"schema_version": SCHEMA, "snapshot_id": pinned_snapshot})
     if (not isinstance(value, dict) or set(value) != {"schema_version", "snapshot_id"}
             or type(value["schema_version"]) is not int or value["schema_version"] != SCHEMA
             or not isinstance(value["snapshot_id"], str) or len(value["snapshot_id"]) != 64
@@ -425,7 +425,7 @@ def selected(root, *, framework_versions=None):
     else:
         verify(root / "python", manifest["python_files"])
         verify(runtime, manifest["runtime_files"])
-    if digest(read(root / "StartMcp.py", MAX_MANIFEST)) != manifest["launcher_sha256"]:
+    if digest(read(launcher_path or root / "StartMcp.py", MAX_MANIFEST)) != manifest["launcher_sha256"]:
         raise ValueError("Stable entry hash mismatch")
     return value, manifest, runtime
 
@@ -559,7 +559,7 @@ class OfflineGeneration:
     and console helpers remain the SDK client's inventory, not app-created actors.
     Kernel identities, including physical Store paths, come only from handles.
     """
-    def __init__(self, root, selection, driver=None):
+    def __init__(self, root, selection, driver=None, *, handoff=None, handoff_nonce=None):
         if driver is None:
             from universal_tools.windows_resources import ProcessDriver
             driver = ProcessDriver()
@@ -579,6 +579,7 @@ class OfflineGeneration:
             self.parent_handle.close()
             raise ValueError("Client parent generation changed before its query handle was retained")
         self.path = self.directory / (uuid.uuid4().hex + ".json")
+        self.handoff_raw = None
         self.record = {"schema_version": SCHEMA, "profile": "standalone-offline", "snapshot": selection,
             "identity": self.identity, "parent": self.parent, "state": "starting",
             "app_created_children": [], "native_intents": False, "reason": "Admitted offline frontdoor"}
@@ -586,6 +587,28 @@ class OfflineGeneration:
         self.guard = threading.RLock()
         self.thread = None
         try:
+            if handoff is not None:
+                from time import monotonic, sleep
+                candidate = Path(handoff)
+                if (candidate.parent != self.directory or candidate.suffix != ".json"
+                        or len(candidate.stem) != 32 or any(c not in "0123456789abcdef" for c in candidate.stem)
+                        or not isinstance(handoff_nonce, str) or len(handoff_nonce) != 64):
+                    raise ValueError("Invalid lazy frontend handoff")
+                deadline = monotonic() + 5
+                while True:
+                    raw = read(candidate)
+                    prior = parse(raw)
+                    if prior.get("handoff_backend") == self.identity:
+                        if (prior.get("profile") != "standalone-offline" or prior.get("identity") != self.parent or prior.get("snapshot") != selection
+                                or prior.get("handoff_nonce") != handoff_nonce or prior.get("lazy_frontend") is not True
+                                or prior.get("state") != "activating" or prior.get("native_intents") is not False
+                                or prior.get("app_created_children") != [self.identity]):
+                            raise ValueError("Lazy frontend original identities or selection differ")
+                        self.path, self.handoff_raw = candidate, raw
+                        break
+                    if monotonic() >= deadline or self.parent_handle.wait(0):
+                        raise RuntimeError("Lazy frontend handoff did not bind this original backend")
+                    sleep(.01)
             self._admit()
         except BaseException:
             self.parent_handle.close()
@@ -602,8 +625,18 @@ class OfflineGeneration:
             for path in list(self.directory.glob("*.json")):
                 raw = receipt(path)
                 prior = parse(raw)
+                if path == self.path and self.handoff_raw is not None:
+                    if raw != self.handoff_raw:
+                        raise RuntimeError("Lazy frontend handoff changed before admission")
+                    self.record["frontend_identity"] = self.parent
+                    self.record["frontend_parent"] = prior["parent"]
+                    self.record["containment"] = prior["containment"]
+                    continue  # Transfer this one connection, never allocate a second slot.
+                pending_frontend = (prior.get("lazy_frontend") is True
+                    and prior.get("state") in {"activating", "closing"}
+                    and self.driver.state(prior["identity"]) == "alive")
                 if (prior.get("profile") != "standalone-offline" or prior.get("native_intents") is not False
-                        or prior.get("app_created_children") != []):
+                        or (prior.get("app_created_children") != [] and not pending_frontend)):
                     raise RuntimeError("Uncertain generation needs app-owned inspection")
                 state = self.driver.state(prior["identity"])
                 if state == "unknown" and prior["identity"].get("host_id") == getattr(self.driver, "host_id", None):
@@ -877,7 +910,7 @@ def configure_archives(runtime, manifest):
     os.environ["FANUC_MCP_GUIDANCE_ROOT"] = str(runtime / "guidance")
 
 
-def main(root=None):
+def main(root=None, *, pinned_snapshot=None, launcher_path=None, handoff=None, handoff_nonce=None):
     root = Path(root) if root is not None else Path(__file__).absolute().parent
     generation = None
     try:
@@ -885,7 +918,7 @@ def main(root=None):
         migration = root / "launcher/bootstrap-migration.json"
         if migration.exists() and parse(read(migration)).get("state") != "committed":
             raise RuntimeError("Reviewed launcher publication is incomplete; metadata-only publication recovery is required")
-        selection, manifest, runtime = selected(root)
+        selection, manifest, runtime = selected(root, pinned_snapshot=pinned_snapshot, launcher_path=launcher_path)
         # Keep the original wire handles and SDK 2.3 stream-claim behavior. This
         # windowless base interpreter is the surviving server, not a short wrapper.
         configure_packages(runtime, manifest)
@@ -902,11 +935,11 @@ def main(root=None):
         from fanuc_workbench.bridge.config import BridgeConfig
         from fanuc_workbench.bridge.offline_profile import validate
         validate(BridgeConfig.load(runtime / "policy.json"))
-        generation = OfflineGeneration(root, selection)
+        generation = OfflineGeneration(root, selection, handoff=handoff, handoff_nonce=handoff_nonce)
         _held.append(generation)
         if not os.path.samefile(generation.identity["executable"], root / "python/pythonw.exe"):
             raise ValueError("Actual kernel executable differs from the retained windowless interpreter")
-        generation.record["containment"] = {"actor_limit": 1, "commit_bytes": FRONTDOOR_BYTES, "kill_on_owner_exit": True}
+        generation.record.setdefault("containment", {"actor_limit": 1, "commit_bytes": FRONTDOOR_BYTES, "kill_on_owner_exit": True})
         generation.start()
         sys.argv = [str(root / "StartMcp.py"), "--offline", "--config", str(runtime / "policy.json"),
             "--management-runtime", str(runtime / "runtime.json"),
@@ -925,5 +958,20 @@ def main(root=None):
         return 0
 
 
+def entrypoint(arguments=None):
+    # Parse this private, fixed-shape entry without importing argparse (or any
+    # other module outside the selected interpreter's bootstrap closure).
+    arguments = sys.argv[1:] if arguments is None else arguments
+    if not arguments:
+        return main()
+    keys = {"--pinned-root", "--pinned-snapshot", "--legacy-entry", "--lazy-handoff", "--handoff-nonce"}
+    if len(arguments) != 10 or set(arguments[::2]) != keys:
+        raise ValueError("Invalid private pinned-backend arguments")
+    options = dict(zip(arguments[::2], arguments[1::2]))
+    return main(Path(options["--pinned-root"]), pinned_snapshot=options["--pinned-snapshot"],
+        launcher_path=Path(options["--legacy-entry"]), handoff=Path(options["--lazy-handoff"]),
+        handoff_nonce=options["--handoff-nonce"])
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(entrypoint())

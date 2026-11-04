@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add an opt-in Windows discovery frontend with a hash-bound catalog and pinned
+  backend activation. Retain one backend after first use, opaque frames, original
+  parent/child ownership and the existing 32-connection/128 MiB budget.
+
 - Emit modern Codex-compatible bare stdio commands with an exact stable Python
   search path. Add guarded plugin-only publication so packaging can be updated
   without changing the selected backend, dependency pins or direct-route policy.
