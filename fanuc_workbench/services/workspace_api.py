@@ -60,9 +60,11 @@ class WorkspaceService:
             result = [row for path in root.rglob("*") if path.is_file() and path.name.upper() == name for row in parser(path)]
         else:
             raise ValueError("Unknown analysis; use one of: " + ", ".join(ANALYSES))
-        result = serial(result)
+        # Analyze all evidence, but materialize only the requested response page.
+        if isinstance(result, set):
+            result = sorted(result)
         if query:
-            result = [row for row in result if query.casefold() in str(row).casefold()]
+            result = [row for row in result if query.casefold() in str(serial(row)).casefold()]
         return {"analysis": kind, **page(result, offset, limit), "evidence_only": True}
 
     @staticmethod

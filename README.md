@@ -26,7 +26,7 @@ before staging. Fresh native selection still requires explicit publication.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1104.112601** (America/New_York). App,
+The current source checkpoint is **26.1104.123038** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
@@ -37,6 +37,9 @@ eight data calls executing and 16 waiting. Guidance and capabilities stay
 available without data admission; artifact publication and audit locking remain shared. Starting
 an offline chat does not acquire native ownership or recover another chat's jobs.
 Startup keeps verified files open without retaining a read buffer for every file.
+Workspace analysis scans all evidence before paging, while only the requested
+rows are serialized for an unfiltered response. Text filters retain full-result
+matching and totals.
 Stdio releases delivered frames and completed output contexts before the next message,
 while retaining the reviewed SDK descriptor diversion and session handling.
 Cleanup attempts both wire restorations and the frontdoor receipt/parent-handle

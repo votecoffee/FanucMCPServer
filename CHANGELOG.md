@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Serialize only the requested workspace analysis page after the complete scan.
+  Preserve filtered matching, full totals, cursors, summaries and evidence errors.
+
 - Preserve a verified native frontend/backend selection during canonical install
   and plugin repair. Refuse payload/policy drift before staging, retain existing
   settings and emit the native standalone plugin binding.
