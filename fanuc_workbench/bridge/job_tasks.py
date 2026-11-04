@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 from contextlib import asynccontextmanager
 import hashlib
 import hmac
@@ -133,7 +134,7 @@ class JobTasks(TaskExtension):
                 notify = not pending
                 pending.add(binding["task_id"])
                 if notify:
-                    loop.call_soon_threadsafe(wake.set)
+                    loop.call_soon_threadsafe(wake.set, context=contextvars.Context())
 
         async def publish():
             while True:
@@ -148,7 +149,7 @@ class JobTasks(TaskExtension):
         jobs = self.bridge.operations.jobs
         with jobs.lock:
             jobs.listeners.add(changed)
-        publisher = asyncio.create_task(publish())
+        publisher = asyncio.create_task(publish(), context=contextvars.Context())
         try:
             async with super().lifespan(server):
                 yield

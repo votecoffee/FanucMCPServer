@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 from contextlib import asynccontextmanager
 import hashlib
 import json
@@ -104,7 +105,7 @@ class ArtifactResources:
                 except (OSError, ValueError):
                     pass  # Hints have no replay; readers always verify current store bytes.
                 await asyncio.sleep(.25)
-        task = asyncio.create_task(watch())
+        task = asyncio.create_task(watch(), context=contextvars.Context())
         try:
             yield
         finally:

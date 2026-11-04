@@ -31,6 +31,12 @@ call creates a fresh pool. Running and queued calls prevent their lane from
 retiring; shutdown joins both active and retiring pools outside admission locks.
 Idle retirement releases thread resources, not the interpreter's baseline memory.
 
+Service-lifetime guidance/artifact watchers and the preview job publisher use
+empty asyncio contexts. Their wake-up callbacks also carry no caller context.
+Embedding a server lifetime inside a request must not retain its ContextVars or
+payload. Per-call dispatcher tracing still copies the current request context;
+authorization and notification ownership remain explicit arguments and bindings.
+
 Completed process history is separate from live admission. Each startup retains
 up to eight proven-departed terminal receipts under `sessions/history/`, preserving
 their exact bytes. Additional terminal rows do not exhaust connection capacity.

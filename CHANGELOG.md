@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Isolate guidance/artifact watchers and preview job notifications from
+  embedding callers' ContextVars, retaining per-request tracing and explicit
+  authorization while releasing caller payloads during background lifetimes.
+
 - Release the last raw/decoded worker IPC response and completed feature,
   native and policy request payloads before waiting for more input. Offline
   startup/close no longer configures or closes a native resource context.

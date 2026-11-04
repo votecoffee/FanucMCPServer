@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextvars
 from contextlib import asynccontextmanager
 import hashlib
 import json
@@ -126,7 +127,7 @@ class WorkflowGuidance(SkillCatalog):
                 except Exception:
                     pass  # Reads fail closed; never replace a valid view with an invalid candidate.
                 await asyncio.sleep(1)
-        task = asyncio.create_task(watch())
+        task = asyncio.create_task(watch(), context=contextvars.Context())
         try:
             yield
         finally:
