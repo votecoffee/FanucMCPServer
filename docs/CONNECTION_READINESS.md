@@ -31,6 +31,13 @@ call creates a fresh pool. Running and queued calls prevent their lane from
 retiring; shutdown joins both active and retiring pools outside admission locks.
 Idle retirement releases thread resources, not the interpreter's baseline memory.
 
+Executor submission can queue a callable before worker startup fails. Application
+work waits for the entire submission to succeed. A failure stops further worker
+admission, cancels pending queue entries, drains running work outside the request
+lock and finishes their request records. The client must reconnect; a later call
+cannot dispatch the rejected operation. Async caller cancellation still leaves a
+running operation admitted until its own completion and readback.
+
 Service-lifetime guidance/artifact watchers and the preview job publisher use
 empty asyncio contexts. Their wake-up callbacks also carry no caller context.
 Embedding a server lifetime inside a request must not retain its ContextVars or

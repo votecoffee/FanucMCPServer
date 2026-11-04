@@ -17,7 +17,7 @@ plugin and native skills. There is no universal Codex plugin or broker route.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1103.175340** (America/New_York). App,
+The current source checkpoint is **26.1103.200231** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.
@@ -30,6 +30,8 @@ an offline chat does not acquire native ownership or recover another chat's jobs
 Idle request threads retire after 30 seconds and restart on demand without closing
 the chat connection. Proven-departed offline session receipts move incrementally
 to retained history; completed history does not consume live admission capacity.
+If a worker fails to start, the server cancels queued requests, drains running
+operations and asks that client to reconnect. Rejected work cannot run on a later request.
 For a large backlog from earlier installations, use the explicit
 [session-history maintenance command](docs/STABLE_LAUNCHER.md#session-history-maintenance).
 Offline Windows status reporting verifies existing private directory permissions

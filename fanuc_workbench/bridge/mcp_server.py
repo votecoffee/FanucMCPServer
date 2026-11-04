@@ -37,7 +37,7 @@ def create_server(bridge: "RobotBridge", *, guidance=None, skills=True, frontend
         from mcp.types import ToolAnnotations
         from pydantic import BaseModel, StrictBool, Field
         from mcp.server.mcpserver.exceptions import ToolError
-        from fanuc_workbench.bridge.requests import RequestQueueFull
+        from fanuc_workbench.bridge.requests import RequestQueueFull, RequestAdmissionFailed
         from mcp.server.mcpserver import Elicit, Resolve
     except ImportError:
         raise RuntimeError('Install MCP support with: python -m pip install -e ".[mcp]"') from None
@@ -113,6 +113,8 @@ def create_server(bridge: "RobotBridge", *, guidance=None, skills=True, frontend
                     if restricted:
                         raise ToolError("Invalid offline request; verify identifiers, manifest-listed paths, hashes and documented argument limits") from None
                     raise
+                except RequestAdmissionFailed:
+                    raise ToolError("Request worker startup failed; this client has stopped admitting work. Reconnect it after drain; inspect existing receipts before repeating any change") from None
                 except RequestQueueFull:
                     raise ToolError("Request capacity reached; inspect current work and wait for an owning request to finish") from None
                 except MemoryError:

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Prevent rejected executor submissions from running on later requests when
+  worker startup fails. Stop admission, cancel pending work, drain running
+  operations and release queued payloads before requesting a client reconnect.
+
 - Isolate guidance/artifact watchers and preview job notifications from
   embedding callers' ContextVars, retaining per-request tracing and explicit
   authorization while releasing caller payloads during background lifetimes.

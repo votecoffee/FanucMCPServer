@@ -19,6 +19,10 @@ class RequestQueueFull(RuntimeError):
     pass
 
 
+class RequestAdmissionFailed(RuntimeError):
+    """Worker admission failed; this dispatcher must not accept more work."""
+
+
 class RequestFuture(Future):
     def __init__(self, identifier):
         super().__init__()
@@ -51,6 +55,7 @@ class RequestDispatcher:
         self.close_lock = threading.RLock()
         self.local = threading.local()
         self.closed = False
+        self.admission_failed = False
         self.active = {}
         self.history = deque(maxlen=64)
         self.pools = {}
@@ -78,7 +83,11 @@ class RequestDispatcher:
         """Return a Future with request_id; the callable's arguments are never logged."""
         lane = "control" if control else "requests"
         context = contextvars.copy_context()
+        admitted = threading.Event()
+        failure = None
         with self.lock:
+            if self.admission_failed:
+                raise RequestAdmissionFailed("Worker admission failed; reconnect this client after its work has drained")
             if self.closed:
                 raise RuntimeError("Request dispatcher has closed")
             configuration = self.configuration_supplier() if self.configuration_supplier else None
@@ -96,6 +105,10 @@ class RequestDispatcher:
             self.active[identifier] = (record, future)
 
             def execute():
+                # Executor submission can enqueue a callable and then raise
+                # while starting a thread. No application work may begin until
+                # the complete submission has succeeded.
+                admitted.wait()
                 if not future.set_running_or_notify_cancel():
                     self._finish(record, future, "cancelled")
                     self._arm_idle(lane)
@@ -122,10 +135,22 @@ class RequestDispatcher:
                 # Do not expose/cancel the executor Future: its queue slot must
                 # remain occupied until execute has drained a cancelled entry.
                 self.pools[lane].submit(context.run, execute)
-            except BaseException:
-                self.active.pop(identifier, None)
-                raise
-            return future
+            except BaseException as exc:
+                self.admission_failed = True
+                record["admission_error_type"] = type(exc).__name__
+                future.cancel()
+                failure = exc
+            finally:
+                admitted.set()
+        if failure is not None:
+            # Stop admission first; drain outside the dispatcher lock so that
+            # already-running work can finish its readback/receipt. A failed
+            # submission is never replayed by a later request.
+            self.close()
+            if not isinstance(failure, Exception):
+                raise failure
+            raise RequestAdmissionFailed("Worker admission failed; pending work was cancelled and running work drained. Reconnect this client") from failure
+        return future
 
     def _arm_idle(self, lane):
         with self.lock:
@@ -166,6 +191,8 @@ class RequestDispatcher:
 
     def _finish(self, record, future, status, **fields):
         with self.lock:
+            if record["request_id"] not in self.active:
+                return
             record.update(status=status, finished_at=utc_now(), cancel_requested=future.cancel_event.is_set(), **fields)
             self.active.pop(record["request_id"], None)
             self.history.append(dict(record))
@@ -188,6 +215,7 @@ class RequestDispatcher:
             return {"max_concurrent_requests": self.workers, "max_pending_requests": self.pending,
                     "robot_lock_timeout_seconds": self.robot_wait_seconds,
                     "active": current, "recent": list(self.history), "closed": self.closed,
+                    "admission_failed": self.admission_failed,
                     "control_workers": 1, "control_capacity": 9, "controller_contacted": False}
 
     def close(self):
@@ -198,15 +226,20 @@ class RequestDispatcher:
                 if self.closed:
                     return
                 self.closed = True
-                futures = [future for _, future in self.active.values()]
+                entries = list(self.active.values())
                 pools = set(self.pools.values()) | set(self.retiring)
                 timers = set(self.idle_timers.values()) | set(self.retiring.values())
                 self.idle_timers.clear()
             for timer in timers:
                 timer.cancel()
-            for future in futures:
+            for _, future in entries:
                 future.cancel()
             for pool in pools:
-                pool.shutdown(wait=True, cancel_futures=False)
+                pool.shutdown(wait=True, cancel_futures=True)
+            # Executor-cancelled queue entries never enter execute(). This also
+            # releases entries left behind when the first worker failed to start.
+            for record, future in entries:
+                if record["request_id"] in self.active and future.cancelled():
+                    self._finish(record, future, "cancelled")
             for timer in timers:
                 timer.join()
