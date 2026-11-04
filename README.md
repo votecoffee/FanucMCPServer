@@ -20,15 +20,17 @@ the exact selected backend and existing route policy.
 An optional [Windows discovery frontend](docs/LAZY_DISCOVERY.md) can serve a
 pinned catalog before starting Python on the first explicit request. It retains
 the backend thereafter; selecting this candidate requires separate publication.
-A [cooperative idle-backend release proposal](docs/IDLE_BACKEND_PROPOSAL.md)
-describes a future offline-only lifetime change; it is not implemented.
+An opt-in [cooperative idle-backend release](docs/IDLE_BACKEND_PROPOSAL.md)
+keeps host stdio open while draining an eligible offline child, then reactivates
+on new input. Unsupported session state retains the child. This source candidate
+requires separate review and publication; installed clients keep their generation.
 Install/repair preserves a verified native selection in the chosen Codex profile
 rather than returning it to eager Python; changed payloads or policies refuse
 before staging. Fresh native selection still requires explicit publication.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1104.123038** (America/New_York). App,
+The current source checkpoint is **26.1104.141415** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.

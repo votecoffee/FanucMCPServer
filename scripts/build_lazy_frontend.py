@@ -15,13 +15,17 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def build(source, root, capture, output, *, csc):
+def build(source, root, capture, output, *, csc, idle_seconds=None):
     from fanuc_workbench.bridge import stable_launcher as launcher
     from fanuc_workbench.version import release_metadata
     release = release_metadata()
     if launcher.parse(launcher.read(root / "application.json")) != {"schema_version": 1, "app": "fanuc-mcp-server"}:
         raise ValueError("The existing installation is not owned by FANUC")
     selection, manifest, runtime = launcher.selected(root)
+    if idle_seconds is not None:
+        metadata = launcher.parse(launcher.read(runtime / "runtime.json"))
+        if not .05 <= idle_seconds <= 3600 or metadata.get("idle_backend_protocol") != 1:
+            raise ValueError("Idle release requires a matching protocol-1 backend and finite interval")
     capture_bytes = capture.read_bytes()
     values = json.loads(capture_bytes)
     if len(values["tools/list"]["tools"]) != 15:
@@ -47,7 +51,7 @@ def build(source, root, capture, output, *, csc):
             encoding="utf-8", newline="\n")
         subprocess.run([str(csc), "/nologo", "/codepage:65001", "/target:winexe", "/platform:x64", "/optimize+",
             "/reference:System.Web.Extensions.dll", "/out:" + str(executable), str(assembly),
-            *(str(native / name) for name in ("Json.cs", "Windows.cs", "Program.cs"))], check=True)
+            *(str(native / name) for name in ("Json.cs", "Windows.cs", "Program.cs", "Idle.cs"))], check=True)
     (output / "FanucMcpFrontend.exe.config").write_bytes(
         b'<?xml version="1.0" encoding="utf-8"?>\n<configuration><startup><supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.8" /></startup></configuration>\n')
     shutil.copyfile(source / "fanuc_workbench/bridge/stable_launcher.py", output / "Backend.py")
@@ -64,6 +68,9 @@ def build(source, root, capture, output, *, csc):
         "application_sha256": digest(root / "application.json"),
         "catalog_capture_sha256": hashlib.sha256(capture_bytes).hexdigest(),
         "runtime": manifest["runtime"], "files": rows}
+    if idle_seconds is not None:
+        descriptor["idle_backend"] = {"protocol": 1, "seconds": idle_seconds,
+                                      "checkpoint_seconds": 5, "drain_seconds": 10}
     path = output / "frontend.json"
     path.write_bytes(launcher.encoded(descriptor))
     return {"candidate": str(output), "manifest_sha256": digest(path), "selection": selection,
@@ -77,9 +84,10 @@ def main():
     parser.add_argument("--catalog-capture", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--csc", type=Path, default=Path(r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"))
+    parser.add_argument("--idle-seconds", type=float, help="Opt-in cooperative offline child retirement; matching backend required")
     args = parser.parse_args()
     print(json.dumps(build(Path(__file__).resolve().parents[1], args.runtime_root.resolve(),
-        args.catalog_capture.resolve(), args.output.resolve(), csc=args.csc), indent=2))
+        args.catalog_capture.resolve(), args.output.resolve(), csc=args.csc, idle_seconds=args.idle_seconds), indent=2))
 
 
 if __name__ == "__main__":

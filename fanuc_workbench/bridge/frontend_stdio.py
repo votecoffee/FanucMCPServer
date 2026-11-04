@@ -42,7 +42,7 @@ def verify_sdk():
 
 
 @asynccontextmanager
-async def stdio_server(stdin=None, stdout=None):
+async def stdio_server(stdin=None, stdout=None, *, idle=None):
     """Use SDK framing, context streams and fd diversion without idle payloads."""
     verify_sdk()
     restore_stdin = restore_stdout = None
@@ -71,8 +71,12 @@ async def stdio_server(stdin=None, stdout=None):
                             try:
                                 message = sdk.types.jsonrpc_message_adapter.validate_json(line, by_name=False)
                             except Exception as error:
+                                if idle is not None:
+                                    idle.wire.unsupported("invalid input")
                                 await read_tx.send(error)
                                 continue
+                            if idle is not None:
+                                idle.wire.received(message, line)
                             session_message = sdk.SessionMessage(message)
                             await read_tx.send(session_message)
                         finally:
@@ -85,11 +89,17 @@ async def stdio_server(stdin=None, stdout=None):
                 async with write_rx:
                     async for session_message in write_rx:
                         raw = None
+                        succeeded = False
+                        if idle is not None:
+                            idle.wire.emitting(session_message.message)
                         try:
                             raw = session_message.message.model_dump_json(by_alias=True, exclude_unset=True)
                             await stdout.write(raw + "\n")
                             await stdout.flush()
+                            succeeded = True
                         finally:
+                            if idle is not None:
+                                idle.wire.flushed(session_message.message, succeeded=succeeded)
                             session_message = raw = None
                             # Output serialization does not use the sender's
                             # ContextVars. Input read_rx.last_context still

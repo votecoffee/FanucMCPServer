@@ -564,6 +564,9 @@ class OfflineGeneration:
             from universal_tools.windows_resources import ProcessDriver
             driver = ProcessDriver()
         self.root, self.driver = Path(root), driver
+        self.selection = selection
+        self.idle_control = None
+        self.idle_yielded = False
         self.directory = self.root / "sessions"
         self.directory.mkdir(exist_ok=True)
         ordinary(self.directory, directory=True)
@@ -686,8 +689,35 @@ class OfflineGeneration:
 
     def write(self, state, reason):
         with self.guard:
+            if self.idle_yielded:
+                raise RuntimeError("Backend receipt writer already yielded to its frontend")
             self.record.update(state=state, reason=reason)
             atomic(self.path, encoded(self.record))
+
+    def yield_idle(self, control, attempt):
+        """Transfer only this original child's writer under the admission fence."""
+        with self.guard, locked(self.directory / "admission.lock"):
+            withdrawn = control.directory / "withdraw.json"
+            if withdrawn.exists():
+                value = parse(read(withdrawn))
+                if value.get("attempt") == attempt and all(value.get(k) == v for k, v in control.config.items()):
+                    return None
+            prior = parse(read(self.path))
+            if (self.idle_yielded or prior != self.record or prior.get("state") != "active"
+                    or prior.get("identity") != self.identity or not self.parent_handle.alive()
+                    or self.parent_handle.identity != self.parent):
+                raise RuntimeError("Idle writer preimage or exact parent changed")
+            frontend = parse(self.handoff_raw)
+            if (frontend.get("identity") != self.parent or frontend.get("handoff_backend") != self.identity
+                    or frontend.get("handoff_nonce") != control.config["nonce"]
+                    or frontend.get("idle_epoch") != control.config["epoch"]):
+                raise ValueError("Idle writer handoff binding differs")
+            frontend.update(state="closing", app_created_children=[self.identity],
+                            idle_attempt=attempt, reason="Original backend quiescent; frontend retains admission during natural drain")
+            payload = encoded(frontend)
+            atomic(self.path, payload)
+            self.idle_yielded = True
+            return digest(payload)
 
     def start(self):
         self.write("active", "Running selected offline generation; no app-created children")
@@ -711,7 +741,10 @@ class OfflineGeneration:
             raise
         finally:
             try:
-                self.write("failed" if failed else "closed", "Offline process leaving its owned generation; no native jobs were admitted")
+                if self.idle_control is not None:
+                    self.idle_control.close(failed)
+                if not self.idle_yielded:
+                    self.write("failed" if failed else "closed", "Offline process leaving its owned generation; no native jobs were admitted")
             finally:
                 self.parent_handle.close()
 
@@ -910,7 +943,7 @@ def configure_archives(runtime, manifest):
     os.environ["FANUC_MCP_GUIDANCE_ROOT"] = str(runtime / "guidance")
 
 
-def main(root=None, *, pinned_snapshot=None, launcher_path=None, handoff=None, handoff_nonce=None):
+def main(root=None, *, pinned_snapshot=None, launcher_path=None, handoff=None, handoff_nonce=None, idle_control=None):
     root = Path(root) if root is not None else Path(__file__).absolute().parent
     generation = None
     try:
@@ -941,6 +974,11 @@ def main(root=None, *, pinned_snapshot=None, launcher_path=None, handoff=None, h
             raise ValueError("Actual kernel executable differs from the retained windowless interpreter")
         generation.record.setdefault("containment", {"actor_limit": 1, "commit_bytes": FRONTDOOR_BYTES, "kill_on_owner_exit": True})
         generation.start()
+        if idle_control is not None:
+            if handoff is None:
+                raise ValueError("Idle control requires an original frontend handoff")
+            from fanuc_workbench.bridge.idle_backend import install as install_idle
+            generation.idle_control = install_idle(generation, idle_control, handoff_nonce, globals())
         sys.argv = [str(root / "StartMcp.py"), "--offline", "--config", str(runtime / "policy.json"),
             "--management-runtime", str(runtime / "runtime.json"),
             "--management-registry", manifest["management_registry"], "--instance-role", "per-chat"]
@@ -965,12 +1003,14 @@ def entrypoint(arguments=None):
     if not arguments:
         return main()
     keys = {"--pinned-root", "--pinned-snapshot", "--legacy-entry", "--lazy-handoff", "--handoff-nonce"}
-    if len(arguments) != 10 or set(arguments[::2]) != keys:
+    if len(arguments) == 12:
+        keys.add("--idle-control")
+    if len(arguments) != len(keys) * 2 or set(arguments[::2]) != keys:
         raise ValueError("Invalid private pinned-backend arguments")
     options = dict(zip(arguments[::2], arguments[1::2]))
     return main(Path(options["--pinned-root"]), pinned_snapshot=options["--pinned-snapshot"],
         launcher_path=Path(options["--legacy-entry"]), handoff=Path(options["--lazy-handoff"]),
-        handoff_nonce=options["--handoff-nonce"])
+        handoff_nonce=options["--handoff-nonce"], idle_control=options.get("--idle-control"))
 
 
 if __name__ == "__main__":

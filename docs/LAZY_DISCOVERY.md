@@ -66,9 +66,11 @@ Activation starts one original backend, verifies its initialization and tool
 catalog, and forwards the pending request once. The original host initialization,
 opaque request IDs, UTF-8, media, metadata and subsequent frames are retained.
 Cancellation observed before dispatch prevents that operation from running.
-Failure ends the connection without another launch or operation replay. Once
-activated, the backend stays for the connection; no idle restart, native context
-migration or grant persistence is introduced. This frontend supports only the
+Failure ends the connection without another launch or operation replay.
+By default, an activated backend stays for the connection. The optional
+[offline idle protocol](IDLE_BACKEND_PROPOSAL.md) can gracefully park its own
+quiescent child and initialize a fresh child on later input. It transfers no
+native context or grants. This frontend supports only the
 existing handshake-based standalone-offline profile and MCP SDK 2.3.0.
 
 There are at most 16 pending frames before activation, each limited to 8 MiB;
@@ -92,9 +94,9 @@ Normal EOF closes the backend input and waits on the original creation handle.
 Uncertain launch intent and failed handoffs remain available for inspection.
 No controller/native operations or execution extensions are exposed.
 
-The [idle-backend release proposal](IDLE_BACKEND_PROPOSAL.md) describes a future
-cooperative retirement protocol. The current implementation retains an activated
-backend until EOF; request-thread retirement does not release the interpreter.
+The [cooperative idle-backend protocol](IDLE_BACKEND_PROPOSAL.md) is opt-in and
+requires a matching reviewed backend. Without it, an activated backend stays
+until EOF; request-thread retirement alone does not release the interpreter.
 
 ## Validation scope
 

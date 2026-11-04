@@ -205,7 +205,7 @@ def install(root, wheelhouse, wheel_manifest, config, *, expected_selection, reg
         plugin = {"name": "fanuc-mcp-server", "version": plugin_version}
         launcher.atomic(runtime / "plugin.json", launcher.encoded(plugin))
         launcher.atomic(runtime / "runtime.json", launcher.encoded({"plugin_id": "fanuc-mcp-server@fanuc-mcp-server-local",
-            "release": release, "profile": "standalone-offline", "stable_root": str(root)}))
+            "release": release, "profile": "standalone-offline", "stable_root": str(root), "idle_backend_protocol": 1}))
         python_files = archive_runtime(runtime, python, entry_bytes)
         probe_imports = {"python_files": python_files, "runtime_files": launcher.inventory(runtime)}
         launcher.atomic(runtime / "probe-imports.json", launcher.encoded(probe_imports))

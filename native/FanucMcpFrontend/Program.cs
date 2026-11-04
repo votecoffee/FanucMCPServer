@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 
 namespace FanucMcp {
-    internal sealed class Frontend : IDisposable {
+    internal sealed partial class Frontend : IDisposable {
         const int FrameLimit = 8 * 1024 * 1024;
         static readonly UTF8Encoding Utf8 = new UTF8Encoding(false, true);
         readonly List<IDisposable> pins = new List<IDisposable>();
@@ -26,7 +26,8 @@ namespace FanucMcp {
         readonly JavaScriptSerializer serializer = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024, RecursionLimit = 64 };
         readonly Dictionary<string, object> identity, parent;
         readonly IntPtr parentHandle, job;
-        readonly string root, folder, snapshot, token, receiptPath, diagnostics;
+        readonly string root, folder, snapshot, receiptPath, diagnostics;
+        string token;
         Dictionary<string, object> record;
         Json manifest, catalog;
         byte[] initialization, initializedNotification;
@@ -120,6 +121,7 @@ namespace FanucMcp {
             manifest = Json.Parse(Utf8.GetString(Pin(manifestPath, hash, -1, 8 * 1024 * 1024, true)));
             Need(manifest["schema_version"].Raw == "1" && manifest.String("app") == "fanuc-mcp-server" && manifest.String("profile") == "standalone-offline", "Unsupported frontend profile");
             root = Full(manifest.String("backend_root")); snapshot = manifest.String("snapshot_id");
+            ConfigureIdle(manifest["idle_backend"]);
             Json owner = Json.Parse(Utf8.GetString(Pin(Path.Combine(root, "application.json"), manifest.String("application_sha256"), -1, 65536, true)));
             Need(owner.String("app") == "fanuc-mcp-server" && owner["schema_version"].Raw == "1", "Installation ownership differs");
             Need(snapshot != null && System.Text.RegularExpressions.Regex.IsMatch(snapshot, "^[a-f0-9]{64}$"), "Invalid pinned selection");
@@ -137,6 +139,7 @@ namespace FanucMcp {
             Need(manifest.String("runtime") == selected.String("runtime"), "Backend runtime differs");
             string runtime = Child(root, "runtimes/" + selected.String("runtime"));
             PinTree(Path.Combine(root, "python"), selected["python_files"]); PinTree(runtime, selected["runtime_files"]);
+            if (idleEnabled) Need(Json.Parse(Utf8.GetString(ReadFile(Path.Combine(runtime, "runtime.json"), 65536)))["idle_backend_protocol"].Raw == "1", "Backend idle protocol differs");
             Json policy = Json.Parse(Utf8.GetString(ReadFile(Path.Combine(runtime, "policy.json"), 1024 * 1024)));
             Need(policy["robots"].Object.Count == 0 && policy["allow_writes"].Raw == "false", "Offline policy required");
             Need(Windows.Digest(ReadFile(Path.Combine(folder, "LegacyEntry.py"), 1024 * 1024)) == selected.String("launcher_sha256"), "Legacy entry binding differs");
@@ -242,7 +245,8 @@ namespace FanucMcp {
             return b.Append('\\', slashes * 2).Append('"').ToString();
         }
         void Activate() {
-            Need(!attempted && initialization != null && initializedNotification != null, "Backend activation is unavailable before initialization"); attempted = true;
+            Need((!attempted || (idleEnabled && parked)) && initialization != null && initializedNotification != null, "Backend activation is unavailable before initialization");
+            PrepareIdleActivation(); parked = false; attempted = true; activationAttempts++;
             lock (stateLock) {
                 record["handoff_nonce"] = token;
                 WriteState("activating", new object[] { new { state = "launch-intent" } }, "One backend launch intent; no operation dispatched");
@@ -250,43 +254,46 @@ namespace FanucMcp {
             ProcessStartInfo start = new ProcessStartInfo(Path.Combine(root, "python", "pythonw.exe"));
             string[] args = {"-I", "-B", Path.Combine(folder, "Backend.py"), "--pinned-root", root, "--pinned-snapshot", snapshot,
                 "--legacy-entry", Path.Combine(folder, "LegacyEntry.py"), "--lazy-handoff", receiptPath, "--handoff-nonce", token};
+            if (idleEnabled) args = args.Concat(new [] {"--idle-control", controlDirectory}).ToArray();
             start.Arguments = String.Join(" ", args.Select(QuoteArgument).ToArray()); start.WorkingDirectory = root;
             start.UseShellExecute = false; start.CreateNoWindow = true; start.WindowStyle = ProcessWindowStyle.Hidden;
             start.RedirectStandardInput = start.RedirectStandardOutput = start.RedirectStandardError = true;
             start.EnvironmentVariables.Remove("PYTHONPATH"); start.EnvironmentVariables.Remove("PYTHONHOME");
             start.EnvironmentVariables["PYTHONNOUSERSITE"] = "1"; start.EnvironmentVariables["PYTHONDONTWRITEBYTECODE"] = "1"; start.EnvironmentVariables["PYTHONUTF8"] = "1";
             backend = new Process { StartInfo = start };
-            Need(backend.Start(), "Backend did not start"); originalBackend = backend.Handle;
+            Need(backend.Start(), "Backend did not start"); backendStarts++; originalBackend = backend.Handle;
             backendIdentity = Windows.Identity(originalBackend, backend.Id);
             bool member; Need(Windows.IsProcessInJob(originalBackend, job, out member) && member, "Original backend is outside frontend containment");
-            errorTask = Task.Factory.StartNew(delegate { backend.StandardError.BaseStream.CopyTo(Console.OpenStandardError()); }, TaskCreationOptions.LongRunning);
+            Process child = backend;
+            if (idleEnabled) Atomic(Path.Combine(controlDirectory, "config.json"), IdleEnvelope());
+            errorTask = Task.Factory.StartNew(delegate { child.StandardError.BaseStream.CopyTo(Console.OpenStandardError()); }, TaskCreationOptions.LongRunning);
             lock (stateLock) {
                 record["handoff_backend"] = backendIdentity;
                 WriteState("activating", new object[] { backendIdentity }, "Original child identity bound; no operation dispatched");
             }
             Event("backend_started", new { identity = backendIdentity, parent = identity, snapshot });
-            backend.StandardInput.BaseStream.Write(initialization, 0, initialization.Length); backend.StandardInput.BaseStream.Flush();
-            Task<byte[]> responseTask = Task.Factory.StartNew(delegate { return Frame(backend.StandardOutput.BaseStream); }, TaskCreationOptions.LongRunning);
+            WriteBackend(initialization);
+            Task<byte[]> responseTask = Task.Factory.StartNew(delegate { return Frame(child.StandardOutput.BaseStream); }, TaskCreationOptions.LongRunning);
             Need(responseTask.Wait(10000), "Backend initialization deadline elapsed; no retry");
             byte[] response = responseTask.Result; Need(response != null, "Backend initialization closed");
             Json node = Json.Parse(Utf8.GetString(response)); Json initial = Json.Parse(Utf8.GetString(initialization));
             Need(node["id"] != null && node["id"].Raw == initial["id"].Raw && node["error"] == null, "Backend handshake differs");
             Need(node["result"].Raw == Json.Parse(InitializeResult(initial)).Raw || Equivalent(node["result"], Json.Parse(InitializeResult(initial))), "Backend identity/capabilities differ from pinned catalog");
-            backend.StandardInput.BaseStream.Write(initializedNotification, 0, initializedNotification.Length); backend.StandardInput.BaseStream.Flush();
+            WriteBackend(initializedNotification);
             string catalogId = "__fanuc_catalog_" + token;
             byte[] catalogRequest = Utf8.GetBytes("{\"jsonrpc\":\"2.0\",\"id\":" + Json.Quote(catalogId) + ",\"method\":\"tools/list\",\"params\":{}}\n");
-            backend.StandardInput.BaseStream.Write(catalogRequest, 0, catalogRequest.Length); backend.StandardInput.BaseStream.Flush();
-            Task<byte[]> toolsTask = Task.Factory.StartNew(delegate { return Frame(backend.StandardOutput.BaseStream); }, TaskCreationOptions.LongRunning);
+            WriteBackend(catalogRequest);
+            Task<byte[]> toolsTask = Task.Factory.StartNew(delegate { return Frame(child.StandardOutput.BaseStream); }, TaskCreationOptions.LongRunning);
             Need(toolsTask.Wait(10000) && toolsTask.Result != null, "Backend catalog handshake failed");
             Json actualTools = Json.Parse(Utf8.GetString(toolsTask.Result));
             Need(actualTools.String("id") == catalogId && actualTools["error"] == null && Equivalent(actualTools["result"], catalog["static"]["tools/list"]), "Backend catalog differs from pinned descriptors");
             activated = true;
-            initialization = initializedNotification = null;
+            if (!idleEnabled) initialization = initializedNotification = null;
             outputTask = Task.Factory.StartNew(delegate {
-                try { backend.StandardOutput.BaseStream.CopyTo(new LockedOutput(output, outputLock)); }
+                try { child.StandardOutput.BaseStream.CopyTo(new LockedOutput(output, outputLock)); }
                 catch (Exception error) { Event("output_failure", new { type = error.GetType().Name }); throw; }
             }, TaskCreationOptions.LongRunning);
-            Event("backend_ready", new { identity = backendIdentity, starts = 1 });
+            Event("backend_ready", new { identity = backendIdentity, starts = activationAttempts });
         }
         static bool Equivalent(Json left, Json right) {
             if (left == null || right == null) return left == right;
@@ -303,9 +310,15 @@ namespace FanucMcp {
                 try {
                 if (outputTask != null && outputTask.IsFaulted) outputTask.GetAwaiter().GetResult();
                 if (errorTask != null && errorTask.IsFaulted) errorTask.GetAwaiter().GetResult();
-                if (activated && backend.HasExited) throw new IOException("Original backend exited; reconnect without replay");
+                if (retirementBlocked) { if (eof) break; Thread.Sleep(100); continue; }
+                if (activated && backend != null && backend.HasExited) throw new IOException("Original backend exited; reconnect without replay");
+                if (activated && !parked) {
+                    try { TryRetire(); }
+                    catch (Exception error) { BlockRetirement("Retirement validation failed: " + error.GetType().Name); }
+                }
+                if (retirementBlocked) continue;
                 if (!incoming.TryTake(out frame, 100)) continue;
-                if (activated) { backend.StandardInput.BaseStream.Write(frame, 0, frame.Length); backend.StandardInput.BaseStream.Flush(); continue; }
+                if (activated) { if (parked) Activate(); WriteBackend(frame); continue; }
                 try { request = Json.Parse(Utf8.GetString(frame)); }
                 catch (FormatException) { Send("{\"jsonrpc\":\"2.0\",\"id\":null,\"error\":{\"code\":-32700,\"message\":\"Invalid JSON\"}}"); continue; }
                 string method = request.String("method"); Event("frontend_method", new { method });
@@ -321,7 +334,7 @@ namespace FanucMcp {
                 try { Activate(); }
                 catch (Exception error) { Event("activation_failed", new { type = error.GetType().Name }); Error(request, "Backend activation failed; reconnect after inspection", -32000); break; }
                 if (IsCancelled(request) || eof) Error(request, "Request cancelled before backend dispatch", -32800);
-                else { backend.StandardInput.BaseStream.Write(frame, 0, frame.Length); backend.StandardInput.BaseStream.Flush(); }
+                else WriteBackend(frame);
                 } finally { frame = null; request = null; }
             }
             if (inputFailure != null) throw new IOException("Input transport failed", inputFailure);
@@ -344,14 +357,15 @@ namespace FanucMcp {
                             Event("backend_exited", new { identity = backendIdentity, exit_code = backend.ExitCode });
                             closingRecord["state"] = "closed"; closingRecord["app_created_children"] = new object[0]; Atomic(closing, closingRecord);
                             Json prior = Json.Parse(Utf8.GetString(ReadFile(receiptPath, 65536)));
-                            if (Equivalent(prior["identity"], Json.Parse(Encode(identity))))
+                            if (!retirementBlocked && Equivalent(prior["identity"], Json.Parse(Encode(identity))))
                                 WriteState("failed", new object[0], "Original backend departed before handoff; no operation replay");
                         } finally { backend.Dispose(); originalBackend = IntPtr.Zero; }
                     }
-                } else if (!attempted) WriteState("closed", new object[0], "Frontend EOF; backend was never started");
-                Event("frontend_closed", new { activation_attempts = attempted ? 1 : 0, backend_starts = backendIdentity != null ? (object)1 : attempted ? null : (object)0 });
+                } else if (!attempted || (idleEnabled && parked)) WriteState("closed", new object[0], "Frontend EOF; no resident backend");
+                Event("frontend_closed", new { activation_attempts = activationAttempts, backend_starts = backendStarts });
             } finally {
                 stop = true;
+                if (controlPin != null) controlPin.Dispose();
                 if (parentTask != null) parentTask.GetAwaiter().GetResult();
                 if (parentHandle != IntPtr.Zero && !Windows.CloseHandle(parentHandle)) throw new Win32Exception();
                 for (int index = pins.Count - 1; index >= 0; index--) pins[index].Dispose();

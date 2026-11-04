@@ -1,7 +1,8 @@
-# Offline backend idle release proposal
+# Cooperative offline backend idle release
 
-Status: design proposal only. The installed frontend retains its backend after
-activation. This document adds no timer, setting, runtime or deployment behavior.
+Status: opt-in source candidate. Existing installations retain their selected
+behavior until a matching frontend/backend pair is reviewed and published.
+The default remains one backend retained after first activation.
 
 ## Current lifetime
 
@@ -17,7 +18,7 @@ cooperative backend retirement worth considering. A quiet process or an empty
 request dispatcher alone cannot prove protocol quiescence: accepted SDK messages,
 response serialization, output flushes and session subscriptions also matter.
 
-## Proposed scope
+## Scope
 
 Limit the first implementation to a newly reviewed, matching frontend/backend
 pair using `standalone-offline`. Leave eager clients, previous generations and
@@ -25,7 +26,7 @@ native/controller profiles unchanged. Keep the existing frontend, host stdio,
 32-connection admission pool, two-actor/128 MiB containment, dependency pins,
 policy, evidence directories and uncertain-owner barriers.
 
-Use a finite idle interval, initially proposed as 60 seconds since the last
+Use a finite idle interval, normally 60 seconds since the last
 completed and flushed operation. Enable it only through a separately reviewed
 immutable frontend descriptor. A chat tool cannot change this behavior. Keep
 the current retain-until-EOF behavior when either peer lacks the exact supported
@@ -87,9 +88,9 @@ failure. No automatic kill, stale-selector rollback, reconciliation or retry is
 part of idle release. Bound proposal/validation and graceful drain separately;
 expiration is not proof of departure.
 
-## Source changes and focused verification
+## Implementation and focused verification
 
-| Source | Required change |
+| Source | Integration |
 | --- | --- |
 | `native/FanucMcpFrontend/Program.cs` | Add an activation-epoch state machine, dispatch fence, retained negotiation capsule and own-child retirement. Capture child-specific pump references so an old task cannot read a new child's stream. |
 | `fanuc_workbench/bridge/frontend_stdio.py` and `protocol.py` | Observe full protocol acceptance, pending messages, response flush and session-state eligibility without changing SDK source or wire bytes. |
@@ -98,14 +99,48 @@ expiration is not proof of departure.
 | `scripts/build_lazy_frontend.py` | Pin the optional idle protocol and finite bounds to the reviewed closure. |
 
 The existing frontend's single-activation rule is an explicit compatibility
-boundary. A successor needs a new reviewed release; existing clients keep their
+boundary. Each successor needs a new reviewed release; existing clients keep their
 original behavior. Check exact previous-generation participant and writer-fence
 compatibility before publication. Incompatible or UNKNOWN owners stay protected.
 
-Use a small synthetic control for work arriving at the retirement boundary,
+Focused controls cover the receipt writer, unsupported session state and response
+flush boundaries. Use a small synthetic control for work arriving at the retirement boundary,
 including queued work, cancellation, a blocked output flush, subscriptions and
 an uncertain child. Demonstrate one connection serving a request, retiring its
 own child naturally, then serving a new request without losing its admission
 slot or replaying the old call. Retain original handles and failed checkpoints.
 An eventual publication requires one useful saved-route read and natural drain;
 no broader host, model or capacity matrix is part of this proposal.
+
+## Build and limits
+
+Use the existing candidate builder with a catalog captured from that exact
+protocol-1 backend:
+
+```powershell
+python scripts/build_lazy_frontend.py `
+  --runtime-root C:/Applications/FanucMCPServer/MCP `
+  --catalog-capture C:/Packages/fanuc-discovery/CATALOG_CAPTURE.json `
+  --output C:/Packages/fanuc-discovery/idle-candidate `
+  --idle-seconds 60
+```
+
+The backend's hash-bound runtime metadata must declare `idle_backend_protocol=1`.
+The descriptor pins its interval and separate five-second checkpoint and
+ten-second drain bounds. The idle clock starts at the last accepted message or
+completed response flush. The checkpoint clock starts before the first fence
+write; the drain clock starts before closing the original child's input.
+
+Control files are private, nonce/epoch/identity-bound checkpoints under the
+installation's sessions directory. They contain no tool payloads. Retained
+terminal files preserve the original outcome; this implementation adds no
+automatic archival or recovery. A failed transferred checkpoint keeps the
+frontend and original child protected and prevents new dispatch or relaunch.
+Normal EOF still drains that original child; parent-loss containment is unchanged.
+
+Resource subscriptions, logging changes, unsupported client notifications,
+server requests/notifications, malformed messages or unmatched responses retain
+the original child. Noncanonical transport line endings can fail the exact byte
+boundary check and also retain it. These messages still use the existing wire
+path; they are not rejected to make idle release possible. The backend uses
+shared durable workspaces and policy rather than a new empty evidence store.

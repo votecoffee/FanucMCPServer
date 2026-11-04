@@ -9,7 +9,9 @@ class FanucServer(ExtensionServer):
 
     async def run_stdio_async(self):
         from fanuc_workbench.bridge.frontend_stdio import stdio_server
-        async with stdio_server() as (read_stream, write_stream):
+        idle = getattr(self, "idle_backend", None)
+        streams = stdio_server() if idle is None else stdio_server(idle=idle)
+        async with streams as (read_stream, write_stream):
             await self._lowlevel_server.run(
                 read_stream, write_stream, self._lowlevel_server.create_initialization_options())
 

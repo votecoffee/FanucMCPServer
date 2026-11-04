@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add opt-in cooperative idle-child retirement for the standalone offline
+  frontend. Fence accepted work, response flush and exact receipt writers;
+  require natural original-child exit before parking or a fresh activation.
+  Unsupported session state retains its child; uncertain checkpoints block
+  relaunch. Keep host stdio, admission, workspaces, policy and dependency pins.
+
 - Serialize only the requested workspace analysis page after the complete scan.
   Preserve filtered matching, full totals, cursors, summaries and evidence errors.
 

@@ -37,7 +37,7 @@ def executables(tmp_path_factory):
     native = SOURCE / "native/FanucMcpFrontend"
     subprocess.run([str(CSC), "/nologo", "/codepage:65001", "/target:winexe", "/platform:x64", "/optimize+",
         "/reference:System.Web.Extensions.dll", "/out:" + str(frontend),
-        *(str(native / p) for p in ("Json.cs", "Windows.cs", "Program.cs"))], check=True)
+        *(str(native / p) for p in ("Json.cs", "Windows.cs", "Program.cs", "Idle.cs"))], check=True)
     subprocess.run([str(CSC), "/nologo", "/codepage:65001", "/target:winexe", "/platform:x64", "/out:" + str(backend),
         str(native / "Json.cs"), str(SOURCE / "tests/native/FrontendEchoBackend.cs")], check=True)
     return frontend, backend
@@ -161,6 +161,53 @@ def test_one_activation_preserves_unicode_media_metadata_and_large_active_frames
         client.close()
     assert sum(row["event"] == "backend_started" for row in events(folder)) == 1
     assert [row["details"]["exit_code"] for row in events(folder) if row["event"] == "backend_exited"] == [0]
+
+
+def test_previous_frontend_reads_live_idle_writer_checkpoint_without_changing_peer(candidate, tmp_path):
+    """Use an explicitly supplied sealed previous executable; no installed owner runs here."""
+    import shutil
+    previous = os.environ.get("FANUC_PREVIOUS_FRONTEND_EXE")
+    expected = os.environ.get("FANUC_PREVIOUS_FRONTEND_SHA256")
+    if not previous or not expected:
+        pytest.skip("Supply an exact reviewed previous frontend for this compatibility control")
+    previous = Path(previous)
+    assert digest(previous) == expected
+    root, folder = candidate
+    peer = Client(folder)
+    old = None
+    try:
+        peer.initialize()
+        peer.send({"jsonrpc": "2.0", "id": "peer", "method": "fixture/echo", "params": {"payload": "complete"}})
+        peer.response("peer")
+        rows = list((root / "sessions").glob("*.json"))
+        assert len(rows) == 1
+        receipt = json.loads(rows[0].read_bytes())
+        assert receipt["identity"]["pid"] == peer.process.pid and len(receipt["app_created_children"]) == 1
+        # An owned synthetic live pair represents the exact public receipt shape
+        # after the backend writer yields, before original-child natural drain.
+        receipt.update(state="closing", idle_epoch=1, idle_attempt="d" * 32)
+        checkpoint = encoded(receipt)
+        rows[0].write_bytes(checkpoint)
+        old_folder = tmp_path / "previous-candidate"
+        old_folder.mkdir()
+        descriptor = json.loads((folder / "frontend.json").read_bytes())
+        for entry in descriptor["files"]:
+            shutil.copyfile(folder / entry["path"], old_folder / entry["path"])
+        shutil.copyfile(previous, old_folder / "FanucMcpFrontend.exe")
+        descriptor["files"] = inventory(old_folder)
+        (old_folder / "frontend.json").write_bytes(encoded(descriptor))
+        old = Client(old_folder)
+        old.initialize()
+        old.send({"jsonrpc": "2.0", "id": "metadata", "method": "tools/list", "params": {}})
+        value, _ = old.response("metadata")
+        assert len(value["result"]["tools"]) == 1
+        old.close()
+        old = None
+        assert rows[0].read_bytes() == checkpoint and peer.process.poll() is None
+    finally:
+        if old is not None:
+            old.close()
+        peer.close()
 
 
 def test_cancel_before_dispatch_does_not_launch_backend(candidate):

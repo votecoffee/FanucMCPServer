@@ -569,6 +569,12 @@ def main() -> None:
             from fanuc_workbench.services.local_native import LocalNativeValidation
             native_service = LocalNativeValidation(bridge, native_policy)
         server = create_server(bridge, frontend_identity=secrets.token_hex(32), offline=args.offline, local_native=native_service)
+        if args.offline:
+            from fanuc_workbench.bridge.idle_backend import current as idle_current
+            idle = idle_current()
+            if idle is not None:
+                idle.bind(bridge)
+                server.idle_backend = idle
         with offline_profile.lifetime_receipt(bridge, profile="standalone-local-native" if native_service else offline_profile.PROFILE) if restricted else nullcontext():
             with report_service(bridge, runtime=args.management_runtime, registry=args.management_registry, role=args.instance_role):
                 try:
