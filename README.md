@@ -20,6 +20,8 @@ the exact selected backend and existing route policy.
 An optional [Windows discovery frontend](docs/LAZY_DISCOVERY.md) can serve a
 pinned catalog before starting Python on the first explicit request. It retains
 the backend thereafter; selecting this candidate requires separate publication.
+A [cooperative idle-backend release proposal](docs/IDLE_BACKEND_PROPOSAL.md)
+describes a future offline-only lifetime change; it is not implemented.
 Install/repair preserves a verified native selection in the chosen Codex profile
 rather than returning it to eager Python; changed payloads or policies refuse
 before staging. Fresh native selection still requires explicit publication.

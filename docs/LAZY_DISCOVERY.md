@@ -92,6 +92,10 @@ Normal EOF closes the backend input and waits on the original creation handle.
 Uncertain launch intent and failed handoffs remain available for inspection.
 No controller/native operations or execution extensions are exposed.
 
+The [idle-backend release proposal](IDLE_BACKEND_PROPOSAL.md) describes a future
+cooperative retirement protocol. The current implementation retains an activated
+backend until EOF; request-thread retirement does not release the interpreter.
+
 ## Validation scope
 
 Use one actual Codex discovery with its real startup parameters and verify zero
