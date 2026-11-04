@@ -307,7 +307,9 @@ def pinned_tree(root, entries, *, exact=True):
         if directory:
             handles.append(handle)
         else:
-            stream = os.fdopen(msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY), "rb")
+            # Retain the exact deny-write/delete handle after hashing, without
+            # keeping an unused Python read buffer for every pinned payload.
+            stream = os.fdopen(msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY), "rb", buffering=0)
             streams.append(stream)
             return stream
     try:

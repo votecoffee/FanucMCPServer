@@ -90,6 +90,9 @@ Archives and native payloads stay pinned against writes/replacement from
 verification through process exit. Imports use only those archives and exact
 manifest-declared native extensions. Unselected legacy standard-library files,
 new native-directory modules and unsafe archive member paths are refused.
+Verification hashes unbuffered file handles and retains those same handles.
+This preserves deny-write/delete sharing without keeping a Python read buffer
+for each payload. The archive import readers retain their separate buffering.
 The installer retains its original unpacked staging for payload comparison.
 
 The bundle installer `InstallPlugin.cmd --bundle ...` now uses this contract and

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Remove retained per-file Python read buffers from launcher verification
+  pins. Keep the same hashed handles and deny-write/delete protection while
+  reducing metadata frontend baseline memory. SDK and framework pins unchanged.
+
 - Prevent rejected executor submissions from running on later requests when
   worker startup fails. Stop admission, cancel pending work, drain running
   operations and release queued payloads before requesting a client reconnect.
