@@ -16,7 +16,7 @@ and evidence state. Each published process has one actor and **128 MiB** private
 commit. The normal steady-state bound is **4 GiB**, matching the former eight
 512 MiB actors, with no app-created child processes. Metadata, tool schemas,
 current guidance and health do not import analysis services or acquire a data
-execution lease. The existing SDK and original byte-stream transport are retained.
+execution lease. The pinned SDK and its descriptor-ownership contract are retained.
 
 Data operations admit **eight executing calls** per evidence state and **16
 waiting calls**, with a five-second admission deadline. Locks are acquired only
@@ -60,6 +60,14 @@ substitute working-set figures or claim this theoretical ceiling was consumed.
 Direct development offline clients have the same 32-connection OS lease bound;
 the accepted 128 MiB process containment is established by the published stable
 launcher. Library embedding is not installed-process acceptance.
+
+The app-owned stdio provider uses the exact reviewed MCP SDK 2.3 descriptor
+claim/restore helpers, UTF-8 wrappers and context streams. Completed input models,
+lines, output models and serialized frames are released before the next idle
+wait. Input reads bypass the asynchronous file iterator that retains its last
+yielded line. SDK source bytes are verified through the import loader in both
+loose and immutable archive layouts; an unreviewed provider refuses startup.
+The SDK session loop, FD 0/1 diversion and framework/SDK pins remain unchanged.
 
 ## Startup and publication
 

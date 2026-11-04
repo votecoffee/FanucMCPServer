@@ -7,6 +7,12 @@ class FanucServer(ExtensionServer):
         self.enable_discovery_cache = enable_discovery_cache
         super().__init__(*args, **kwargs)
 
+    async def run_stdio_async(self):
+        from fanuc_workbench.bridge.frontend_stdio import stdio_server
+        async with stdio_server() as (read_stream, write_stream):
+            await self._lowlevel_server.run(
+                read_stream, write_stream, self._lowlevel_server.create_initialization_options())
+
     async def _handle_list_tools(self, ctx, params):
         result = await super()._handle_list_tools(ctx, params)
         if self.enable_discovery_cache and ctx.protocol_version == "2026-07-28":

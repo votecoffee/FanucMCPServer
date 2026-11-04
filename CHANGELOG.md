@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Release delivered stdio models and serialized frames before idle input/output
+  waits, including the last line retained by the asynchronous file iterator.
+  Use an app-owned provider with the reviewed SDK descriptor ownership and
+  session handling; keep the existing SDK/framework pins and verification handles.
+
 - Remove retained per-file Python read buffers from launcher verification
   pins. Keep the same hashed handles and deny-write/delete protection while
   reducing metadata frontend baseline memory. SDK and framework pins unchanged.
