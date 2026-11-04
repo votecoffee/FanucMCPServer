@@ -103,7 +103,9 @@ async def stdio_server(stdin=None, stdout=None):
             tasks.start_soon(writer)
             yield read_rx, write_tx
     finally:
-        if restore_stdout is not None:
-            restore_stdout()
-        if restore_stdin is not None:
-            restore_stdin()
+        try:
+            if restore_stdout is not None:
+                restore_stdout()
+        finally:
+            if restore_stdin is not None:
+                restore_stdin()

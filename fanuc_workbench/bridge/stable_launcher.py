@@ -670,10 +670,17 @@ class OfflineGeneration:
 
     def close(self, *, failed=False):
         self.stop.set()
-        if self.thread:
-            self.thread.join(timeout=1)
-        self.write("failed" if failed else "closed", "Offline process leaving its owned generation; no native jobs were admitted")
-        self.parent_handle.close()
+        try:
+            if self.thread:
+                self.thread.join(timeout=1)
+        except BaseException:
+            failed = True
+            raise
+        finally:
+            try:
+                self.write("failed" if failed else "closed", "Offline process leaving its owned generation; no native jobs were admitted")
+            finally:
+                self.parent_handle.close()
 
 
 def contain_current():

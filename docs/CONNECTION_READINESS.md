@@ -75,6 +75,11 @@ loose and immutable archive layouts; an unreviewed provider refuses startup.
 The output receiver also clears its unused completed sender ContextVar snapshot
 after flush or failure; input context propagation to SDK handlers is retained.
 The SDK session loop, FD 0/1 diversion and framework/SDK pins remain unchanged.
+Stdio restoration attempts stdin even when stdout restoration raises. The
+frontdoor similarly attempts its terminal receipt and parent query-handle close
+after a watcher-join error; receipt failure still permits query-handle cleanup.
+Errors remain chained. A failed receipt write does not invent a terminal state
+or prove departure; exact-generation admission and UNKNOWN gates remain intact.
 
 ## Startup and publication
 

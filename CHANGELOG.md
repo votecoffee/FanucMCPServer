@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Attempt independent frontdoor receipt/parent-query cleanup and both stdio
+  descriptor restorations after an earlier teardown error. Preserve original
+  and chained failures, failed-write evidence and exact-generation admission.
+
 - Cancel and unregister idle-retirement timers whose startup fails, preserving
   completed results, request drain and offline metadata-slot release. Record
   the error type and retry retirement after later work; keep real uncertain
