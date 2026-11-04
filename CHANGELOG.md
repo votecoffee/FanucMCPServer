@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Release completed stdio output ContextVar snapshots after flush or failure,
+  preserving input context propagation to SDK handlers.
+
 - Release delivered stdio models and serialized frames before idle input/output
   waits, including the last line retained by the asynchronous file iterator.
   Use an app-owned provider with the reviewed SDK descriptor ownership and

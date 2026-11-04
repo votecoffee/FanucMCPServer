@@ -1,5 +1,6 @@
 """Real idle input pipe, delivered frame reachability and descriptor ownership."""
 import asyncio
+import contextvars
 import gc
 import json
 import os
@@ -153,3 +154,72 @@ def test_unreviewed_sdk_version_is_refused_before_claim(monkeypatch):
     monkeypatch.setattr(frontend_stdio, "version", lambda package: "unreviewed")
     with pytest.raises(RuntimeError, match="reviewed MCP 2.3.0"):
         frontend_stdio.verify_sdk()
+
+
+@pytest.mark.parametrize("fail_flush", [False, True])
+def test_completed_writer_context_is_released_and_input_context_propagates(fail_flush):
+    output_payload = contextvars.ContextVar("fixture_output_payload", default=None)
+    input_marker = contextvars.ContextVar("fixture_input_marker", default=None)
+    class Payload:
+        def __init__(self):
+            self.data = bytearray(8 * 1024 * 1024)
+    class Output:
+        def __init__(self):
+            self.flushed = anyio.Event()
+        async def write(self, raw):
+            assert json.loads(raw)["result"] == {"ok": True}
+        async def flush(self):
+            self.flushed.set()
+            if fail_flush:
+                raise OSError("synthetic flush failure")
+
+    async def scenario():
+        read_fd, write_fd = os.pipe()
+        incoming = anyio.wrap_file(os.fdopen(read_fd, "r", encoding="utf-8"))
+        feed = anyio.wrap_file(os.fdopen(write_fd, "w", encoding="utf-8"))
+        output = Output()
+        reference = None
+        failures = []
+        token = input_marker.set("input-owner")
+        manager = frontend_stdio.stdio_server(incoming, output)
+        try:
+            try:
+                async with manager as (read, write):
+                    input_marker.reset(token)
+                    token = None
+                    try:
+                        await feed.write('{"jsonrpc":"2.0","method":"fixture"}\n')
+                        await feed.flush()
+                        await read.receive()
+                        assert read.last_context.get(input_marker) == "input-owner"
+                        async def send():
+                            payload = Payload()
+                            observed = weakref.ref(payload)
+                            output_token = output_payload.set(payload)
+                            try:
+                                await write.send(sdk.SessionMessage(sdk.types.JSONRPCResponse(
+                                    jsonrpc="2.0", id=1, result={"ok": True})))
+                            finally:
+                                output_payload.reset(output_token)
+                            return observed
+                        reference = await send()
+                        await output.flushed.wait()
+                        await anyio.sleep(.02)
+                        gc.collect()
+                        assert reference() is None
+                    finally:
+                        # A writer failure cancels the fixture body. Still send
+                        # EOF to drain its own blocked input worker normally.
+                        with anyio.CancelScope(shield=True):
+                            await feed.aclose()
+                            await write.aclose()
+            except* OSError as error:
+                failures.append(error)
+            assert bool(failures) is fail_flush
+            gc.collect()
+            assert reference is not None and reference() is None
+        finally:
+            if token is not None:
+                input_marker.reset(token)
+            await incoming.aclose()
+    asyncio.run(scenario())

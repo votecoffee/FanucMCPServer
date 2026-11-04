@@ -91,6 +91,10 @@ async def stdio_server(stdin=None, stdout=None):
                             await stdout.flush()
                         finally:
                             session_message = raw = None
+                            # Output serialization does not use the sender's
+                            # ContextVars. Input read_rx.last_context still
+                            # propagates to the SDK handler unchanged.
+                            write_rx.last_context = None
             except anyio.ClosedResourceError:
                 await anyio.lowlevel.checkpoint()
 

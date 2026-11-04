@@ -67,6 +67,8 @@ lines, output models and serialized frames are released before the next idle
 wait. Input reads bypass the asynchronous file iterator that retains its last
 yielded line. SDK source bytes are verified through the import loader in both
 loose and immutable archive layouts; an unreviewed provider refuses startup.
+The output receiver also clears its unused completed sender ContextVar snapshot
+after flush or failure; input context propagation to SDK handlers is retained.
 The SDK session loop, FD 0/1 diversion and framework/SDK pins remain unchanged.
 
 ## Startup and publication
