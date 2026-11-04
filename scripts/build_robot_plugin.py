@@ -76,9 +76,26 @@ def copy_installer_services(source, output):
         shutil.copyfile(source / "fanuc_workbench" / relative, destination)
 
 
-def build(source: Path, output: Path, framework_wheel: Path):
+def build(source: Path, output: Path, framework_wheel: Path, *, wheelhouse=None, wheel_manifest=None):
     release = verify_release(source)
     verify_framework_wheel(source, framework_wheel)
+    dependency_wheels = []
+    if (wheelhouse is None) != (wheel_manifest is None):
+        raise ValueError("Offline build requires both --wheelhouse and --wheel-manifest")
+    if wheelhouse is not None:
+        rows = json.loads(Path(wheel_manifest).read_bytes())
+        names = set()
+        for row in rows:
+            name = row["path"]
+            if (Path(name).name != name or not name.endswith(".whl") or name in names):
+                raise ValueError("Reviewed wheels must have unique flat wheel names")
+            names.add(name)
+            path = Path(wheelhouse) / name
+            data = path.read_bytes()
+            if len(data) != row["bytes"] or hashlib.sha256(data).hexdigest() != row["sha256"]:
+                raise ValueError("Offline dependency wheel differs from reviewed manifest")
+            if not name.startswith("fanuc_mcp_server_bridge-"):
+                dependency_wheels.append(path)
     if output.exists():
         raise FileExistsError("Choose a new output directory; existing bundles are preserved")
     if sys.platform != "win32":
@@ -98,6 +115,13 @@ def build(source: Path, output: Path, framework_wheel: Path):
     wheels = plugin / "wheels"
     wheels.mkdir()
     shutil.copyfile(framework_wheel, wheels / framework_wheel.name)
+    for path in dependency_wheels:
+        target = wheels / path.name
+        if target.exists():
+            if target.read_bytes() != path.read_bytes():
+                raise ValueError("Reviewed wheelhouse conflicts with the framework wheel")
+        else:
+            shutil.copyfile(path, target)
     environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PIP_DISABLE_PIP_VERSION_CHECK": "1"}
     with tempfile.TemporaryDirectory(prefix="fanuc_build_", dir=output.parent) as temporary:
         stage = Path(temporary).resolve()
@@ -106,11 +130,11 @@ def build(source: Path, output: Path, framework_wheel: Path):
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         shutil.copyfile(source / "packaging" / "bridge" / "pyproject.toml", stage / "pyproject.toml")
         shutil.copyfile(source / "LICENSE", stage / "LICENSE")
-        subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "--wheel-dir", str(wheels), str(stage)],
+        subprocess.run([sys.executable, "-m", "pip", "wheel", "--no-deps", "--no-build-isolation", "--wheel-dir", str(wheels), str(stage)],
                        check=True, env=environment)
     own = next(wheels.glob("fanuc_mcp_server_bridge-*.whl"))
     verify_bridge_version(own, release)
-    subprocess.run([sys.executable, "-m", "pip", "download", "--only-binary=:all:", "--find-links", str(wheels), "--constraint", str(source / "packaging/framework-requirements.txt"), "--dest", str(wheels), str(own)],
+    subprocess.run([sys.executable, "-m", "pip", "download", *( ["--no-index"] if wheelhouse is not None else []), "--only-binary=:all:", "--find-links", str(wheels), "--constraint", str(source / "packaging/framework-requirements.txt"), "--dest", str(wheels), str(own)],
                    check=True, env=environment)
     docs = output / "docs"
     docs.mkdir()
@@ -153,8 +177,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--framework-wheel", required=True, type=Path, help="Verified shared framework wheel matching packaging/framework.lock.json")
+    parser.add_argument("--wheelhouse", type=Path, help="Reuse a reviewed offline dependency closure")
+    parser.add_argument("--wheel-manifest", type=Path, help="Exact path/bytes/SHA-256 inventory for --wheelhouse")
     args = parser.parse_args()
-    print(json.dumps(build(Path(__file__).resolve().parents[1], args.output.resolve(), args.framework_wheel.resolve()), indent=2))
+    print(json.dumps(build(Path(__file__).resolve().parents[1], args.output.resolve(), args.framework_wheel.resolve(),
+                           wheelhouse=args.wheelhouse, wheel_manifest=args.wheel_manifest), indent=2))
 
 
 if __name__ == "__main__":

@@ -36,8 +36,9 @@ def test_installer_registers_only_standalone_routes(tmp_path, monkeypatch, selec
     route = selected or "plugin"
     assert calls == (["runtime"] if route == "none" else ["runtime", route])
     server = json.loads((root / "plugin/mcp.json").read_bytes())["mcpServers"]["fanuc-mcp-server"]
-    assert server["command"] == str(runtime / "python/pythonw.exe")
-    assert server["cwd"] == str(runtime) and str(root) not in json.dumps(server)
+    assert server["command"] == "pythonw.exe"
+    assert server["env"]["PATH"] == str(runtime / "python")
+    assert server["cwd"] == "${PLUGIN_DATA}" and str(root) not in json.dumps(server)
 
 
 @pytest.mark.parametrize("removed", [["--register", "broker"], ["--register", "auto"],

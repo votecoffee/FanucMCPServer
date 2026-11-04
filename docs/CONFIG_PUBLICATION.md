@@ -1,7 +1,15 @@
 # Codex config publication
 
 Bundle setup delegates plugin/marketplace or direct MCP registration to the Codex
-CLI. It does not serialize `config.toml` in Python. `--codex-home` selects an
+CLI. It does not serialize `config.toml` in Python. Registration holds
+`Local\CodexMcpSettingsPublication-v1`. An explicit expected config hash is
+checked inside that mutex; guarded registration refuses to enable a bundled
+FANUC server alongside an enabled canonical direct route and verifies the
+resulting parsed settings. An existing recognized FANUC local marketplace can
+move by changing only its source value, preserving comments, physical endings,
+other settings and the disabled bundled-server policy. The supported CLI then
+adds the marketplace and plugin without uninstalling the old cache.
+`--codex-home` selects an
 explicit separate profile; `--register none` avoids registration entirely. Do
 not run installation/registration against a live profile during source or fixture
 testing. Documentation changes require no reinstall or restart.

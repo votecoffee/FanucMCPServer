@@ -14,10 +14,13 @@ The shared dependency comes from [CodexMCPBroker](https://github.com/votecoffee/
 which now provides an MCP application framework and a separately installed Windows
 management app. FanucMCPServer retains its standalone MCP server, app-owned Codex
 plugin and native skills. There is no universal Codex plugin or broker route.
+Bundled stdio uses a bare executable name with its search path restricted to the
+stable installation and the supported persistent `${PLUGIN_DATA}` working directory. Plugin-only publication can update packaging while retaining
+the exact selected backend and existing route policy.
 The MCP/native integration is under development; physical-controller acceptance
 and native program deployment validation remain pending.
 
-The current source checkpoint is **26.1104.005537** (America/New_York). App,
+The current source checkpoint is **26.1104.014521** (America/New_York). App,
 package and standalone plugin versions share this fixed timestamp. See
 [release versioning](docs/RELEASE_VERSIONING.md) for canonical package identities,
 leading-zero normalization and the stamp-once release procedure.

@@ -92,13 +92,31 @@ replace a live peer's backend or mutate a retained runtime.
 
 The local plugin keeps its own `plugin.json` and `fanuc-robot` skill. The bundle
 hashes an immutable `mcp.template.json`; setup emits `mcp.json` with the selected
-app-owned `python/pythonw.exe`, `StartMcp.py` and stable working directory.
+app-owned `StartMcp.py`. Plugin `cwd` is `${PLUGIN_DATA}`, the host's persistent
+data directory; the existing bootstrap switches to its stable installation before
+serving. The command is the bare
+`pythonw.exe`; its explicit `PATH` contains only the verified stable Python
+directory. No wrapper or resident relay is added. The bootstrap still verifies
+the actual kernel executable against its retained interpreter. A Python directory
+containing a semicolon is refused because it cannot be one Windows PATH entry.
 The `${FANUC_MCP_INSTALL_ROOT}` source markers are installer recipes; no host
-variable expansion is assumed. Publish only the generated absolute binding.
+variable expansion is assumed. Publish only the generated stable binding.
 The stable entry verifies immutable snapshots and preserves original SDK wire
 handles, EOF and exact parent lifetime. Configuration and evidence live outside
 the plugin cache. Public marketplace submission and
 native Codex confirmation UI acceptance remain pending.
+
+For a packaging-only update, add `--plugin-only` with the existing selection
+and bootstrap hashes. Setup verifies the current zero-robot read-only installation
+and generates the plugin binding without installing or selecting another backend.
+Use `--expected-codex-config-sha256 HASH` for guarded CLI registration. Registration
+uses the shared Windows settings-publication mutex and preserves a disabled
+bundled route when the canonical direct FANUC route is enabled.
+
+To reuse reviewed dependency wheels offline, build with both `--wheelhouse DIR`
+and `--wheel-manifest JSON`. Each path, size and SHA-256 is checked before use;
+the resolver uses only the supplied closure. Building requires setuptools and
+wheel in the matching build interpreter.
 
 The managed stdio profile requires Windows. Its SDK streams remain ordinary
 stdin/stdout pipes. A bounded private activation handshake establishes ledger

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Emit modern Codex-compatible bare stdio commands with an exact stable Python
+  search path. Add guarded plugin-only publication so packaging can be updated
+  without changing the selected backend, dependency pins or direct-route policy.
+  Support reviewed offline wheel closures for reproducible plugin bundles.
+
 - Attempt independent frontdoor receipt/parent-query cleanup and both stdio
   descriptor restorations after an earlier teardown error. Preserve original
   and chained failures, failed-write evidence and exact-generation admission.

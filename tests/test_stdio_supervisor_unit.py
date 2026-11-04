@@ -94,9 +94,10 @@ def test_generated_plugin_connection_uses_installed_python_and_no_conditional_pl
     connection = setup.plugin_connection(python, pointer, runtime)
     assert set(connection["mcpServers"]) == {"fanuc-mcp-server"}
     server = connection["mcpServers"]["fanuc-mcp-server"]
-    assert server["command"] == str(python)
+    assert server["command"] == "pythonw.exe"
+    assert server["env"]["PATH"] == str(runtime / "python")
     assert server["args"] == ["-I", "-B", str(runtime / "StartMcp.py")]
-    assert server["cwd"] == str(runtime)
+    assert server["cwd"] == "${PLUGIN_DATA}"
 
 
 def test_bundle_recipe_remains_verifiable_after_generating_runtime_connection(tmp_path):

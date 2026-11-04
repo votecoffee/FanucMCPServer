@@ -13,6 +13,8 @@ def load_setup():
     spec=importlib.util.spec_from_file_location('plugin_upgrade_setup',path)
     module=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    from contextlib import nullcontext
+    module.publication_lock = nullcontext  # Disposable CLI spies never lock live settings.
     return module
 
 
