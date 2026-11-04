@@ -1,7 +1,8 @@
 """Explicit offline MCP installation; immutable runtimes, atomic selection, no registration.
 
-The caller supplies a reviewed wheel inventory. This service never reads Codex
-settings, edits caches, fetches dependencies, runs native tools or retires peers.
+The caller supplies a reviewed wheel inventory. Before staging, this service
+may read only FANUC's Codex row to retain a verified native selection. It never
+edits settings/caches, fetches dependencies, runs native tools or retires peers.
 """
 from __future__ import annotations
 
@@ -118,7 +119,7 @@ def copy_python(destination, source=None):
 
 
 def install(root, wheelhouse, wheel_manifest, config, *, expected_selection, registry, plugin_version, python_source=None,
-            expected_bootstrap=None):
+            expected_bootstrap=None, codex_home=None):
     if os.name != "nt":
         raise ValueError("Stable FANUC launcher installation currently requires Windows")
     root, wheelhouse, config = Path(root).absolute(), Path(wheelhouse).absolute(), Path(config).absolute()
@@ -128,6 +129,12 @@ def install(root, wheelhouse, wheel_manifest, config, *, expected_selection, reg
         raise ValueError("Choose an app-owned installation outside checkouts, caches and build output")
     if any((parent / ".git").exists() for parent in (root, *root.parents)):
         raise ValueError("Stable launcher must not be installed in a development checkout")
+    from fanuc_workbench.services.frontend_selection import retained_installation
+    retained = retained_installation(root, config, expected_selection=expected_selection,
+        expected_bootstrap=expected_bootstrap, codex_home=codex_home)
+    if retained is not None:
+        retained.update(schema_version=1, requested_release=release_metadata())
+        return retained  # Verified repair is a no-op; never downgrade to eager Python.
     rows = launcher.parse(launcher.read(wheel_manifest, launcher.MAX_MANIFEST))
     launcher.verify(wheelhouse, rows)
     wheels = [wheelhouse / row["path"] for row in rows]
@@ -241,11 +248,12 @@ def main(argv=None):
     parser.add_argument("--management-registry", required=True, type=Path)
     parser.add_argument("--installed-plugin-version", required=True, help="Observed standalone plugin version; this installer does not publish plugins")
     parser.add_argument("--expected-bootstrap-sha256", help="Exact prior entry hash for an explicitly reviewed bootstrap migration")
+    parser.add_argument("--codex-home", type=Path, help="Read-only profile used to preserve an existing verified native frontend")
     args = parser.parse_args(argv)
     try:
         result = install(args.app_root, args.wheelhouse, args.wheel_manifest, args.config,
             expected_selection=args.expected_selection_sha256, registry=args.management_registry, plugin_version=args.installed_plugin_version,
-            expected_bootstrap=args.expected_bootstrap_sha256)
+            expected_bootstrap=args.expected_bootstrap_sha256, codex_home=args.codex_home)
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError) as exc:
         print("FANUC stable installation refused: " + str(exc), file=sys.stderr)
         return 1

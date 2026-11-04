@@ -1,8 +1,8 @@
 # Lazy discovery frontend
 
 The optional Windows frontend answers reviewed discovery methods without starting
-Python. The ordinary installer and selected route remain unchanged until a
-separate guarded publication selects this candidate. The frontend requires
+Python. Selecting a new native frontend requires a separate guarded publication.
+Canonical install and plugin repair retain a verified existing native selection. The frontend requires
 Windows x64 and .NET Framework 4.8; building uses the Windows C# compiler and
 does not download packages.
 
@@ -28,6 +28,24 @@ checks the captured offline catalog and release, and emits a hash-bound
 exact candidate connection. It never edits Codex settings or selects a runtime.
 Keep the candidate bytes unchanged while reviewing and publishing them through
 the shared [settings publication contract](CONFIG_PUBLICATION.md).
+
+## Preserve an installed native selection
+
+`InstallMCP.cmd` and built-bundle setup read only FANUC's direct row in the
+chosen Codex profile (`--codex-home`, `CODEX_HOME`, or the default user profile).
+A recognized native binding is checked against its exact manifest, all six files,
+app ownership, immutable backend, SDK/framework pins and read-only policy.
+A valid repair returns the retained connection and actual backend release without
+installing another backend or changing settings. `requested_release` identifies
+the installer source; it does not claim that release replaced the pinned backend.
+
+Bundle setup, including `--plugin-only`, emits the same native binding with a
+bare executable name and restricted `PATH`. The disabled duplicate server policy
+and canonical settings stay under their existing publication controls. A changed
+policy, stale expected selector or unverified native payload refuses before
+staging; it never silently falls back to Python. Backend/frontend upgrades need
+a new reviewed pair and explicit publication. Fresh installations without a
+selected native frontend retain the ordinary preparation workflow.
 
 ## Protocol and lifetime
 

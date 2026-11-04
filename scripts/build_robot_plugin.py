@@ -70,7 +70,7 @@ def copy_installer_services(source, output):
     # Regular packages take precedence over installed/editable namespaces. A
     # namespace-only bundle could accidentally load an older global installer.
     for relative in ("__init__.py", "version.py", "bridge/__init__.py", "bridge/stable_launcher.py",
-                     "services/__init__.py", "services/stable_install.py"):
+                     "services/__init__.py", "services/stable_install.py", "services/frontend_selection.py"):
         destination = output / "fanuc_workbench" / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / "fanuc_workbench" / relative, destination)

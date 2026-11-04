@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Preserve a verified native frontend/backend selection during canonical install
+  and plugin repair. Refuse payload/policy drift before staging, retain existing
+  settings and emit the native standalone plugin binding.
+
 - Add an opt-in Windows discovery frontend with a hash-bound catalog and pinned
   backend activation. Retain one backend after first use, opaque frames, original
   parent/child ownership and the existing 32-connection/128 MiB budget.

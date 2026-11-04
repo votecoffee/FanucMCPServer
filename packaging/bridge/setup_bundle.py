@@ -74,7 +74,7 @@ def plugin_connection(python, pointer, runtime):
                     "PYTHONNOUSERSITE": "1", "PYTHONUTF8": "1"}}}}
 
 
-def existing_connection(root, expected_selection, expected_bootstrap):
+def existing_connection(root, expected_selection, expected_bootstrap, *, codex_home=None, config=None):
     """Verify an existing offline installation without publishing a generation."""
     from fanuc_workbench.bridge import stable_launcher as launcher
     root = Path(root).absolute()
@@ -84,6 +84,14 @@ def existing_connection(root, expected_selection, expected_bootstrap):
         raise ValueError("Existing runtime selection changed")
     if launcher.digest(launcher.read(root / "StartMcp.py", launcher.MAX_MANIFEST)) != expected_bootstrap:
         raise ValueError("Existing runtime bootstrap changed")
+    from fanuc_workbench.services.frontend_selection import selected_native, policy_document
+    retained = selected_native(root, codex_home=codex_home)
+    if retained is not None:
+        if config is not None and policy_document(config) != retained[1]:
+            raise ValueError("Requested policy differs from the pinned native backend")
+        if launcher.digest(launcher.read(root / "launcher/current.json")) != expected_selection:
+            raise ValueError("Existing runtime selection changed during native verification")
+        return retained[0]
     selection, manifest, runtime = launcher.selected(root)
     policy = launcher.parse(launcher.read(runtime / "policy.json"))
     if policy.get("robots") != {} or policy.get("allow_writes") is not False:
@@ -302,13 +310,17 @@ def main():
     if args.plugin_only:
         if not args.expected_bootstrap_sha256:
             raise ValueError("Plugin-only publication requires the existing bootstrap SHA-256")
-        result = existing_connection(args.runtime_dir, args.expected_selection_sha256, args.expected_bootstrap_sha256)
+        result = existing_connection(args.runtime_dir, args.expected_selection_sha256, args.expected_bootstrap_sha256, codex_home=args.codex_home, config=args.config)
     else:
         result = install(args.runtime_dir, wheels, wheel_manifest, args.config,
             expected_selection=args.expected_selection_sha256, registry=args.management_registry,
             plugin_version=args.installed_plugin_version or versions.PACKAGE_VERSION,
-            expected_bootstrap=args.expected_bootstrap_sha256)
-    connection = plugin_connection(result["connection"]["command"], None, args.runtime_dir)
+            expected_bootstrap=args.expected_bootstrap_sha256, codex_home=args.codex_home)
+    if result.get("native_frontend_preserved"):
+        from fanuc_workbench.services.frontend_selection import plugin_connection as native_plugin_connection
+        connection = native_plugin_connection(args.runtime_dir, result["connection"])
+    else:
+        connection = plugin_connection(result["connection"]["command"], None, args.runtime_dir)
     generated_file(root, "plugin/mcp.json", json.dumps(connection, indent=2).encode())
     if args.register == "plugin":
         register_plugin(codex, root, environment, args.expected_codex_config_sha256)
