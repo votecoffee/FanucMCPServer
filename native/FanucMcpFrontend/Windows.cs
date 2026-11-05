@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -25,6 +26,7 @@ namespace FanucMcp {
         [DllImport("kernel32.dll", SetLastError=true)] static extern bool GetFileInformationByHandleEx(SafeFileHandle handle, int kind, out Tag tag, uint size);
         [StructLayout(LayoutKind.Sequential)] struct Tag { public uint attributes, tag; }
         [DllImport("ntdll.dll")] static extern int NtQueryInformationProcess(IntPtr process, int kind, ref BasicProcess data, uint size, out uint returned);
+        [DllImport("ntdll.dll")] static extern int NtQuerySystemInformation(uint kind, IntPtr buffer, uint size, out uint returned);
         [StructLayout(LayoutKind.Sequential)] struct BasicProcess { public IntPtr reserved, peb, r1, r2, pid, parent; }
         [StructLayout(LayoutKind.Sequential)] struct BasicLimits { public long user, jobUser; public uint flags; public UIntPtr minimum, maximum; public uint active; public UIntPtr affinity; public uint priority, scheduling; }
         [StructLayout(LayoutKind.Sequential)] struct IO { public ulong read, write, other, readBytes, writeBytes, otherBytes; }
@@ -61,6 +63,49 @@ namespace FanucMcp {
                 return WaitForSingleObject(handle, 0) == 0 ? "absent" : "alive";
             } catch (Win32Exception) { return "unknown"; }
             finally { if (!CloseHandle(handle)) throw new Win32Exception(); }
+        }
+        // Same SystemProcessInformation prefix and bound as the Python
+        // launcher. A missing process in this snapshot proves nothing.
+        internal static Dictionary<int, long> ProcessCreationTimes() {
+            if (IntPtr.Size != 8) return null;
+            const int limit = 16 * 1024 * 1024, prefix = 88;
+            const int creationOffset = 32, pidOffset = 80;
+            int size = 1024 * 1024;
+            while (size <= limit) {
+                IntPtr buffer = Marshal.AllocHGlobal(size);
+                try {
+                    uint returned;
+                    int status = NtQuerySystemInformation(5, buffer, (uint)size, out returned);
+                    if (status == unchecked((int)0xc0000004)) {
+                        long nextSize = Math.Max(2L * size, (long)returned + 65536);
+                        if (nextSize > limit) return null;
+                        size = (int)nextSize;
+                        continue;
+                    }
+                    if (status != 0 || returned < prefix || returned > size) return null;
+                    var times = new Dictionary<int, long>();
+                    int offset = 0;
+                    while (offset <= (int)returned - prefix) {
+                        int next = Marshal.ReadInt32(buffer, offset);
+                        long pid = Marshal.ReadInt64(buffer, offset + pidOffset);
+                        if (pid < 0 || pid > Int32.MaxValue || times.ContainsKey((int)pid)) return null;
+                        times.Add((int)pid, Marshal.ReadInt64(buffer, offset + creationOffset));
+                        if (next == 0) return times;
+                        if (next < prefix || next > (int)returned - offset - prefix) return null;
+                        offset += next;
+                    }
+                    return null;
+                } finally { Marshal.FreeHGlobal(buffer); }
+            }
+            return null;
+        }
+        internal static bool HasLaterCreation(Json identity, Dictionary<int, long> times) {
+            int pid;
+            long prior, observed;
+            return times != null && identity.String("host_id") == Host &&
+                Int32.TryParse(identity["pid"].Raw, NumberStyles.None, CultureInfo.InvariantCulture, out pid) && pid >= 5 &&
+                Int64.TryParse(identity.String("created"), NumberStyles.None, CultureInfo.InvariantCulture, out prior) && prior > 0 &&
+                times.TryGetValue(pid, out observed) && observed > prior;
         }
         internal static IntPtr Contain() {
             IntPtr job = CreateJobObject(IntPtr.Zero, null);

@@ -156,6 +156,8 @@ namespace FanucMcp {
             record = NewRecord("starting", new object[0]);
             using (FileStream gate = Admission()) {
                 int active = 0, legacy = 0;
+                Dictionary<int, long> processCreations = null;
+                bool queriedProcessCreations = false;
                 foreach (string path in Directory.GetFiles(sessions, "*.json")) {
                     Json prior = Json.Parse(Utf8.GetString(ReadFile(path, 65536)));
                     Need(prior.String("profile") == "standalone-offline" && prior["native_intents"].Raw == "false", "Uncertain prior ownership");
@@ -163,6 +165,16 @@ namespace FanucMcp {
                     string state = Windows.State(prior["identity"]);
                     Need(!pending || (prior["lazy_frontend"] != null && prior["lazy_frontend"].Raw == "true" && state == "alive"), "Uncertain prior children need inspection");
                     bool terminal = new [] {"closed", "failed", "parent-exited", "reconciled-dead"}.Contains(prior.String("state"));
+                    if (state == "unknown" && !terminal) {
+                        if (!queriedProcessCreations) {
+                            processCreations = Windows.ProcessCreationTimes();
+                            queriedProcessCreations = true;
+                        }
+                        if (Windows.HasLaterCreation(prior["identity"], processCreations)) {
+                            state = "different";
+                            Event("prior_pid_reused", new { receipt = Path.GetFileName(path), identity = prior["identity"]["pid"].Raw });
+                        }
+                    }
                     if (state == "alive" || (state == "unknown" && terminal)) {
                         active++; Json limit = prior["containment"];
                         if (limit == null || Int64.Parse(limit["commit_bytes"].Raw) > 128L * 1024 * 1024) legacy++;
