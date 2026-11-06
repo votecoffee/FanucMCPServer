@@ -16,7 +16,10 @@ _CONFIG_RE = re.compile(r"CONFIG\s*:\s*'([^']+)'", re.IGNORECASE)
 
 
 def read_text(path: Path) -> str:
-    raw = path.read_bytes()
+    return decode_listing(path.read_bytes())
+
+
+def decode_listing(raw: bytes) -> str:
     for enc in ("utf-8", "cp1252", "latin-1"):
         try:
             return raw.decode(enc)
@@ -70,9 +73,12 @@ def set_program_comment(path: Path, new_comment: str) -> ProgramInfo:
 
 
 def parse_positions(path: Path) -> list[PositionRecord]:
-    text = read_text(path)
+    return parse_positions_text(read_text(path), path.stem)
+
+
+def parse_positions_text(text: str, fallback_program: str) -> list[PositionRecord]:
     pm = _PROG_RE.search(text)
-    program = pm.group(1).strip() if pm else path.stem
+    program = pm.group(1).strip() if pm else fallback_program
     in_pos = False
     current_index: int | None = None
     current_group = "GP1"

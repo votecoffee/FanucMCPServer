@@ -210,6 +210,31 @@ Existing installations should follow the [upgrade notes](docs/ROBOT_PLUGIN_SETUP
 
 ## Usage
 
+### Standalone Windows middleware
+
+Run the saved-listing CLI from the checkout with Python 3.11 or newer. It needs
+only the Python standard library. Set `FANUC_MIDDLEWARE_PYTHON` to a Python
+executable path to select a specific interpreter.
+
+```powershell
+.\RunMiddleware.cmd --help
+.\RunMiddleware.cmd positions --input "C:\path\example.LS" --limit 25
+```
+
+The command reads at most 1 MiB from an ordinary local `.LS` file and emits
+one JSON result with the source SHA-256, parsed positions and a `next_offset`
+when another page is available. Each call exits after completing its local
+read and analysis. Exit `75` and JSON error `busy` indicate that another
+engineering job holds the Windows session's shared slot. Help uses no slot.
+Other exit codes are `64` for usage, `65` for listing or data limits, `66`
+for unavailable input, `69` for the required runtime and `70` for admission
+failure.
+
+The [chat skill](skills/fanuc-middleware/SKILL.md) documents the CLI workflow.
+The [optional MCP adapter](packaging/middleware-mcp/) is a separate Python
+package. Its stdio entry point, `fanuc-middleware-mcp --cli <absolute path to
+scripts/fanuc_middleware.py>`, uses the same CLI dispatch and job slot.
+
 ### CLI
 
 Create a private configuration from the example:

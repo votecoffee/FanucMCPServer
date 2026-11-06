@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fanuc-middleware-mcp"
+version = "0.1.0"
+description = "Optional MCP adapter for the FANUC saved-listing middleware"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["mcp==2.3.0"]
+classifiers = ["Operating System :: Microsoft :: Windows"]
+
+[project.scripts]
+fanuc-middleware-mcp = "fanuc_middleware_mcp:main"
+
+[tool.setuptools]
+py-modules = ["fanuc_middleware_mcp"]
