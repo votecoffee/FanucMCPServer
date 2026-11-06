@@ -212,12 +212,17 @@ Existing installations should follow the [upgrade notes](docs/ROBOT_PLUGIN_SETUP
 
 ### Standalone Windows middleware
 
-Run the saved-listing CLI from the checkout with Python 3.11 or newer. It needs
-only the Python standard library. Set `FANUC_MIDDLEWARE_PYTHON` to a Python
-executable path to select a specific interpreter.
+Use the Windows launcher from the installed app or a checkout. The engineering
+catalog uses the app's Python environment with `jsonschema` and the relevant
+desktop, protocol and native dependencies. Set `FANUC_MIDDLEWARE_PYTHON` to
+select a specific interpreter. Saved LS convenience commands also work with
+the Python standard library.
 
 ```powershell
 .\RunMiddleware.cmd --help
+.\RunMiddleware.cmd catalog
+.\RunMiddleware.cmd describe workspace.import
+.\RunMiddleware.cmd run workspace.import --request "C:\path\import.json" --config "C:\path\local-profile.json"
 .\RunMiddleware.cmd positions --input "C:\path\example.LS" --limit 25
 .\RunMiddleware.cmd trace --workspace "C:\path\backup" --path MAIN.LS --view signals
 .\RunMiddleware.cmd compare --workspace "C:\path\revisions" --before old/MAIN.LS --after new/MAIN.LS
@@ -236,9 +241,9 @@ Exit codes are `64` for invalid arguments, `65` for rejected evidence,
 `66` for unavailable input, `69` for the required runtime, `73` for an existing
 destination, `74` for package I/O failure, and `130` for interruption.
 
-See the [chat skill](skills/fanuc-middleware/SKILL.md) and
-[program diagnostics guide](docs/PROGRAM_DIAGNOSTICS.md) for commands and
-evidence limits.
+See the [Windows CLI guide](docs/LOCAL_CLI.md) for the catalog, local policy,
+bounded jobs and reviewed controller changes. The
+[chat skill](skills/fanuc-middleware/SKILL.md) describes the same workflow.
 
 ### CLI
 

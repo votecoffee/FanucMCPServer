@@ -6,11 +6,12 @@ adoption; it does not upgrade the framework, SDK or optional host.
 
 ## Separate connections from data execution
 
-The standalone saved-listing CLI runs independent local jobs. Help and version
-commands load no program services. Data commands work synchronously on
-explicit saved inputs and launch no vendor applications or analysis workers.
-Each package build stages output in its destination parent before publishing
-to a new name.
+The Windows CLI runs independent one-shot requests. Help, version and catalog
+discovery create no controller connection or worker. Saved bundled analyses
+run in the calling process. Configured controller reads, native toolchains and
+registered features use existing scoped leases and owned workers. The CLI
+closes the operation and its owned workers before exit. Durable controller
+and native-tool receipts retain unresolved outcomes for the affected resource.
 
 Normal desktop demand includes many idle chats. A two-client fixture does not
 establish that the next chat can initialize. The former eight lifetime slots

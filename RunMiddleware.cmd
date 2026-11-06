@@ -1,6 +1,12 @@
 @echo off
 setlocal DisableDelayedExpansion
+if not defined FANUC_CLI_CONFIG if exist "%~dp0profile.json" set "FANUC_CLI_CONFIG=%~dp0profile.json"
+if not defined FANUC_CLI_RESOURCE_DIR if exist "%~dp0profile.json" set "FANUC_CLI_RESOURCE_DIR=%~dp0..\Data\resources"
 if defined FANUC_MIDDLEWARE_PYTHON goto configured
+if exist "%~dp0.venv\Scripts\python.exe" (
+    "%~dp0.venv\Scripts\python.exe" -I -B "%~dp0scripts\fanuc_middleware.py" %*
+    exit /b
+)
 where py.exe >nul 2>nul
 if errorlevel 1 goto onpath
 py.exe -3 -I -B "%~dp0scripts\fanuc_middleware.py" %*

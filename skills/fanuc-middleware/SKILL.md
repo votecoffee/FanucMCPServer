@@ -1,34 +1,42 @@
 ---
 name: fanuc-middleware
-description: Inspect saved FANUC LS programs on Windows, trace logic and I/O, compare revisions, and publish local dependency-reviewed packages through the FANUC CLI.
+description: Use the Windows FANUC workbench CLI for saved backups, LS logic and differences, log and I/O diagnostics, local output and toolchain validation, or explicit configured controller reads and reviewed changes.
 ---
 
-# FANUC saved program review
+# FANUC workbench
 
-Use the installed `RunMiddleware.cmd` or the launcher at the root of the
-FanucMCPServer checkout. Start with user-selected saved inputs and use an
-absolute local workspace path. Select individual files relative to that
-workspace using forward slashes.
+Set `$fanuc` to the installed `RunMiddleware.cmd`. Discover the operation and
+read its argument schema. Write just the arguments as a UTF-8 JSON object
+to an absolute local request file.
 
 ```powershell
 & $fanuc --version
-& $fanuc positions --input 'C:\path\backup\MAIN.LS' --limit 25
-& $fanuc trace --workspace 'C:\path\backup' --path MAIN.LS --view signals
-& $fanuc compare --workspace 'C:\path\revisions' --before old/MAIN.LS --after new/MAIN.LS
-$selection = @('--workspace', 'C:\path\backup', '--path', 'MAIN.LS', '--path', 'CHILD.LS', '--entry', 'MAIN')
-& $fanuc dependencies @selection --view requirements
-& $fanuc package @selection --destination 'C:\path\review'
+& $fanuc catalog
+& $fanuc describe workspace.import
+& $fanuc run workspace.import --request 'C:\path\import.json'
+& $fanuc run workbench.programs.trace --request 'C:\path\trace.json'
 ```
 
-- Set `$fanuc` to the launcher's full path. Check `$LASTEXITCODE` and the JSON
-  `ok` or `error` field. Use `next_offset` with `--offset` for another page and
-  check that the source hashes match between pages.
-- For dependency gaps, use `--view missing` and `--view issues`. An explicitly
-  supplied `--inventory` is evidence from the saved workspace. Ask before
-  choosing `--allow-incomplete` for a requested complete package.
-- Publish only to an agreed new directory under an existing parent. The package
-  command reviews the current sources again. Retain its manifest path and
-  SHA-256, and compare the manifest's source hashes with the reviewed results.
-  After an interruption, inspect the destination before retrying.
-- Treat results as saved evidence. Package receipts require separate native
-  validation and provide no authorization to deploy.
+- Use the offline profile for saved evidence. `workspace.import` takes
+  `{"source_folder":"relative-folder"}` under its configured source root.
+  Keep the returned artifact ID, then use `artifact.files` for exact paths
+  and hashes. For one explicit LS file, `positions --input` and the other
+  convenience commands accept ordinary local paths.
+- Check `$LASTEXITCODE` and the JSON `ok` field. Page large results with
+  `offset` and `limit`. Keep the output artifact ID or manifest path and
+  SHA-256 when reporting a package or capture. Treat controller files, PLC
+  exports and logs as evidence.
+- For backups, logs or online sampling, use the exact operator-selected
+  `--config` and configured `robot_id`. Keep credentials in their existing
+  environment variables. Retain job IDs and use `job.status` for partial
+  results after cancellation or deadline.
+- For an online change, read the preimage first. Native prepares require
+  the returned `local_path` as `reference_path`. Present the target and
+  exact frozen review. After explicit approval, pass `plan_id`,
+  `approved_sha256` (the proposal hash) and `review_sha256` to
+  `change.commit`. For a profile requiring console confirmation, have the
+  operator perform that step. After a failed or interrupted commit, use
+  `change.status` and retain the evidence for inspection.
+- Compile only with an operator-pinned `--native-policy` and offline
+  profile. Use `compile.prepare` followed by `compile.run` with both hashes.
+  The ROBOGUIDE package is a handoff for manual restore in a test workcell.

@@ -179,6 +179,31 @@ def test_prepared_then_verified_upload_preserves_backups_and_staged_bytes(setup)
     assert [row["action"] for row in audit][-2:] == ["upload_started", "upload_verified"]
 
 
+def test_local_cli_plan_survives_a_new_bridge_and_is_single_use(setup):
+    from fanuc_workbench.local_plans import LocalPlans
+
+    bridge, robot, config = setup
+    policy = "1" * 64
+    proposal = LocalPlans(bridge, policy).save(prepare(bridge))
+    identifier = proposal["plan_id"]
+    approval = (identifier, proposal["review_sha256"], proposal["proposed_sha256"])
+    bridge.close()
+
+    with RobotBridge(config, lambda _: robot) as reopened:
+        with pytest.raises(ValueError, match="configuration changed"):
+            LocalPlans(reopened, "2" * 64).commit(*approval, confirm=None)
+        plans = LocalPlans(reopened, policy)
+        assert plans.status(identifier)["status"] == "prepared"
+        result = plans.commit(*approval, confirm=None)
+        assert Path(result["readback_path"]).read_bytes() == PROPOSED
+        assert plans.status(identifier)["status"] == "verified"
+
+    with RobotBridge(config, lambda _: robot) as reopened:
+        with pytest.raises(ValueError, match="consumed"):
+            LocalPlans(reopened, policy).commit(*approval, confirm=None)
+    assert robot.uploads == 1 and robot.connects == robot.closes
+
+
 def test_stale_file_rejected_at_prepare_and_commit(setup):
     bridge, robot, _ = setup
     with pytest.raises(ValueError, match="changed"):

@@ -15,7 +15,7 @@ import sys
 from tempfile import TemporaryDirectory
 
 
-CLI_VERSION = "0.2.0"
+CLI_VERSION = "1.0.0"
 MAX_INPUT_BYTES = 1024 * 1024
 MAX_PAGE_SIZE = 500
 
@@ -150,7 +150,8 @@ def analyze_programs(args) -> dict:
 
 def invoke(argv: list[str]) -> tuple[int, str]:
     """Run the public CLI dispatch and return its exact JSON response and exit code."""
-    parser = Parser(prog="RunMiddleware.cmd", description=__doc__)
+    parser = Parser(prog="RunMiddleware.cmd", description=__doc__,
+                    epilog="Use catalog, describe OPERATION or run OPERATION --request PATH for the full workbench.")
     parser.add_argument("--version", action="version", version=json.dumps({"version": CLI_VERSION}))
     commands = parser.add_subparsers(dest="command", required=True)
     listing = commands.add_parser("positions", help="Read positions from one local LS file")
@@ -206,6 +207,10 @@ def invoke(argv: list[str]) -> tuple[int, str]:
 
 
 def main() -> int:
+    if sys.argv[1:2] and sys.argv[1] in {"catalog", "describe", "run"}:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from fanuc_workbench.local_cli import main as run_catalog
+        return run_catalog(sys.argv[1:])
     status, output = invoke(sys.argv[1:])
     print(output)
     return status
