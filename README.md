@@ -219,21 +219,26 @@ executable path to select a specific interpreter.
 ```powershell
 .\RunMiddleware.cmd --help
 .\RunMiddleware.cmd positions --input "C:\path\example.LS" --limit 25
+.\RunMiddleware.cmd trace --workspace "C:\path\backup" --path MAIN.LS --view signals
+.\RunMiddleware.cmd compare --workspace "C:\path\revisions" --before old/MAIN.LS --after new/MAIN.LS
+.\RunMiddleware.cmd dependencies --workspace "C:\path\backup" --path MAIN.LS --path CHILD.LS --entry MAIN
+.\RunMiddleware.cmd package --workspace "C:\path\backup" --path MAIN.LS --path CHILD.LS --entry MAIN --destination "C:\path\review"
 ```
 
-The command reads at most 1 MiB from an ordinary local `.LS` file and emits
-one JSON result with the source SHA-256, parsed positions and a `next_offset`
-when another page is available. Each call exits after completing its local
-read and analysis. Exit `75` and JSON error `busy` indicate that another
-engineering job holds the Windows session's shared slot. Help uses no slot.
-Other exit codes are `64` for usage, `65` for listing or data limits, `66`
-for unavailable input, `69` for the required runtime and `70` for admission
-failure.
+Commands emit one JSON response and exit. Analysis results include source hashes
+and a `next_offset` when another page is available. Package output includes
+the path and SHA-256 of `package.json`. Use a new directory under an existing
+local parent. The package contains exact source copies and requires separate
+native validation before deployment. An incomplete package requires an explicit
+`--allow-incomplete` and is marked for review only.
 
-The [chat skill](skills/fanuc-middleware/SKILL.md) documents the CLI workflow.
-The [optional MCP adapter](packaging/middleware-mcp/) is a separate Python
-package. Its stdio entry point, `fanuc-middleware-mcp --cli <absolute path to
-scripts/fanuc_middleware.py>`, uses the same CLI dispatch and job slot.
+Exit codes are `64` for invalid arguments, `65` for rejected evidence,
+`66` for unavailable input, `69` for the required runtime, `73` for an existing
+destination, `74` for package I/O failure, and `130` for interruption.
+
+See the [chat skill](skills/fanuc-middleware/SKILL.md) and
+[program diagnostics guide](docs/PROGRAM_DIAGNOSTICS.md) for commands and
+evidence limits.
 
 ### CLI
 

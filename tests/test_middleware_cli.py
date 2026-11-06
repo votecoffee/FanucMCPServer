@@ -57,7 +57,7 @@ finally:
 """
 
 
-@unittest.skipUnless(os.name == "nt", "Windows session admission")
+@unittest.skipUnless(os.name == "nt", "Windows launcher")
 class MiddlewareCliTests(unittest.TestCase):
     def run_cli(self, *args):
         return subprocess.run(
@@ -68,7 +68,7 @@ class MiddlewareCliTests(unittest.TestCase):
             timeout=PROCESS_TIMEOUT,
         )
 
-    def test_shared_mutex_refuses_work_and_allows_help(self):
+    def test_saved_file_job_runs_while_legacy_mutex_is_held(self):
         with tempfile.TemporaryDirectory(prefix="fanuc middleware ") as temp:
             ready = Path(temp) / "ready"
             with subprocess.Popen(
@@ -82,14 +82,12 @@ class MiddlewareCliTests(unittest.TestCase):
                         self.assertLess(time.monotonic(), deadline, "holder failed to report readiness")
                         time.sleep(0.02)
 
-                    help_result = self.run_cli("--help")
-                    self.assertEqual(help_result.returncode, 0, help_result.stderr)
-                    self.assertIn("positions", help_result.stdout)
-
-                    missing = Path(temp) / "missing.LS"
-                    busy = self.run_cli("positions", "--input", missing)
-                    self.assertEqual(busy.returncode, 75, busy.stderr)
-                    self.assertEqual(json.loads(busy.stdout)["error"]["code"], "busy")
+                    path = Path(temp) / "independent.LS"
+                    path.write_bytes(LISTING)
+                    result = self.run_cli("positions", "--input", path)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(json.loads(result.stdout)["result"]["total"], 2)
+                    self.assertIsNone(holder.poll())
                 finally:
                     holder.stdin.close()
                     try:
@@ -100,9 +98,34 @@ class MiddlewareCliTests(unittest.TestCase):
                         raise
 
             self.assertEqual(holder.returncode, 0)
-            unavailable = self.run_cli("positions", "--input", missing)
-            self.assertEqual(unavailable.returncode, 66, unavailable.stderr)
-            self.assertEqual(json.loads(unavailable.stdout)["error"]["code"], "input_unavailable")
+
+    def test_review_and_publish_new_local_package(self):
+        with tempfile.TemporaryDirectory(prefix="fanuc middleware ") as temp:
+            root = Path(temp)
+            source = root / "DEMO.LS"
+            source.write_bytes(b"/PROG DEMO\r\n/MN\r\n   1:  CALL CHILD ;\r\n/POS\r\n/END\r\n")
+            child = root / "CHILD.LS"
+            child.write_bytes(b"/PROG CHILD\r\n/MN\r\n   1:  ! fixture ;\r\n/POS\r\n/END\r\n")
+            selection = ("--workspace", root, "--path", source.name, "--path", child.name, "--entry", "DEMO")
+
+            review = self.run_cli("dependencies", *selection)
+            self.assertEqual(review.returncode, 0, review.stderr)
+            self.assertTrue(json.loads(review.stdout)["result"]["explicit_dependencies_accounted_for"])
+
+            destination = root / "review output"
+            package = self.run_cli("package", *selection, "--destination", destination)
+            self.assertEqual(package.returncode, 0, package.stdout + package.stderr)
+            receipt = json.loads(package.stdout)["result"]
+            manifest = Path(receipt["manifest"]).read_bytes()
+            self.assertEqual(receipt["manifest_sha256"], hashlib.sha256(manifest).hexdigest())
+            self.assertFalse(json.loads(manifest)["deployment_authorized"])
+            for path in (source, child):
+                self.assertEqual((destination / "programs" / path.name).read_bytes(), path.read_bytes())
+
+            duplicate = self.run_cli("package", *selection, "--destination", destination)
+            self.assertEqual(duplicate.returncode, 73, duplicate.stderr)
+            self.assertEqual(Path(receipt["manifest"]).read_bytes(), manifest)
+            self.assertEqual(list(root.glob(".fanuc-review-*")), [])
 
     def test_reads_bounded_page_and_reports_exact_input(self):
         with tempfile.TemporaryDirectory(prefix="fanuc middleware ") as temp:

@@ -6,12 +6,11 @@ adoption; it does not upgrade the framework, SDK or optional host.
 
 ## Separate connections from data execution
 
-The standalone saved-listing middleware and its optional adapter share one
-active job per Windows desktop session across cooperating engineering apps.
-Data dispatch checks `Local\OpenAIEngineeringMiddleware.Job.v1` with a zero
-wait. It reports `busy` when occupied and releases the slot after cleanup.
-Help, adapter startup and tool discovery reserve no slot. This path starts
-no vendor applications or analysis worker processes.
+The standalone saved-listing CLI runs independent local jobs. Help and version
+commands load no program services. Data commands work synchronously on
+explicit saved inputs and launch no vendor applications or analysis workers.
+Each package build stages output in its destination parent before publishing
+to a new name.
 
 Normal desktop demand includes many idle chats. A two-client fixture does not
 establish that the next chat can initialize. The former eight lifetime slots

@@ -4,6 +4,19 @@ Shared services retain source hashes, physical file lines and TP line numbers.
 They read explicitly selected preserved files and do not execute LS or contact a
 controller. The original call-graph release remains preserved.
 
+## Windows command coverage
+
+Use `RunMiddleware.cmd --help` from the checkout.
+
+| Workflow | Current entry point |
+| --- | --- |
+| Saved LS positions, instruction tracing, semantic comparison and dependency packages | `positions`, `trace`, `compare`, `dependencies`, `package` |
+| Saved WAIT observations, triggered captures and validation reports | `python -m fanuc_workbench.program_tools` with `wait`, `capture` or `validation` |
+| Whole-backup health, alarms, registers, frames, PLC mapping and saved recordings | Desktop workspace and recorder tools |
+| Local compilation and ROBOGUIDE | Existing native workflows. Compilation needs a compatible, explicitly selected MakeTP/PrintTP toolchain and robot context. Simulation requires a test workcell. |
+| Controller file and data reads | Existing configured FTP/SFTP and native controller services. A target and its supported interface must be selected explicitly. |
+| Online mutations | Existing typed proposal, review and commit workflows. They require an explicit policy, exact target and fresh preflight and readback. |
+
 ## Logic and access tracing
 
 ```python

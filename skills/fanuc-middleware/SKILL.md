@@ -1,21 +1,34 @@
 ---
 name: fanuc-middleware
-description: Use the on-demand Windows FANUC CLI to inspect position records in a saved local .LS listing. Applies to offline listing analysis from a user-provided file.
+description: Inspect saved FANUC LS programs on Windows, trace logic and I/O, compare revisions, and publish local dependency-reviewed packages through the FANUC CLI.
 ---
 
-# FANUC saved listings
+# FANUC saved program review
 
-Find `RunMiddleware.cmd` at the root of the FanucMCPServer checkout. Use a
-user-provided absolute path to a saved local `.LS` file. In PowerShell, run
-the launcher from that checkout.
+Use the installed `RunMiddleware.cmd` or the launcher at the root of the
+FanucMCPServer checkout. Start with user-selected saved inputs and use an
+absolute local workspace path. Select individual files relative to that
+workspace using forward slashes.
 
 ```powershell
-.\RunMiddleware.cmd positions --input "C:\path\example.LS" --limit 25
+& $fanuc --version
+& $fanuc positions --input 'C:\path\backup\MAIN.LS' --limit 25
+& $fanuc trace --workspace 'C:\path\backup' --path MAIN.LS --view signals
+& $fanuc compare --workspace 'C:\path\revisions' --before old/MAIN.LS --after new/MAIN.LS
+$selection = @('--workspace', 'C:\path\backup', '--path', 'MAIN.LS', '--path', 'CHILD.LS', '--entry', 'MAIN')
+& $fanuc dependencies @selection --view requirements
+& $fanuc package @selection --destination 'C:\path\review'
 ```
 
-- Use `--help` or `positions --help` to inspect usage without taking the job slot.
-- Read the JSON result and retain its source SHA-256 when reporting positions.
-  Use `next_offset` with `--offset` for another page. Compare hashes between pages.
-- If the command exits with `75` and `error.code` is `busy`, report that another
-  engineering job holds the slot and return control to the user.
-- Treat the listing as saved evidence. Keep the operation local to that file.
+- Set `$fanuc` to the launcher's full path. Check `$LASTEXITCODE` and the JSON
+  `ok` or `error` field. Use `next_offset` with `--offset` for another page and
+  check that the source hashes match between pages.
+- For dependency gaps, use `--view missing` and `--view issues`. An explicitly
+  supplied `--inventory` is evidence from the saved workspace. Ask before
+  choosing `--allow-incomplete` for a requested complete package.
+- Publish only to an agreed new directory under an existing parent. The package
+  command reviews the current sources again. Retain its manifest path and
+  SHA-256, and compare the manifest's source hashes with the reviewed results.
+  After an interruption, inspect the destination before retrying.
+- Treat results as saved evidence. Package receipts require separate native
+  validation and provide no authorization to deploy.
