@@ -84,7 +84,8 @@ Robot troubleshooting often involves collecting controller files, comparing
 backups and reviewing edits across several tools. FanucMCPServer exposes those
 operations through shared Python services, an MCP adapter and a PySide6 desktop
 application. FTP/SFTP provide file transport; an optional installed FANUC Robot
-Object provider adds native controller data over TCP.
+Object provider adds native controller data over TCP, including indexed user
+frame and tool offsets via [the Workbench CLI](docs/LOCAL_CLI.md).
 
 The MCP host owns configured targets, credentials, retained evidence, approval
 and readback. Reloadable Python workers supply analyses and change proposals

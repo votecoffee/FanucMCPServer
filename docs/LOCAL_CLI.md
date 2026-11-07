@@ -44,6 +44,14 @@ cancellation and allow an in-flight transfer to close. `job.status` reads
 retained progress and artifacts. `job.cancel` applies to CLI-owned read jobs.
 Monitor diagnostics bind sequential samples and captured LS revisions.
 
+With Workbench CLI 1.0.1, `core.controller.sample` also accepts
+`UFRAME[group,index]` and `UTOOL[group,index]` on the FRRobot provider.
+For example, send `{"robot_id":"example","expressions":["UFRAME[1,3]","UTOOL[1,2]"]}`
+with a configured robot ID. The result includes Cartesian XYZ/WPR values in
+millimetres and degrees, keyed by expression. The provider reads the specified
+table entries without selecting them. An unavailable entry is reported under
+`errors`.
+
 MakeTP/PrintTP requires a compatible installed toolchain and a pinned
 `--native-policy` under an offline profile. `compile.prepare` returns a
 reviewed plan and `compile.run` takes both review and compiler-plan hashes.

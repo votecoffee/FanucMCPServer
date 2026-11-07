@@ -9,6 +9,7 @@ import re
 import struct
 
 REGISTER = re.compile(r"(R|PR)\[([1-9][0-9]{0,5})(?:,([1-9][0-9]{0,5}))?\]")
+FRAME = re.compile(r"(UFRAME|UTOOL)\[([1-9][0-9]{0,2}),([1-9][0-9]{0,2})\]")
 IO = re.compile(r"(DI|DO|GI|GO|AI|AO|RI|RO|UI|UO|F)\[([1-9][0-9]{0,5})\]")
 PROGRAM = re.compile(r"[A-Z][A-Z0-9_]{0,7}")
 
@@ -30,6 +31,13 @@ def register_target(value):
     if group > 8:
         raise ValueError("Position-register group must be between 1 and 8")
     return kind, group, index
+
+
+def frame_target(value):
+    match = FRAME.fullmatch(value) if isinstance(value, str) else None
+    if not match or int(match[2]) > 8 or int(match[3]) > 255:
+        raise ValueError("Use UFRAME[group,index] or UTOOL[group,index] with group 1-8 and index 1-255")
+    return match[1], int(match[2]), int(match[3])
 
 
 def program_name(value):

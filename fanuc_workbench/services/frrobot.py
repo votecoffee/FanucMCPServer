@@ -1,9 +1,11 @@
 """Narrow FANUC Robot Object adapter. No UI, KCL, run, motion or I/O writes."""
 from __future__ import annotations
 
+import math
 import time
 
-from fanuc_workbench.services.native_values import IO, fingerprint, register_matches, register_target
+from fanuc_workbench.services.native_values import (FRAME, IO, fingerprint, frame_target,
+                                                    register_matches, register_target)
 
 IO_CODES = {"DI": 1, "DO": 2, "AI": 3, "AO": 4, "RI": 8, "RO": 9,
             "GI": 18, "GO": 19, "UI": 20, "UO": 21, "F": 35}
@@ -135,6 +137,23 @@ class FrRobot:
                     "value": self._get(obj, "RegLong" if code == 16 else "RegFloat")}
         return {**result, **self.position(obj)}
 
+    def _read_frame(self, expression):
+        kind, group, index = frame_target(expression)
+        frames = self._get(self.robot, "UserFrames" if kind == "UFRAME" else "ToolFrames")
+        position = self._get(self._get(frames, "Item", index), "Group", group)
+        self.binding.call(position, "Refresh")
+        if not self._get(position, "IsInitialized"):
+            raise ValueError("The requested FANUC frame is uninitialized")
+        code = int(self._get(position, "Type"))
+        if code not in {2, 6}:
+            raise ValueError("The requested FANUC frame is not Cartesian")
+        fmt = self._get(position, "Formats", code)
+        values = {axis: float(self._get(fmt, axis)) for axis in "XYZWPR"}
+        if not all(math.isfinite(value) for value in values.values()):
+            raise ValueError("The requested FANUC frame contains nonfinite values")
+        return {"kind": kind, "group": group, "index": index, "initialized": True,
+                "representation": "cartesian", "values": values}
+
     def sample(self, expressions):
         values, errors = {}, {}
         for expression in expressions:
@@ -145,6 +164,8 @@ class FrRobot:
                     signal = self._get(signal, "Item", int(match[2]))
                     self.binding.call(signal, "Refresh")
                     values[expression] = {"value": self._get(signal, "Value"), "assigned": bool(self._get(signal, "IsAssigned"))}
+                elif FRAME.fullmatch(expression):
+                    values[expression] = self._read_frame(expression)
                 else:
                     values[expression] = self.read_register(expression)
             except Exception as exc:

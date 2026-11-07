@@ -39,7 +39,7 @@ def core_operations():
                    "extension_id": "core"} for name, description, fields in specs}
     native = [
         ("core.controller.status", "Read native current position, task status and alarm evidence", "read", {"robot_id": {"type": "string"}, "group": {"type": "integer", "minimum": 1, "maximum": 8}, "alarm_limit": {"type": "integer", "minimum": 0, "maximum": 100}}, ["robot_id"]),
-        ("core.controller.sample", "Read native R/PR/I/O values through the configured vendor data API", "read", {"robot_id": {"type": "string"}, "expressions": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 100, "uniqueItems": True}}, ["robot_id", "expressions"]),
+        ("core.controller.sample", "Read native R/PR/I/O values and indexed UFRAME/UTOOL offsets through the configured vendor data API", "read", {"robot_id": {"type": "string"}, "expressions": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 100, "uniqueItems": True}}, ["robot_id", "expressions"]),
         ("core.controller.reconnect", "Explicitly reconnect a native worker after failure; invalidates native plans; no controller writes", "read", {"robot_id": {"type": "string"}}, ["robot_id"]),
         ("core.controller.programs", "Browse native program names and metadata", "read", {"robot_id": {"type": "string"}, "offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 500}}, ["robot_id"]),
         ("core.registers.read", "Preserve a typed native R/PR value and exact endpoint-bound SHA-256 before editing", "read", {"robot_id": {"type": "string"}, "target": {"type": "string"}}, ["robot_id", "target"]),

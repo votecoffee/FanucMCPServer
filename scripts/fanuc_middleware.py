@@ -15,7 +15,7 @@ import sys
 from tempfile import TemporaryDirectory
 
 
-CLI_VERSION = "1.0.0"
+CLI_VERSION = "1.0.1"
 MAX_INPUT_BYTES = 1024 * 1024
 MAX_PAGE_SIZE = 500
 

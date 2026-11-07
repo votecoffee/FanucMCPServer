@@ -252,6 +252,24 @@ def test_core_catalog_carries_native_operations_without_new_mcp_tools(native_cas
         bridge.extensions.run_read(op['id'], {}, op['revision'])
 
 
+def test_native_samples_preserve_indexed_frame_reads(native_case):
+    bridge, _, api = native_case
+    expression = "UFRAME[2,3]"
+    api.values[expression] = {"kind": "UFRAME", "group": 2, "index": 3, "values": {"X": 5.0}}
+    operation = bridge.extensions.describe("core.controller.sample")
+    result = bridge.extensions.run_read(operation["id"], {
+        "robot_id": "r1", "expressions": [expression],
+    }, operation["revision"])["result"]
+    assert result["robot_id"] == "r1"
+    assert result["values"] == {expression: api.values[expression]}
+    assert result["capture_is_atomic"] is False
+    bridge.operations.store.verify(result["artifact_id"])
+    for expression in ("UFRAME[9,3]", "UTOOL[1,256]", "UTOOL[1,0]", "$MNUTOOL[1,1]"):
+        with pytest.raises(ValueError):
+            bridge.native.sample("r1", [expression])
+    assert api.calls == ["sample"] and api.writes == 0
+
+
 def test_native_sample_records_typed_evidence_and_existing_watch_can_use_it(native_case):
     bridge, _, api = native_case
     sample = bridge.operations.sample('r1', ['R[999]'])

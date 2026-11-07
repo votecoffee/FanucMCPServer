@@ -67,6 +67,37 @@ def test_native_reads_do_not_set_any_vendor_property():
     assert binding.puts == [] and set(binding.calls) == {'Refresh'}
 
 
+def test_indexed_frame_samples_read_the_exact_vendor_group_and_table_entry():
+    binding = Binding()
+    selectors = []
+    original_get = binding.get
+
+    def get(obj, name, *args):
+        if name in {"Item", "Group"}:
+            selectors.append((name, args[0]))
+            return obj[name][args[0]]
+        return original_get(obj, name, *args)
+
+    binding.get = get
+    axes = {axis: float(i) for i, axis in enumerate("XYZWPR")}
+    frame = {"IsInitialized": True, "Type": 2, "Formats": axes}
+    binding.robot["UserFrames"] = {"Item": {3: {"Group": {2: frame}}}}
+    binding.robot["ToolFrames"] = {"Item": {4: {"Group": {1: frame}},
+                                            5: {"Group": {1: {"IsInitialized": False}}}}}
+    api = FrRobot("192.0.2.1", binding=binding, robot=binding.robot)
+    sample = api.sample(["UFRAME[2,3]", "UTOOL[1,4]", "UTOOL[1,5]"])
+    assert sample["values"] == {
+        "UFRAME[2,3]": {"kind": "UFRAME", "group": 2, "index": 3, "initialized": True,
+                        "representation": "cartesian", "values": axes},
+        "UTOOL[1,4]": {"kind": "UTOOL", "group": 1, "index": 4, "initialized": True,
+                       "representation": "cartesian", "values": axes},
+    }
+    assert sample["errors"] == {"UTOOL[1,5]": "ValueError"}
+    assert selectors == [("Item", 3), ("Group", 2), ("Item", 4), ("Group", 1),
+                         ("Item", 5), ("Group", 1)]
+    assert binding.calls == ["Refresh"] * 3 and not binding.puts
+
+
 def test_native_r_write_uses_typed_property_and_rechecks_original():
     binding = Binding()
     api = FrRobot('192.0.2.1', binding=binding, robot=binding.robot)

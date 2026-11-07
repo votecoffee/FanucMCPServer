@@ -77,7 +77,7 @@ operations and use the exact returned revision (`core.native@1` initially):
 | Operation | Purpose |
 | --- | --- |
 | `core.controller.status` | Current position, tasks and alarm history/active flag |
-| `core.controller.sample` | Typed R/PR/I/O reads |
+| `core.controller.sample` | Typed R/PR/I/O and indexed UFRAME/UTOOL reads |
 | `core.controller.programs` | Paged native program metadata |
 | `core.controller.reconnect` | Explicit worker recovery; invalidates native plans |
 | `core.registers.read` | Preserve the typed value and endpoint-bound SHA-256 |

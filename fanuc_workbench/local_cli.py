@@ -26,7 +26,7 @@ from fanuc_workbench.local_plans import LocalPlans
 from fanuc_workbench.services.workspace_api import WorkspaceService, page, serial
 
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 ACTIVE_JOB = {"queued", "running", "cancel_requested"}
 NATIVE_TARGET_ROUTES = {
     "core.controller.status", "core.controller.sample", "core.controller.programs",

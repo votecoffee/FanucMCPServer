@@ -14,7 +14,7 @@ from pathlib import Path
 from fanuc_workbench.bridge.storage import atomic_json, confined
 from fanuc_workbench.services.native_controller import NativeApiError, NativeControllerService
 from fanuc_workbench.services.native_programs import validate_source, verify_listing
-from fanuc_workbench.services.native_values import (IO, canonical, fingerprint, program_name,
+from fanuc_workbench.services.native_values import (FRAME, IO, canonical, fingerprint, frame_target, program_name,
                                                     propose_register, register_matches, register_target)
 
 
@@ -113,7 +113,9 @@ class NativeChanges:
         for expression in expressions:
             if not isinstance(expression, str):
                 raise ValueError("Native watch expressions must be explicit strings")
-            if not IO.fullmatch(expression):
+            if FRAME.fullmatch(expression):
+                frame_target(expression)
+            elif not IO.fullmatch(expression):
                 register_target(expression)
         self._access(robot_id)
         with self.bridge._robot_lock(robot_id):
